@@ -26,7 +26,8 @@ import {
   Calendar,
   Settings,
   LogOut,
-  ChevronDown
+  ChevronDown,
+  Archive
 } from 'lucide-react'
 
 interface DashboardStats {
@@ -114,88 +115,33 @@ export default function NanoporeDashboard() {
   })
   const [showCreateModal, setShowCreateModal] = useState(false)
 
-  // Mock data for development
+  // Load data on mount
   useEffect(() => {
-    const mockSamples: NanoporeSample[] = [
-      {
-        id: '1',
-        sample_name: 'NANO-001-2024',
-        project_id: 'PRJ-2024-001',
-        submitter_name: 'Dr. Sarah Johnson',
-        submitter_email: 'sarah.johnson@university.edu',
-        lab_name: 'Genomics Lab',
-        sample_type: 'Genomic DNA',
-        status: 'sequencing',
-        priority: 'high',
-        assigned_to: 'Jenny Chen',
-        library_prep_by: 'Grey Wilson',
-        submitted_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        created_by: 'demo-user',
-        concentration: 125.5,
-        volume: 50,
-        flow_cell_type: 'R10.4.1',
-        chart_field: 'HTSF-001'
-      },
-      {
-        id: '2',
-        sample_name: 'NANO-002-2024',
-        project_id: 'PRJ-2024-002',
-        submitter_name: 'Dr. Michael Chen',
-        submitter_email: 'michael.chen@institute.org',
-        lab_name: 'Molecular Biology Lab',
-        sample_type: 'Total RNA',
-        status: 'prep',
-        priority: 'urgent',
-        assigned_to: 'Stephanie Lee',
-        library_prep_by: null,
-        submitted_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        created_by: 'demo-user',
-        concentration: 89.2,
-        volume: 30,
-        flow_cell_type: 'R9.4.1',
-        chart_field: 'NANO-002'
-      },
-      {
-        id: '3',
-        sample_name: 'NANO-003-2024',
-        project_id: 'PRJ-2024-003',
-        submitter_name: 'Dr. Lisa Wang',
-        submitter_email: 'lisa.wang@research.edu',
-        lab_name: 'Bioinformatics Core',
-        sample_type: 'Amplicon',
-        status: 'completed',
-        priority: 'normal',
-        assigned_to: 'Jenny Chen',
-        library_prep_by: 'Grey Wilson',
-        submitted_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        created_by: 'demo-user',
-        concentration: 156.8,
-        volume: 75,
-        flow_cell_type: 'R10.4.1',
-        chart_field: 'SEQ-003'
+    const loadData = async () => {
+      try {
+        const samplesData = await apiClient.listSamples()
+        setSamples(samplesData)
+        
+        // Calculate stats
+        setStats({
+          total: samplesData.length,
+          submitted: samplesData.filter(s => s.status === 'submitted').length,
+          inProgress: samplesData.filter(s => ['prep', 'sequencing', 'analysis'].includes(s.status)).length,
+          completed: samplesData.filter(s => s.status === 'completed').length,
+          urgent: samplesData.filter(s => s.priority === 'urgent').length
+        })
+        
+        setLoading(false)
+      } catch (error) {
+        console.error('Failed to load samples:', error)
+        toast.error('Failed to load samples')
+        setLoading(false)
       }
-    ]
+    }
 
-    // Simulate API call
+    // Simulate loading time
     setTimeout(() => {
-      setSamples(mockSamples)
-      
-      // Calculate stats
-      const newStats = {
-        total: mockSamples.length,
-        submitted: mockSamples.filter(s => s.status === 'submitted').length,
-        inProgress: mockSamples.filter(s => ['prep', 'sequencing', 'analysis'].includes(s.status)).length,
-        completed: mockSamples.filter(s => s.status === 'completed').length,
-        urgent: mockSamples.filter(s => s.priority === 'urgent').length
-      }
-      setStats(newStats)
-      setLoading(false)
+      loadData()
     }, 1000)
   }, [])
 
@@ -215,43 +161,20 @@ export default function NanoporeDashboard() {
   }
 
   const handleSampleSubmit = async (sampleData: any) => {
-    // TODO: Connect to actual API
-    console.log('Creating sample:', sampleData)
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    // Add to local state for now
-    const newSample: NanoporeSample = {
-      id: Date.now().toString(),
-      sample_name: sampleData.sampleName,
-      project_id: sampleData.projectId,
-      submitter_name: sampleData.submitterName,
-      submitter_email: sampleData.submitterEmail,
-      lab_name: sampleData.labName,
-      sample_type: sampleData.sampleType,
-      status: 'submitted',
-      priority: sampleData.priority,
-      assigned_to: null,
-      library_prep_by: null,
-      submitted_at: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      created_by: 'demo-user',
-      concentration: sampleData.concentration,
-      volume: sampleData.volume,
-      flow_cell_type: sampleData.flowCellType,
-      chart_field: sampleData.chartField
+    try {
+      const newSample = await apiClient.createSample(sampleData)
+      setSamples(prev => [newSample, ...prev])
+      setStats(prev => ({
+        ...prev,
+        total: prev.total + 1,
+        submitted: prev.submitted + 1
+      }))
+      toast.success('Sample created successfully!')
+      setShowCreateModal(false)
+    } catch (error) {
+      console.error('Failed to create sample:', error)
+      toast.error('Failed to create sample')
     }
-    
-    setSamples(prev => [newSample, ...prev])
-    
-    // Update stats
-    setStats(prev => ({
-      ...prev,
-      total: prev.total + 1,
-      submitted: prev.submitted + 1
-    }))
   }
 
   const handleUploadPDF = () => {

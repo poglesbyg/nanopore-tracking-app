@@ -3,7 +3,6 @@ import type { ErrorInfo, ReactNode } from 'react'
 import { Toaster } from '../ui/sonner'
 import AuthWrapper from '../auth/auth-wrapper'
 import NanoporeDashboard from './nanopore-dashboard'
-import { TRPCProvider } from '../providers/trpc-provider'
 
 interface ErrorBoundaryState {
   hasError: boolean
@@ -59,25 +58,14 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
 }
 
 export function NanoporeApp() {
-  // Check if we're in a browser environment
-  if (typeof window === 'undefined') {
-    return (
-      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
-        <div className="animate-pulse">Loading...</div>
-      </div>
-    )
-  }
-
   return (
     <ErrorBoundary>
-      <TRPCProvider>
-        <AuthWrapper>
-          <div className="max-w-7xl mx-auto px-4 py-8">
-            <NanoporeDashboard />
-            <Toaster />
-          </div>
-        </AuthWrapper>
-      </TRPCProvider>
+      <AuthWrapper>
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <NanoporeDashboard />
+          <Toaster />
+        </div>
+      </AuthWrapper>
     </ErrorBoundary>
   )
 }

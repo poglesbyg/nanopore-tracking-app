@@ -1,16 +1,17 @@
 import { useState, useEffect, createContext, useContext } from 'react'
-import { authService, type User } from '../../lib/auth'
+import type { ReactNode } from 'react'
+import { authService, type User } from '../../lib/auth-client'
 import LoginForm from './login-form'
 import { toast } from 'sonner'
 
 interface AuthContextType {
   user: User | null
   login: (email: string, password: string) => Promise<boolean>
-  logout: () => void
+  logout: () => Promise<void>
   isLoading: boolean
 }
 
-const AuthContext = createContext<AuthContextType | null>(null)
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export const useAuth = () => {
   const context = useContext(AuthContext)
@@ -21,28 +22,26 @@ export const useAuth = () => {
 }
 
 interface AuthWrapperProps {
-  children: React.ReactNode
+  children: ReactNode
 }
 
 export default function AuthWrapper({ children }: AuthWrapperProps) {
   const [user, setUser] = useState<User | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
   const [sessionId, setSessionId] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isHydrated, setIsHydrated] = useState(false)
 
   useEffect(() => {
-    // Check for existing session on mount
+    // Mark as hydrated once we're on the client
+    setIsHydrated(true)
+    
     const checkSession = async () => {
       const storedSessionId = localStorage.getItem('nanopore_session')
       if (storedSessionId) {
-        const session = await authService.validateSession(storedSessionId)
-        if (session) {
-          const userData = await authService.getUserById(session.userId)
-          if (userData) {
-            setUser(userData)
-            setSessionId(storedSessionId)
-          } else {
-            localStorage.removeItem('nanopore_session')
-          }
+        const result = await authService.validateSession(storedSessionId)
+        if (result) {
+          setUser(result.user)
+          setSessionId(storedSessionId)
         } else {
           localStorage.removeItem('nanopore_session')
         }
@@ -58,8 +57,8 @@ export default function AuthWrapper({ children }: AuthWrapperProps) {
       const result = await authService.login(email, password)
       if (result) {
         setUser(result.user)
-        setSessionId(result.sessionId)
-        localStorage.setItem('nanopore_session', result.sessionId)
+        setSessionId(result.session.id)
+        localStorage.setItem('nanopore_session', result.session.id)
         toast.success(`Welcome back, ${result.user.name}!`)
         return true
       }
@@ -71,10 +70,8 @@ export default function AuthWrapper({ children }: AuthWrapperProps) {
   }
 
   const logout = async () => {
-    if (sessionId) {
-      await authService.logout(sessionId)
-      localStorage.removeItem('nanopore_session')
-    }
+    await authService.logout()
+    localStorage.removeItem('nanopore_session')
     setUser(null)
     setSessionId(null)
     toast.success('Logged out successfully')
@@ -87,7 +84,8 @@ export default function AuthWrapper({ children }: AuthWrapperProps) {
     isLoading
   }
 
-  if (isLoading) {
+  // During SSR or initial hydration, always show loading
+  if (!isHydrated || isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
