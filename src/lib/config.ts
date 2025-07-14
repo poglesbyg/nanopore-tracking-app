@@ -137,8 +137,8 @@ export const config: AppConfig = {
     smtp: {
       host: getEnvVar('SMTP_HOST', 'smtp.gmail.com'),
       port: getEnvNumber('SMTP_PORT', 587),
-      user: getEnvVar('SMTP_USER', ''),
-      pass: getEnvVar('SMTP_PASS', '')
+      user: process.env.SMTP_USER || '',
+      pass: process.env.SMTP_PASS || ''
     },
     from: getEnvVar('FROM_EMAIL', 'noreply@nanopore-tracking.com'),
     enabled: getEnvBoolean('ENABLE_EMAIL', false)
@@ -146,7 +146,7 @@ export const config: AppConfig = {
   
   monitoring: {
     logLevel: (process.env.LOG_LEVEL as AppConfig['monitoring']['logLevel']) || 'info',
-    sentryDsn: process.env.SENTRY_DSN
+    sentryDsn: process.env.SENTRY_DSN || undefined
   },
   
   features: {
