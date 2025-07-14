@@ -19,11 +19,16 @@ const t = initTRPC.context<Context>().create()
 export const router = t.router
 export const publicProcedure = t.procedure
 
-// Import the real nanopore router
-import { nanoporeRouter } from './api/nanopore'
+// Create app router without importing nanopore router directly
+// This prevents database code from being bundled for the client
+export const createAppRouter = async () => {
+  // Dynamically import the nanopore router only on the server
+  const { nanoporeRouter } = await import('./api/nanopore')
+  
+  return router({
+    nanopore: nanoporeRouter,
+  })
+}
 
-export const appRouter = router({
-  nanopore: nanoporeRouter,
-})
-
-export type AppRouter = typeof appRouter 
+// Export type for client-side usage
+export type AppRouter = Awaited<ReturnType<typeof createAppRouter>> 
