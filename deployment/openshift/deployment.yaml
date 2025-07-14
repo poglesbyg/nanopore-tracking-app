@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: nanopore-tracking-app
-        image: nanopore-tracking-app:latest
+        image: image-registry.openshift-image-registry.svc:5000/dept-barc/nanopore-tracking-app:latest
         ports:
         - containerPort: 3001
         env:

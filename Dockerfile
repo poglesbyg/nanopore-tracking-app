@@ -18,12 +18,12 @@ FROM node:20-alpine AS production
 
 WORKDIR /app
 
-# Copy built application first
+# Copy built application and package files
 COPY --from=base /app/dist ./dist
 COPY --from=base /app/package*.json ./
 
-# Install only production dependencies (without postinstall script)
-RUN npm ci --only=production --ignore-scripts && npm cache clean --force
+# Install all dependencies needed for runtime
+RUN npm ci --ignore-scripts && npm cache clean --force
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs
@@ -32,6 +32,9 @@ RUN adduser -S astro -u 1001
 # Change ownership of the app directory
 RUN chown -R astro:nodejs /app
 USER astro
+
+# Set the port environment variable
+ENV PORT=3001
 
 # Expose port
 EXPOSE 3001
