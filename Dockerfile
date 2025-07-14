@@ -3,27 +3,36 @@ FROM node:20-alpine AS base
 # Set working directory
 WORKDIR /app
 
+# Install pnpm
+RUN npm install -g pnpm@10.13.1
+
 # Install dependencies
-COPY package*.json ./
-RUN npm ci
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile
 
 # Copy source code
 COPY . .
 
 # Build the application
-RUN npm run build
+RUN pnpm run build
 
 # Production stage
 FROM node:20-alpine AS production
 
 WORKDIR /app
 
-# Copy built application and package files
-COPY --from=base /app/dist ./dist
-COPY --from=base /app/package*.json ./
+# Install pnpm
+RUN npm install -g pnpm@10.13.1
 
-# Install all dependencies needed for runtime
-RUN npm ci --ignore-scripts && npm cache clean --force
+# Copy package files
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+
+# Install production dependencies
+RUN pnpm install --frozen-lockfile --prod && pnpm store prune
+
+# Copy built application
+COPY --from=base /app/dist ./dist
+COPY --from=base /app/src ./src
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs
@@ -40,5 +49,9 @@ ENV HOST=0.0.0.0
 # Expose port
 EXPOSE 3001
 
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:3001/health || exit 1
+
 # Start the application
-CMD ["npm", "start"]
+CMD ["pnpm", "start"]
