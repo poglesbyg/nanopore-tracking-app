@@ -27,8 +27,8 @@ RUN npm install -g pnpm@10.13.1
 # Copy package files
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
-# Install production dependencies
-RUN pnpm install --frozen-lockfile --prod && pnpm store prune
+# Install production dependencies (skip postinstall scripts)
+RUN pnpm install --frozen-lockfile --prod --ignore-scripts && pnpm store prune
 
 # Copy built application
 COPY --from=base /app/dist ./dist
