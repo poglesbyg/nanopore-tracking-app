@@ -88,6 +88,7 @@ export function EditTaskModal({
     e.preventDefault()
     if (!sample) return
 
+    // Required field validation
     if (
       !formData.sampleName.trim() ||
       !formData.submitterName.trim() ||
@@ -97,10 +98,42 @@ export function EditTaskModal({
       return
     }
 
-    // Validate email format
+    // Email format validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(formData.submitterEmail)) {
       toast.error('Please enter a valid email address')
+      return
+    }
+
+    // Sample name validation (alphanumeric, dashes, underscores)
+    const sampleNameRegex = /^[a-zA-Z0-9_-]+$/
+    if (!sampleNameRegex.test(formData.sampleName)) {
+      toast.error('Sample name can only contain letters, numbers, dashes, and underscores')
+      return
+    }
+
+    // Workflow status validation
+    const validStatusTransitions: Record<string, string[]> = {
+      'submitted': ['prep', 'archived'],
+      'prep': ['sequencing', 'submitted', 'archived'],
+      'sequencing': ['analysis', 'prep', 'archived'],
+      'analysis': ['completed', 'sequencing', 'archived'],
+      'completed': ['archived'],
+      'archived': []
+    }
+
+    const currentStatus = sample.status || 'submitted'
+    const newStatus = formData.status
+    const allowedTransitions = validStatusTransitions[currentStatus] || []
+    
+    if (newStatus !== currentStatus && !allowedTransitions.includes(newStatus)) {
+      toast.error(`Invalid status transition from ${currentStatus} to ${newStatus}`)
+      return
+    }
+
+    // Priority validation for urgent samples
+    if (formData.priority === 'urgent' && !formData.assignedTo.trim()) {
+      toast.error('Urgent samples must be assigned to a team member')
       return
     }
 

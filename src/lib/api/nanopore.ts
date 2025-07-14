@@ -163,4 +163,52 @@ export const nanoporeRouter = router({
         .returningAll()
         .executeTakeFirstOrThrow()
     }),
+
+  // Update sample status
+  updateStatus: publicProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        status: z.enum(['submitted', 'prep', 'sequencing', 'analysis', 'completed', 'archived']),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const updateData: any = {
+        status: input.status,
+        updated_at: new Date(),
+      }
+      
+      // Add timestamps for specific status changes
+      if (input.status === 'prep') {
+        updateData.started_at = new Date()
+      } else if (input.status === 'completed') {
+        updateData.completed_at = new Date()
+      }
+
+      return await ctx.db
+        .updateTable('nanopore_samples')
+        .set(updateData)
+        .where('id', '=', input.id)
+        .returningAll()
+        .executeTakeFirstOrThrow()
+    }),
+
+  // Delete sample
+  delete: publicProcedure
+    .input(z.string().uuid())
+    .mutation(async ({ input, ctx }) => {
+      const result = await ctx.db
+        .deleteFrom('nanopore_samples')
+        .where('id', '=', input)
+        .executeTakeFirst()
+      
+      if (result.numDeletedRows === 0n) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Sample not found',
+        })
+      }
+      
+      return { success: true }
+    }),
 })

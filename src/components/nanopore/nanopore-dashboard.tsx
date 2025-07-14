@@ -131,6 +131,7 @@ export default function NanoporeDashboard() {
   const [showExportModal, setShowExportModal] = useState(false)
   const [selectedSample, setSelectedSample] = useState<NanoporeSample | null>(null)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null)
 
   // Type mapping functions to convert between API and modal types
   const mapApiToModal = (apiSample: NanoporeSample): any => ({
@@ -194,6 +195,18 @@ export default function NanoporeDashboard() {
     }, 1000)
   }, [])
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (openDropdown) {
+        setOpenDropdown(null)
+      }
+    }
+
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [openDropdown])
+
   const filteredSamples = samples.filter(sample => {
     const matchesSearch = sample.sample_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          sample.submitter_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -251,8 +264,32 @@ export default function NanoporeDashboard() {
   }
 
   const handleDeleteSample = async (sample: NanoporeSample) => {
-    // TODO: Implement delete functionality when API endpoint is available
-    toast.info('Delete functionality coming soon')
+    if (!window.confirm(`Are you sure you want to delete sample "${sample.sample_name}"?`)) {
+      return
+    }
+
+    setActionLoading(sample.id)
+    try {
+      await apiClient.deleteSample(sample.id)
+      setSamples(prev => prev.filter(s => s.id !== sample.id))
+      
+      // Update stats
+      setStats(prev => ({
+        ...prev,
+        total: prev.total - 1,
+        ...(sample.status === 'submitted' && { submitted: prev.submitted - 1 }),
+        ...(sample.status === 'completed' && { completed: prev.completed - 1 }),
+        ...(['prep', 'sequencing', 'analysis'].includes(sample.status || '') && { inProgress: prev.inProgress - 1 }),
+        ...(sample.priority === 'urgent' && { urgent: prev.urgent - 1 })
+      }))
+      
+      toast.success('Sample deleted successfully')
+    } catch (error) {
+      console.error('Failed to delete sample:', error)
+      toast.error('Failed to delete sample')
+    } finally {
+      setActionLoading(null)
+    }
   }
 
   const handleSampleUpdate = async (sampleId: string, updateData: any) => {
@@ -305,6 +342,45 @@ export default function NanoporeDashboard() {
     } finally {
       setActionLoading(null)
     }
+  }
+
+  const handleStatusUpdate = async (sample: NanoporeSample, newStatus: string) => {
+    setActionLoading(sample.id)
+    try {
+      const updatedSample = await apiClient.updateSampleStatus(sample.id, newStatus)
+      setSamples(prev => prev.map(s => s.id === sample.id ? updatedSample : s))
+      
+      // Recalculate stats
+      const updatedSamples = samples.map(s => s.id === sample.id ? updatedSample : s)
+      setStats({
+        total: updatedSamples.length,
+        submitted: updatedSamples.filter(s => s.status === 'submitted').length,
+        inProgress: updatedSamples.filter(s => {
+          const status = s.status || ''
+          return ['prep', 'sequencing', 'analysis'].includes(status)
+        }).length,
+        completed: updatedSamples.filter(s => s.status === 'completed').length,
+        urgent: updatedSamples.filter(s => s.priority === 'urgent').length
+      })
+      
+      toast.success(`Sample status updated to ${newStatus}`)
+    } catch (error) {
+      console.error('Failed to update status:', error)
+      toast.error('Failed to update status')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  // Get next available status for workflow progression
+  const getNextStatus = (currentStatus: string | null | undefined): string | null => {
+    if (!currentStatus) return null
+    const workflow = ['submitted', 'prep', 'sequencing', 'analysis', 'completed', 'archived']
+    const currentIndex = workflow.indexOf(currentStatus)
+    if (currentIndex === -1 || currentIndex === workflow.length - 1) {
+      return null
+    }
+    return workflow[currentIndex + 1]
   }
 
   if (loading) {
@@ -571,48 +647,85 @@ export default function NanoporeDashboard() {
                       
                       {/* Action Buttons */}
                       <div className="flex items-center space-x-1">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleViewSample(sample)}
-                          className="flex items-center space-x-1"
-                        >
-                          <Eye className="h-3 w-3" />
-                          <span>View</span>
-                        </Button>
+                        {/* Quick Status Update Button */}
+                        {getNextStatus(sample.status || null) && (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleStatusUpdate(sample, getNextStatus(sample.status || null)!)}
+                            className="flex items-center space-x-1 text-blue-600 hover:text-blue-700"
+                            disabled={actionLoading === sample.id}
+                          >
+                            <Activity className="h-3 w-3" />
+                            <span>→ {getNextStatus(sample.status || null)}</span>
+                          </Button>
+                        )}
                         
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleEditSample(sample)}
-                          className="flex items-center space-x-1"
-                          disabled={actionLoading === sample.id}
-                        >
-                          <Edit className="h-3 w-3" />
-                          <span>Edit</span>
-                        </Button>
-                        
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleAssignSample(sample)}
-                          className="flex items-center space-x-1"
-                          disabled={actionLoading === sample.id}
-                        >
-                          <Users className="h-3 w-3" />
-                          <span>Assign</span>
-                        </Button>
-                        
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleDeleteSample(sample)}
-                          className="flex items-center space-x-1 text-red-600 hover:text-red-700"
-                          disabled={actionLoading === sample.id}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                          <span>Delete</span>
-                        </Button>
+                        {/* Action Menu Dropdown */}
+                        <div className="relative">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => setOpenDropdown(openDropdown === sample.id ? null : sample.id)}
+                            className="flex items-center space-x-1"
+                            disabled={actionLoading === sample.id}
+                          >
+                            <MoreHorizontal className="h-3 w-3" />
+                            <span>Actions</span>
+                          </Button>
+                          
+                          {openDropdown === sample.id && (
+                            <div className="absolute right-0 mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-50">
+                              <div className="py-1">
+                                <button
+                                  onClick={() => {
+                                    handleViewSample(sample)
+                                    setOpenDropdown(null)
+                                  }}
+                                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                  <span>View Details</span>
+                                </button>
+                                
+                                <button
+                                  onClick={() => {
+                                    handleEditSample(sample)
+                                    setOpenDropdown(null)
+                                  }}
+                                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                  <span>Edit Sample</span>
+                                </button>
+                                
+                                <button
+                                  onClick={() => {
+                                    handleAssignSample(sample)
+                                    setOpenDropdown(null)
+                                  }}
+                                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                                >
+                                  <Users className="h-4 w-4" />
+                                  <span>Assign Staff</span>
+                                </button>
+                                
+                                <div className="border-t border-gray-100 my-1"></div>
+                                
+                                <button
+                                  onClick={() => {
+                                    handleDeleteSample(sample)
+                                    setOpenDropdown(null)
+                                  }}
+                                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                  <span>Delete Sample</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>

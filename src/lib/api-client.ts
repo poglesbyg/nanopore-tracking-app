@@ -121,6 +121,39 @@ class ApiClient {
     }
   }
 
+  async updateSampleStatus(id: string, status: string): Promise<NanoporeSample> {
+    // Mock implementation
+    const samples = await this.listSamples()
+    const sample = samples.find(s => s.id === id)
+    if (!sample) throw new Error('Sample not found')
+    
+    const updateData: any = {
+      status,
+      updated_at: MOCK_DATE_TODAY
+    }
+    
+    // Add timestamps for specific status changes
+    if (status === 'prep') {
+      updateData.started_at = MOCK_DATE_TODAY
+    } else if (status === 'completed') {
+      updateData.completed_at = MOCK_DATE_TODAY
+    }
+    
+    return {
+      ...sample,
+      ...updateData
+    }
+  }
+
+  async deleteSample(id: string): Promise<{ success: boolean }> {
+    // Mock implementation - in a real app this would call the API
+    const samples = await this.listSamples()
+    const sample = samples.find(s => s.id === id)
+    if (!sample) throw new Error('Sample not found')
+    
+    return { success: true }
+  }
+
   async exportSamples(params: any): Promise<{ data: string, filename: string, mimeType: string }> {
     // Mock implementation
     return {
