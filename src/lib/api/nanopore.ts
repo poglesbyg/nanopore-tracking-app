@@ -1,10 +1,4 @@
-import type { JsonValue } from '@app/db/types'
 import { z } from 'zod'
-
-import * as fileStorage from './nanopore/file-storage'
-import * as nanoporeGetters from './nanopore/getters'
-import * as nanoporeSetters from './nanopore/setters'
-import * as nanoporeExport from './nanopore/export'
 import { router, publicProcedure } from '../trpc'
 import { TRPCError } from '@trpc/server'
 
@@ -38,23 +32,6 @@ const createNanoporeSampleSchema = z.object({
   chartField: z.string().min(1, 'Chart field is required for intake validation').max(255),
 })
 
-const createNanoporeSampleDetailsSchema = z.object({
-  organism: z.string().optional(),
-  genomeSize: z.string().optional(),
-  expectedReadLength: z.string().optional(),
-  libraryPrepKit: z.string().optional(),
-  barcodingRequired: z.boolean().default(false),
-  barcodeKit: z.string().optional(),
-  runTimeHours: z.number().int().positive().optional(),
-  basecallingModel: z.string().optional(),
-  dataDeliveryMethod: z.string().optional(),
-  fileFormat: z.string().optional(),
-  analysisRequired: z.boolean().default(false),
-  analysisType: z.string().optional(),
-  specialInstructions: z.string().optional(),
-  internalNotes: z.string().optional(),
-})
-
 const updateNanoporeSampleSchema = z.object({
   sampleName: z.string().max(255).optional(),
   projectId: z.string().optional(),
@@ -68,120 +45,20 @@ const updateNanoporeSampleSchema = z.object({
   totalAmount: z.number().positive().optional(),
   flowCellType: z.string().optional(),
   flowCellCount: z.number().int().positive().optional(),
-  status: z
-    .enum([
-      'submitted',
-      'prep',
-      'sequencing',
-      'analysis',
-      'completed',
-      'archived',
-    ])
-    .optional(),
+  status: z.enum(['submitted', 'prep', 'sequencing', 'analysis', 'completed', 'archived']).optional(),
   priority: z.enum(['low', 'normal', 'high', 'urgent']).optional(),
   assignedTo: z.string().optional(),
   libraryPrepBy: z.string().optional(),
 })
 
-const updateProcessingStepSchema = z.object({
-  stepStatus: z
-    .enum(['pending', 'in_progress', 'completed', 'failed', 'skipped'])
-    .optional(),
-  assignedTo: z.string().optional(),
-  notes: z.string().optional(),
-  resultsData: z.any().optional(),
-})
-
 export const nanoporeRouter = router({
-  // Get all nanopore samples for current user
+  // Get all nanopore samples
   getAll: publicProcedure.query(async ({ ctx }) => {
-    return await nanoporeGetters.getAllNanoporeSamples(ctx.db)
-  }),
-
-  // Get nanopore sample by ID
-  getById: publicProcedure
-    .input(z.object({ id: z.string().uuid() }))
-    .query(async ({ input, ctx }) => {
-      return await nanoporeGetters.getNanoporeSampleById(
-        ctx.db,
-        input.id,
-        'demo-user',
-      )
-    }),
-
-  // Get nanopore sample with details
-  getWithDetails: publicProcedure
-    .input(z.object({ id: z.string().uuid() }))
-    .query(async ({ input, ctx }) => {
-      return await nanoporeGetters.getNanoporeSampleWithDetails(
-        ctx.db,
-        input.id,
-        'demo-user',
-      )
-    }),
-
-  // Get complete nanopore sample data
-  getFull: publicProcedure
-    .input(z.object({ id: z.string().uuid() }))
-    .query(async ({ input, ctx }) => {
-      return await nanoporeGetters.getNanoporeSampleFull(
-        ctx.db,
-        input.id,
-        'demo-user',
-      )
-    }),
-
-  // Get recent nanopore samples for dashboard
-  getRecent: publicProcedure
-    .input(z.object({ limit: z.number().int().positive().max(50).default(10) }))
-    .query(async ({ input, ctx }) => {
-      return await nanoporeGetters.getRecentNanoporeSamples(
-        ctx.db,
-        'demo-user',
-        input.limit,
-      )
-    }),
-
-  // Get nanopore samples by status
-  getByStatus: publicProcedure
-    .input(z.object({ status: z.string() }))
-    .query(async ({ input, ctx }) => {
-      return await nanoporeGetters.getNanoporeSamplesByStatus(
-        ctx.db,
-        'demo-user',
-        input.status,
-      )
-    }),
-
-  // Get nanopore samples by priority
-  getByPriority: publicProcedure
-    .input(z.object({ priority: z.string() }))
-    .query(async ({ input, ctx }) => {
-      return await nanoporeGetters.getNanoporeSamplesByPriority(
-        ctx.db,
-        'demo-user',
-        input.priority,
-      )
-    }),
-
-  // Get nanopore samples assigned to team member
-  getByAssignee: publicProcedure
-    .input(z.object({ assignedTo: z.string() }))
-    .query(async ({ input, ctx }) => {
-      return await nanoporeGetters.getNanoporeSamplesByAssignee(
-        ctx.db,
-        input.assignedTo,
-      )
-    }),
-
-  // Get all nanopore samples (team view)
-  getAllSamples: publicProcedure.query(async ({ ctx }) => {
-    return await nanoporeGetters.getAllNanoporeSamples(ctx.db)
-  }),
-
-  // Get nanopore queue for team dashboard
-  getQueue: publicProcedure.query(async ({ ctx }) => {
-    return await nanoporeGetters.getNanoporeQueue(ctx.db)
+    return await ctx.db
+      .selectFrom('nanopore_samples')
+      .selectAll()
+      .orderBy('submitted_at', 'desc')
+      .execute()
   }),
 
   // Create new nanopore sample
@@ -196,39 +73,35 @@ export const nanoporeRouter = router({
         })
       }
 
-      const sampleData: nanoporeSetters.CreateNanoporeSampleInput = {
-        ...input,
-        createdBy: 'demo-user',
-      }
-      return await nanoporeSetters.createNanoporeSample(ctx.db, sampleData)
-    }),
-
-  // Create nanopore sample with details
-  createWithDetails: publicProcedure
-    .input(
-      z.object({
-        sample: createNanoporeSampleSchema,
-        details: createNanoporeSampleDetailsSchema,
-      }),
-    )
-    .mutation(async ({ input, ctx }) => {
-      // Validate chart field before creating the sample
-      if (!validateChartField(input.sample.chartField)) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: `Invalid chart field: ${input.sample.chartField}. Chart field must be part of the intake validation list.`,
+      const now = new Date()
+      return await ctx.db
+        .insertInto('nanopore_samples')
+        .values({
+          id: crypto.randomUUID(),
+          sample_name: input.sampleName,
+          project_id: input.projectId || null,
+          submitter_name: input.submitterName,
+          submitter_email: input.submitterEmail,
+          lab_name: input.labName || null,
+          sample_type: input.sampleType,
+          sample_buffer: input.sampleBuffer || null,
+          concentration: input.concentration || null,
+          volume: input.volume || null,
+          total_amount: input.totalAmount || null,
+          flow_cell_type: input.flowCellType || null,
+          flow_cell_count: input.flowCellCount,
+          status: 'submitted',
+          priority: input.priority,
+          assigned_to: input.assignedTo || null,
+          library_prep_by: input.libraryPrepBy || null,
+          chart_field: input.chartField,
+          submitted_at: now,
+          created_at: now,
+          updated_at: now,
+          created_by: 'demo-user',
         })
-      }
-
-      const sampleData: nanoporeSetters.CreateNanoporeSampleInput = {
-        ...input.sample,
-        createdBy: 'demo-user',
-      }
-      return await nanoporeSetters.createCompleteNanoporeSample(
-        ctx.db,
-        sampleData,
-        input.details,
-      )
+        .returningAll()
+        .executeTakeFirstOrThrow()
     }),
 
   // Update nanopore sample
@@ -240,36 +113,33 @@ export const nanoporeRouter = router({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      return await nanoporeSetters.updateNanoporeSample(
-        ctx.db,
-        input.id,
-        'demo-user',
-        input.data,
-      )
-    }),
+      const updateData: any = {}
+      
+      if (input.data.sampleName !== undefined) updateData.sample_name = input.data.sampleName
+      if (input.data.projectId !== undefined) updateData.project_id = input.data.projectId
+      if (input.data.submitterName !== undefined) updateData.submitter_name = input.data.submitterName
+      if (input.data.submitterEmail !== undefined) updateData.submitter_email = input.data.submitterEmail
+      if (input.data.labName !== undefined) updateData.lab_name = input.data.labName
+      if (input.data.sampleType !== undefined) updateData.sample_type = input.data.sampleType
+      if (input.data.sampleBuffer !== undefined) updateData.sample_buffer = input.data.sampleBuffer
+      if (input.data.concentration !== undefined) updateData.concentration = input.data.concentration
+      if (input.data.volume !== undefined) updateData.volume = input.data.volume
+      if (input.data.totalAmount !== undefined) updateData.total_amount = input.data.totalAmount
+      if (input.data.flowCellType !== undefined) updateData.flow_cell_type = input.data.flowCellType
+      if (input.data.flowCellCount !== undefined) updateData.flow_cell_count = input.data.flowCellCount
+      if (input.data.status !== undefined) updateData.status = input.data.status
+      if (input.data.priority !== undefined) updateData.priority = input.data.priority
+      if (input.data.assignedTo !== undefined) updateData.assigned_to = input.data.assignedTo
+      if (input.data.libraryPrepBy !== undefined) updateData.library_prep_by = input.data.libraryPrepBy
+      
+      updateData.updated_at = new Date()
 
-  // Update nanopore sample status
-  updateStatus: publicProcedure
-    .input(
-      z.object({
-        id: z.string().uuid(),
-        status: z.enum([
-          'submitted',
-          'prep',
-          'sequencing',
-          'analysis',
-          'completed',
-          'archived',
-        ]),
-      }),
-    )
-    .mutation(async ({ input, ctx }) => {
-      return await nanoporeSetters.updateNanoporeSampleStatus(
-        ctx.db,
-        input.id,
-        'demo-user',
-        input.status,
-      )
+      return await ctx.db
+        .updateTable('nanopore_samples')
+        .set(updateData)
+        .where('id', '=', input.id)
+        .returningAll()
+        .executeTakeFirstOrThrow()
     }),
 
   // Assign sample to team member
@@ -282,236 +152,15 @@ export const nanoporeRouter = router({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      return await nanoporeSetters.assignNanoporeSample(
-        ctx.db,
-        input.id,
-        input.assignedTo,
-        input.libraryPrepBy,
-      )
-    }),
-
-  // Delete nanopore sample
-  delete: publicProcedure
-    .input(z.object({ id: z.string().uuid() }))
-    .mutation(async ({ input, ctx }) => {
-      return await nanoporeSetters.deleteNanoporeSample(
-        ctx.db,
-        input.id,
-        'demo-user',
-      )
-    }),
-
-  // Sample details management
-  details: router({
-    // Create sample details
-    create: publicProcedure
-      .input(
-        z.object({
-          sampleId: z.string().uuid(),
-          details: createNanoporeSampleDetailsSchema,
-        }),
-      )
-      .mutation(async ({ input, ctx }) => {
-        return await nanoporeSetters.createNanoporeSampleDetails(ctx.db, {
-          ...input.details,
-          sampleId: input.sampleId,
+      return await ctx.db
+        .updateTable('nanopore_samples')
+        .set({
+          assigned_to: input.assignedTo,
+          library_prep_by: input.libraryPrepBy || null,
+          updated_at: new Date(),
         })
-      }),
-
-    // Update sample details
-    update: publicProcedure
-      .input(
-        z.object({
-          sampleId: z.string().uuid(),
-          details: createNanoporeSampleDetailsSchema.partial(),
-        }),
-      )
-      .mutation(async ({ input, ctx }) => {
-        return await nanoporeSetters.updateNanoporeSampleDetails(
-          ctx.db,
-          input.sampleId,
-          input.details,
-        )
-      }),
-  }),
-
-  // Processing steps management
-  steps: router({
-    // Get processing steps for a sample
-    getBySample: publicProcedure
-      .input(z.object({ sampleId: z.string().uuid() }))
-      .query(async ({ input, ctx }) => {
-        return await nanoporeGetters.getProcessingSteps(ctx.db, input.sampleId)
-      }),
-
-    // Create default processing steps
-    createDefault: publicProcedure
-      .input(z.object({ sampleId: z.string().uuid() }))
-      .mutation(async ({ input, ctx }) => {
-        return await nanoporeSetters.createDefaultProcessingSteps(
-          ctx.db,
-          input.sampleId,
-        )
-      }),
-
-    // Update processing step
-    update: publicProcedure
-      .input(
-        z.object({
-          stepId: z.string().uuid(),
-          data: updateProcessingStepSchema,
-        }),
-      )
-      .mutation(async ({ input, ctx }) => {
-        return await nanoporeSetters.updateProcessingStep(
-          ctx.db,
-          input.stepId,
-          input.data,
-        )
-      }),
-
-    // Start processing step
-    start: publicProcedure
-      .input(
-        z.object({
-          stepId: z.string().uuid(),
-          assignedTo: z.string().optional(),
-        }),
-      )
-      .mutation(async ({ input, ctx }) => {
-        return await nanoporeSetters.startProcessingStep(
-          ctx.db,
-          input.stepId,
-          input.assignedTo,
-        )
-      }),
-
-    // Complete processing step
-    complete: publicProcedure
-      .input(
-        z.object({
-          stepId: z.string().uuid(),
-          notes: z.string().optional(),
-          resultsData: z.any().optional(),
-        }),
-      )
-      .mutation(async ({ input, ctx }) => {
-        return await nanoporeSetters.completeProcessingStep(
-          ctx.db,
-          input.stepId,
-          input.notes,
-          input.resultsData as JsonValue,
-        )
-      }),
-  }),
-
-  // Attachments management
-  attachments: router({
-    // Get attachments for a sample
-    getBySample: publicProcedure
-      .input(z.object({ sampleId: z.string().uuid() }))
-      .query(async ({ input, ctx }) => {
-        return await fileStorage.getSampleAttachments(ctx.db, input.sampleId)
-      }),
-
-    // Upload file attachment
-    upload: publicProcedure
-      .input(
-        z.object({
-          sampleId: z.string().uuid(),
-          file: z.object({
-            name: z.string().min(1).max(255),
-            type: z.string(),
-            size: z.number().int().positive(),
-            content: z.string(), // Base64 encoded content
-          }),
-          description: z.string().optional(),
-        }),
-      )
-      .mutation(async ({ input, ctx }) => {
-        // Convert base64 content to ArrayBuffer
-        const buffer = Buffer.from(input.file.content, 'base64')
-        const arrayBuffer = buffer.buffer.slice(
-          buffer.byteOffset,
-          buffer.byteOffset + buffer.byteLength,
-        )
-
-        return await fileStorage.uploadFileAttachment(ctx.db, {
-          sampleId: input.sampleId,
-          file: {
-            name: input.file.name,
-            type: input.file.type,
-            size: input.file.size,
-            arrayBuffer,
-          },
-          description: input.description,
-          uploadedBy: 'demo-user',
-        })
-      }),
-
-    // Get file content for download
-    download: publicProcedure
-      .input(z.object({ attachmentId: z.string().uuid() }))
-      .query(async ({ input, ctx }) => {
-        const { content, attachment } = await fileStorage.getFileContent(
-          ctx.db,
-          input.attachmentId,
-        )
-
-        return {
-          content: content.toString('base64'),
-          fileName: attachment.fileName,
-          fileType: attachment.fileType,
-          fileSize: attachment.fileSizeBytes,
-        }
-      }),
-
-    // Create attachment (legacy endpoint for manual entries)
-    create: publicProcedure
-      .input(
-        z.object({
-          sampleId: z.string().uuid(),
-          fileName: z.string().min(1).max(255),
-          fileType: z.string().optional(),
-          fileSizeBytes: z.number().int().positive().optional(),
-          filePath: z.string().optional(),
-          description: z.string().optional(),
-        }),
-      )
-      .mutation(async ({ input, ctx }) => {
-        return await nanoporeSetters.createAttachment(ctx.db, {
-          ...input,
-          uploadedBy: 'demo-user',
-        })
-      }),
-
-    // Delete attachment
-    delete: publicProcedure
-      .input(z.object({ attachmentId: z.string().uuid() }))
-      .mutation(async ({ input, ctx }) => {
-        return await fileStorage.deleteFileAttachment(
-          ctx.db,
-          input.attachmentId,
-        )
-      }),
-  }),
-
-  // Export nanopore samples
-  export: publicProcedure
-    .input(
-      z.object({
-        startDate: z.date(),
-        endDate: z.date(),
-        format: z.enum(['csv', 'json']).default('csv'),
-        includeAllUsers: z.boolean().default(false),
-      }),
-    )
-    .query(async ({ input, ctx }) => {
-      return await nanoporeExport.exportNanoporeSamples(ctx.db, 'demo-user', {
-        startDate: input.startDate,
-        endDate: input.endDate,
-        format: input.format,
-        includeAllUsers: input.includeAllUsers,
-      })
+        .where('id', '=', input.id)
+        .returningAll()
+        .executeTakeFirstOrThrow()
     }),
 })

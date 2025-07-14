@@ -1,117 +1,586 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
+import { Input } from '../ui/input'
+import { Separator } from '../ui/separator'
+import { Skeleton } from '../ui/skeleton'
+import CreateSampleModal from './create-sample-modal'
+import { useAuth } from '../auth/auth-wrapper'
+import { 
+  Plus, 
+  Search, 
+  Filter, 
+  Download, 
+  Upload, 
+  AlertCircle, 
+  CheckCircle, 
+  Clock, 
+  User,
+  TestTube,
+  Zap,
+  Archive,
+  TrendingUp,
+  Activity,
+  Calendar,
+  Settings,
+  LogOut,
+  ChevronDown
+} from 'lucide-react'
 
-type NanoporeSample = {
+interface NanoporeSample {
   id: string
-  sampleName: string
-  projectId: string | null
-  submitterName: string
-  submitterEmail: string
-  labName: string | null
-  sampleType: string
-  status: string | null
-  priority: string | null
-  assignedTo: string | null
-  libraryPrepBy: string | null
-  submittedAt: Date
-  createdAt: Date
-  updatedAt: Date
-  createdBy: string
+  sample_name: string
+  project_id: string | null
+  submitter_name: string
+  submitter_email: string
+  lab_name: string | null
+  sample_type: string
+  status: 'submitted' | 'prep' | 'sequencing' | 'analysis' | 'completed' | 'archived'
+  priority: 'low' | 'normal' | 'high' | 'urgent'
+  assigned_to: string | null
+  library_prep_by: string | null
+  submitted_at: string
+  created_at: string
+  updated_at: string
+  created_by: string
+  concentration?: number | null
+  volume?: number | null
+  flow_cell_type?: string | null
+  chart_field: string
 }
 
-export default function NanoporeDashboard() {
-  const [samples] = useState<NanoporeSample[]>([])
-  const [showCreateForm, setShowCreateForm] = useState(false)
+interface DashboardStats {
+  total: number
+  submitted: number
+  inProgress: number
+  completed: number
+  urgent: number
+}
+
+const StatusBadge = ({ status }: { status: string }) => {
+  const statusConfig = {
+    submitted: { color: 'bg-blue-100 text-blue-800', icon: Clock },
+    prep: { color: 'bg-yellow-100 text-yellow-800', icon: TestTube },
+    sequencing: { color: 'bg-purple-100 text-purple-800', icon: Zap },
+    analysis: { color: 'bg-orange-100 text-orange-800', icon: Activity },
+    completed: { color: 'bg-green-100 text-green-800', icon: CheckCircle },
+    archived: { color: 'bg-gray-100 text-gray-800', icon: Archive }
+  }
+
+  const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.submitted
+  const Icon = config.icon
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Nanopore Dashboard</h1>
-        <Button onClick={() => setShowCreateForm(true)}>
-          Add Sample
-        </Button>
-      </div>
+    <Badge className={`${config.color} flex items-center gap-1`}>
+      <Icon className="w-3 h-3" />
+      {status.charAt(0).toUpperCase() + status.slice(1)}
+    </Badge>
+  )
+}
 
-      {samples.length === 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>No Samples Found</CardTitle>
-            <CardDescription>
-              Get started by adding your first nanopore sample.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      ) : (
-        <div className="grid gap-4">
-          {samples.map((sample) => (
-            <Card key={sample.id}>
-              <CardHeader>
-                <CardTitle>{sample.sampleName}</CardTitle>
-                <CardDescription>
-                  Submitted by {sample.submitterName}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex gap-2">
-                  <Badge variant="outline">{sample.status || 'submitted'}</Badge>
-                  <Badge variant="outline">{sample.priority || 'normal'}</Badge>
-                </div>
-              </CardContent>
-            </Card>
+const PriorityBadge = ({ priority }: { priority: string }) => {
+  const priorityConfig = {
+    low: 'bg-gray-100 text-gray-600',
+    normal: 'bg-blue-100 text-blue-700',
+    high: 'bg-orange-100 text-orange-700',
+    urgent: 'bg-red-100 text-red-700'
+  }
+
+  return (
+    <Badge className={priorityConfig[priority as keyof typeof priorityConfig] || priorityConfig.normal}>
+      {priority.charAt(0).toUpperCase() + priority.slice(1)}
+    </Badge>
+  )
+}
+
+const StatCard = ({ title, value, icon: Icon, color, change }: {
+  title: string
+  value: number
+  icon: any
+  color: string
+  change?: { value: number; positive: boolean }
+}) => (
+  <Card className="relative overflow-hidden">
+    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardTitle className="text-sm font-medium text-gray-600">{title}</CardTitle>
+      <Icon className={`h-4 w-4 ${color}`} />
+    </CardHeader>
+    <CardContent>
+      <div className="text-2xl font-bold">{value}</div>
+      {change && (
+        <p className={`text-xs ${change.positive ? 'text-green-600' : 'text-red-600'} flex items-center gap-1`}>
+          <TrendingUp className="h-3 w-3" />
+          {change.positive ? '+' : ''}{change.value}% from last week
+        </p>
+      )}
+    </CardContent>
+  </Card>
+)
+
+export default function NanoporeDashboard() {
+  const { user, logout } = useAuth()
+  const [samples, setSamples] = useState<NanoporeSample[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showUserMenu, setShowUserMenu] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [priorityFilter, setPriorityFilter] = useState<string>('all')
+  const [stats, setStats] = useState<DashboardStats>({
+    total: 0,
+    submitted: 0,
+    inProgress: 0,
+    completed: 0,
+    urgent: 0
+  })
+  const [showCreateModal, setShowCreateModal] = useState(false)
+
+  // Mock data for development
+  useEffect(() => {
+    const mockSamples: NanoporeSample[] = [
+      {
+        id: '1',
+        sample_name: 'NANO-001-2024',
+        project_id: 'PRJ-2024-001',
+        submitter_name: 'Dr. Sarah Johnson',
+        submitter_email: 'sarah.johnson@university.edu',
+        lab_name: 'Genomics Lab',
+        sample_type: 'Genomic DNA',
+        status: 'sequencing',
+        priority: 'high',
+        assigned_to: 'Jenny Chen',
+        library_prep_by: 'Grey Wilson',
+        submitted_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        created_by: 'demo-user',
+        concentration: 125.5,
+        volume: 50,
+        flow_cell_type: 'R10.4.1',
+        chart_field: 'HTSF-001'
+      },
+      {
+        id: '2',
+        sample_name: 'NANO-002-2024',
+        project_id: 'PRJ-2024-002',
+        submitter_name: 'Dr. Michael Chen',
+        submitter_email: 'michael.chen@institute.org',
+        lab_name: 'Molecular Biology Lab',
+        sample_type: 'Total RNA',
+        status: 'prep',
+        priority: 'urgent',
+        assigned_to: 'Stephanie Lee',
+        library_prep_by: null,
+        submitted_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        created_by: 'demo-user',
+        concentration: 89.2,
+        volume: 30,
+        flow_cell_type: 'R9.4.1',
+        chart_field: 'NANO-002'
+      },
+      {
+        id: '3',
+        sample_name: 'NANO-003-2024',
+        project_id: 'PRJ-2024-003',
+        submitter_name: 'Dr. Lisa Wang',
+        submitter_email: 'lisa.wang@research.edu',
+        lab_name: 'Bioinformatics Core',
+        sample_type: 'Amplicon',
+        status: 'completed',
+        priority: 'normal',
+        assigned_to: 'Jenny Chen',
+        library_prep_by: 'Grey Wilson',
+        submitted_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        created_by: 'demo-user',
+        concentration: 156.8,
+        volume: 75,
+        flow_cell_type: 'R10.4.1',
+        chart_field: 'SEQ-003'
+      }
+    ]
+
+    // Simulate API call
+    setTimeout(() => {
+      setSamples(mockSamples)
+      
+      // Calculate stats
+      const newStats = {
+        total: mockSamples.length,
+        submitted: mockSamples.filter(s => s.status === 'submitted').length,
+        inProgress: mockSamples.filter(s => ['prep', 'sequencing', 'analysis'].includes(s.status)).length,
+        completed: mockSamples.filter(s => s.status === 'completed').length,
+        urgent: mockSamples.filter(s => s.priority === 'urgent').length
+      }
+      setStats(newStats)
+      setLoading(false)
+    }, 1000)
+  }, [])
+
+  const filteredSamples = samples.filter(sample => {
+    const matchesSearch = sample.sample_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         sample.submitter_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         sample.lab_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    
+    const matchesStatus = statusFilter === 'all' || sample.status === statusFilter
+    const matchesPriority = priorityFilter === 'all' || sample.priority === priorityFilter
+    
+    return matchesSearch && matchesStatus && matchesPriority
+  })
+
+  const handleCreateSample = () => {
+    setShowCreateModal(true)
+  }
+
+  const handleSampleSubmit = async (sampleData: any) => {
+    // TODO: Connect to actual API
+    console.log('Creating sample:', sampleData)
+    
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
+    // Add to local state for now
+    const newSample: NanoporeSample = {
+      id: Date.now().toString(),
+      sample_name: sampleData.sampleName,
+      project_id: sampleData.projectId,
+      submitter_name: sampleData.submitterName,
+      submitter_email: sampleData.submitterEmail,
+      lab_name: sampleData.labName,
+      sample_type: sampleData.sampleType,
+      status: 'submitted',
+      priority: sampleData.priority,
+      assigned_to: null,
+      library_prep_by: null,
+      submitted_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      created_by: 'demo-user',
+      concentration: sampleData.concentration,
+      volume: sampleData.volume,
+      flow_cell_type: sampleData.flowCellType,
+      chart_field: sampleData.chartField
+    }
+    
+    setSamples(prev => [newSample, ...prev])
+    
+    // Update stats
+    setStats(prev => ({
+      ...prev,
+      total: prev.total + 1,
+      submitted: prev.submitted + 1
+    }))
+  }
+
+  const handleUploadPDF = () => {
+    toast.success('PDF upload modal would open here')
+  }
+
+  const handleExport = () => {
+    toast.success('Export functionality would trigger here')
+  }
+
+  if (loading) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="flex justify-between items-center">
+          <Skeleton className="h-8 w-64" />
+          <div className="flex gap-2">
+            <Skeleton className="h-10 w-32" />
+            <Skeleton className="h-10 w-32" />
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-32" />
           ))}
         </div>
-      )}
+        
+        <div className="space-y-4">
+          {[...Array(3)].map((_, i) => (
+            <Skeleton key={i} className="h-20" />
+          ))}
+        </div>
+      </div>
+    )
+  }
 
-      {showCreateForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-          <Card className="w-full max-w-md">
-            <CardHeader>
-              <CardTitle>Add New Sample</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={(e) => {
-                e.preventDefault()
-                toast.success('Sample would be created here')
-                setShowCreateForm(false)
-              }}>
-                <div className="space-y-4">
-                  <input
-                    type="text"
-                    placeholder="Sample Name"
-                    className="w-full p-2 border rounded"
-                    required
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <TestTube className="h-8 w-8 text-blue-600" />
+                <h1 className="text-2xl font-bold text-gray-900">Nanopore Tracking</h1>
+              </div>
+              <Badge className="bg-blue-100 text-blue-800">v2.0</Badge>
+            </div>
+            
+            <div className="flex items-center space-x-3">
+              <Button variant="outline" onClick={handleExport}>
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
+              <Button variant="outline" onClick={handleUploadPDF}>
+                <Upload className="h-4 w-4 mr-2" />
+                Upload PDF
+              </Button>
+              <Button onClick={handleCreateSample}>
+                <Plus className="h-4 w-4 mr-2" />
+                New Sample
+              </Button>
+              
+              {/* User Menu */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="flex items-center space-x-2 px-3 py-2 rounded-md hover:bg-gray-100 transition-colors"
+                >
+                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                    <User className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <div className="text-left">
+                    <div className="text-sm font-medium text-gray-900">{user?.name}</div>
+                    <div className="text-xs text-gray-500">{user?.role}</div>
+                  </div>
+                  <ChevronDown className="h-4 w-4 text-gray-400" />
+                </button>
+                
+                {showUserMenu && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-50">
+                    <div className="py-1">
+                      <div className="px-4 py-2 text-sm text-gray-700 border-b">
+                        <div className="font-medium">{user?.name}</div>
+                        <div className="text-gray-500">{user?.email}</div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setShowUserMenu(false)
+                          // Add profile settings here
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                      >
+                        <Settings className="h-4 w-4 mr-2" />
+                        Settings
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowUserMenu(false)
+                          logout()
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center"
+                      >
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Sign Out
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+          <StatCard
+            title="Total Samples"
+            value={stats.total}
+            icon={TestTube}
+            color="text-blue-600"
+            change={{ value: 12, positive: true }}
+          />
+          <StatCard
+            title="Submitted"
+            value={stats.submitted}
+            icon={Clock}
+            color="text-yellow-600"
+            change={{ value: 3, positive: true }}
+          />
+          <StatCard
+            title="In Progress"
+            value={stats.inProgress}
+            icon={Activity}
+            color="text-purple-600"
+            change={{ value: 8, positive: true }}
+          />
+          <StatCard
+            title="Completed"
+            value={stats.completed}
+            icon={CheckCircle}
+            color="text-green-600"
+            change={{ value: 15, positive: true }}
+          />
+          <StatCard
+            title="Urgent"
+            value={stats.urgent}
+            icon={AlertCircle}
+            color="text-red-600"
+            change={{ value: 2, positive: false }}
+          />
+        </div>
+
+        {/* Filters and Search */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="text-lg">Sample Management</CardTitle>
+            <CardDescription>
+              Track and manage nanopore sequencing samples through the complete workflow
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search samples, submitters, or labs..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
                   />
-                  <input
-                    type="text"
-                    placeholder="Submitter Name"
-                    className="w-full p-2 border rounded"
-                    required
-                  />
-                  <input
-                    type="email"
-                    placeholder="Submitter Email"
-                    className="w-full p-2 border rounded"
-                    required
-                  />
-                  <div className="flex gap-2">
-                    <Button type="submit">Create</Button>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      onClick={() => setShowCreateForm(false)}
-                    >
-                      Cancel
-                    </Button>
+                </div>
+              </div>
+              
+              <div className="flex gap-2">
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-md bg-white text-sm"
+                >
+                  <option value="all">All Status</option>
+                  <option value="submitted">Submitted</option>
+                  <option value="prep">Prep</option>
+                  <option value="sequencing">Sequencing</option>
+                  <option value="analysis">Analysis</option>
+                  <option value="completed">Completed</option>
+                  <option value="archived">Archived</option>
+                </select>
+                
+                <select
+                  value={priorityFilter}
+                  onChange={(e) => setPriorityFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-md bg-white text-sm"
+                >
+                  <option value="all">All Priority</option>
+                  <option value="low">Low</option>
+                  <option value="normal">Normal</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Samples Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Samples ({filteredSamples.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {filteredSamples.map((sample) => (
+                <div key={sample.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="flex-shrink-0">
+                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                          <TestTube className="h-5 w-5 text-blue-600" />
+                        </div>
+                      </div>
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-2">
+                          <h3 className="text-lg font-medium text-gray-900">{sample.sample_name}</h3>
+                          <StatusBadge status={sample.status} />
+                          <PriorityBadge priority={sample.priority} />
+                        </div>
+                        
+                        <div className="mt-1 flex items-center text-sm text-gray-500 space-x-4">
+                          <div className="flex items-center space-x-1">
+                            <User className="h-4 w-4" />
+                            <span>{sample.submitter_name}</span>
+                          </div>
+                          {sample.lab_name && (
+                            <div className="flex items-center space-x-1">
+                              <TestTube className="h-4 w-4" />
+                              <span>{sample.lab_name}</span>
+                            </div>
+                          )}
+                          <div className="flex items-center space-x-1">
+                            <Calendar className="h-4 w-4" />
+                            <span>{new Date(sample.submitted_at).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                        
+                        <div className="mt-2 flex items-center text-sm text-gray-600 space-x-4">
+                          <span>Type: {sample.sample_type}</span>
+                          {sample.concentration && (
+                            <span>Conc: {sample.concentration} ng/μL</span>
+                          )}
+                          {sample.volume && (
+                            <span>Vol: {sample.volume} μL</span>
+                          )}
+                          {sample.flow_cell_type && (
+                            <span>Flow Cell: {sample.flow_cell_type}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      {sample.assigned_to && (
+                        <div className="text-sm text-gray-500">
+                          Assigned to: <span className="font-medium">{sample.assigned_to}</span>
+                        </div>
+                      )}
+                      <Button variant="outline" size="sm">
+                        <Settings className="h-4 w-4 mr-1" />
+                        Manage
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+              ))}
+              
+              {filteredSamples.length === 0 && (
+                <div className="text-center py-12">
+                  <TestTube className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No samples found</h3>
+                  <p className="text-gray-500 mb-4">
+                    {searchTerm || statusFilter !== 'all' || priorityFilter !== 'all' 
+                      ? 'Try adjusting your filters or search terms'
+                      : 'Get started by creating your first sample'
+                    }
+                  </p>
+                  <Button onClick={handleCreateSample}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Sample
+                  </Button>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      
+      {/* Create Sample Modal */}
+      <CreateSampleModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSubmit={handleSampleSubmit}
+      />
     </div>
   )
 }
