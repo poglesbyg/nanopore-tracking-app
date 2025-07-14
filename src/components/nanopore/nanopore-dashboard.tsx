@@ -421,7 +421,7 @@ export default function NanoporeDashboard() {
                           )}
                           <div className="flex items-center space-x-1">
                             <Calendar className="h-4 w-4" />
-                            <span>{new Date(sample.submitted_at).toLocaleDateString()}</span>
+                            <span>{sample.submitted_at.split('T')[0]}</span>
                           </div>
                         </div>
                         
