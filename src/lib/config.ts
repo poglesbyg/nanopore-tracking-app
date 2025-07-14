@@ -146,7 +146,7 @@ export const config: AppConfig = {
   
   monitoring: {
     logLevel: (process.env.LOG_LEVEL as AppConfig['monitoring']['logLevel']) || 'info',
-    sentryDsn: process.env.SENTRY_DSN || undefined
+    ...(process.env.SENTRY_DSN && { sentryDsn: process.env.SENTRY_DSN })
   },
   
   features: {
