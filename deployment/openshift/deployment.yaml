@@ -5,7 +5,7 @@ metadata:
   labels:
     app: nanopore-tracking-app
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: nanopore-tracking-app
@@ -34,10 +34,10 @@ spec:
               key: ollama-host
         resources:
           requests:
-            memory: "512Mi"
+            memory: "256Mi"
             cpu: "250m"
           limits:
-            memory: "1Gi"
+            memory: "512Mi"
             cpu: "500m"
         livenessProbe:
           httpGet:
