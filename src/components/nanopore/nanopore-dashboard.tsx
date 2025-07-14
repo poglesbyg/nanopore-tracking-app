@@ -7,6 +7,10 @@ import { Input } from '../ui/input'
 import { Separator } from '../ui/separator'
 import { Skeleton } from '../ui/skeleton'
 import CreateSampleModal from './create-sample-modal'
+import { EditTaskModal } from './edit-task-modal'
+import { ViewTaskModal } from './view-task-modal'
+import { AssignModal } from './assign-modal'
+import { ExportModal } from './export-modal'
 import { useAuth } from '../auth/auth-wrapper'
 import { apiClient, type NanoporeSample } from '@/lib/api-client'
 import { 
@@ -27,7 +31,12 @@ import {
   Settings,
   LogOut,
   ChevronDown,
-  Archive
+  Archive,
+  Edit,
+  Eye,
+  Users,
+  Trash2,
+  MoreHorizontal
 } from 'lucide-react'
 
 interface DashboardStats {
@@ -114,6 +123,46 @@ export default function NanoporeDashboard() {
     urgent: 0
   })
   const [showCreateModal, setShowCreateModal] = useState(false)
+  
+  // Modal state management
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [showViewModal, setShowViewModal] = useState(false)
+  const [showAssignModal, setShowAssignModal] = useState(false)
+  const [showExportModal, setShowExportModal] = useState(false)
+  const [selectedSample, setSelectedSample] = useState<NanoporeSample | null>(null)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
+
+  // Type mapping functions to convert between API and modal types
+  const mapApiToModal = (apiSample: NanoporeSample): any => ({
+    id: apiSample.id,
+    sampleName: apiSample.sample_name,
+    projectId: apiSample.project_id,
+    submitterName: apiSample.submitter_name,
+    submitterEmail: apiSample.submitter_email,
+    labName: apiSample.lab_name,
+    sampleType: apiSample.sample_type,
+    status: apiSample.status,
+    priority: apiSample.priority,
+    assignedTo: apiSample.assigned_to,
+    libraryPrepBy: apiSample.library_prep_by,
+    submittedAt: new Date(apiSample.submitted_at),
+    createdAt: new Date(apiSample.created_at),
+    updatedAt: new Date(apiSample.updated_at),
+    createdBy: apiSample.created_by,
+  })
+
+  const mapModalToApi = (modalData: any): Partial<NanoporeSample> => ({
+    sample_name: modalData.sampleName,
+    project_id: modalData.projectId,
+    submitter_name: modalData.submitterName,
+    submitter_email: modalData.submitterEmail,
+    lab_name: modalData.labName,
+    sample_type: modalData.sampleType,
+    status: modalData.status,
+    priority: modalData.priority,
+    assigned_to: modalData.assignedTo,
+    library_prep_by: modalData.libraryPrepBy,
+  })
 
   // Load data on mount
   useEffect(() => {
@@ -182,7 +231,80 @@ export default function NanoporeDashboard() {
   }
 
   const handleExport = () => {
-    toast.success('Export functionality would trigger here')
+    setShowExportModal(true)
+  }
+
+  // Sample action handlers
+  const handleViewSample = (sample: NanoporeSample) => {
+    setSelectedSample(sample)
+    setShowViewModal(true)
+  }
+
+  const handleEditSample = (sample: NanoporeSample) => {
+    setSelectedSample(sample)
+    setShowEditModal(true)
+  }
+
+  const handleAssignSample = (sample: NanoporeSample) => {
+    setSelectedSample(sample)
+    setShowAssignModal(true)
+  }
+
+  const handleDeleteSample = async (sample: NanoporeSample) => {
+    // TODO: Implement delete functionality when API endpoint is available
+    toast.info('Delete functionality coming soon')
+  }
+
+  const handleSampleUpdate = async (sampleId: string, updateData: any) => {
+    setActionLoading(sampleId)
+    try {
+      const apiUpdateData = mapModalToApi(updateData)
+      const updatedSample = await apiClient.updateSample(sampleId, apiUpdateData)
+      setSamples(prev => prev.map(s => s.id === sampleId ? updatedSample : s))
+      
+      // Recalculate stats
+      const updatedSamples = samples.map(s => s.id === sampleId ? updatedSample : s)
+      setStats({
+        total: updatedSamples.length,
+        submitted: updatedSamples.filter(s => s.status === 'submitted').length,
+        inProgress: updatedSamples.filter(s => ['prep', 'sequencing', 'analysis'].includes(s.status)).length,
+        completed: updatedSamples.filter(s => s.status === 'completed').length,
+        urgent: updatedSamples.filter(s => s.priority === 'urgent').length
+      })
+      
+      toast.success('Sample updated successfully')
+      setShowEditModal(false)
+      setSelectedSample(null)
+    } catch (error) {
+      console.error('Failed to update sample:', error)
+      toast.error('Failed to update sample')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleSampleAssignment = async (assignedTo: string, libraryPrepBy?: string) => {
+    if (!selectedSample) return
+    
+    setActionLoading(selectedSample.id)
+    try {
+      const updateData = {
+        assigned_to: assignedTo,
+        library_prep_by: libraryPrepBy || null
+      }
+      
+      const updatedSample = await apiClient.updateSample(selectedSample.id, updateData)
+      setSamples(prev => prev.map(s => s.id === selectedSample.id ? updatedSample : s))
+      
+      toast.success('Sample assigned successfully')
+      setShowAssignModal(false)
+      setSelectedSample(null)
+    } catch (error) {
+      console.error('Failed to assign sample:', error)
+      toast.error('Failed to assign sample')
+    } finally {
+      setActionLoading(null)
+    }
   }
 
   if (loading) {
@@ -446,10 +568,52 @@ export default function NanoporeDashboard() {
                           Assigned to: <span className="font-medium">{sample.assigned_to}</span>
                         </div>
                       )}
-                      <Button variant="outline" size="sm">
-                        <Settings className="h-4 w-4 mr-1" />
-                        Manage
-                      </Button>
+                      
+                      {/* Action Buttons */}
+                      <div className="flex items-center space-x-1">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleViewSample(sample)}
+                          className="flex items-center space-x-1"
+                        >
+                          <Eye className="h-3 w-3" />
+                          <span>View</span>
+                        </Button>
+                        
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleEditSample(sample)}
+                          className="flex items-center space-x-1"
+                          disabled={actionLoading === sample.id}
+                        >
+                          <Edit className="h-3 w-3" />
+                          <span>Edit</span>
+                        </Button>
+                        
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleAssignSample(sample)}
+                          className="flex items-center space-x-1"
+                          disabled={actionLoading === sample.id}
+                        >
+                          <Users className="h-3 w-3" />
+                          <span>Assign</span>
+                        </Button>
+                        
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleDeleteSample(sample)}
+                          className="flex items-center space-x-1 text-red-600 hover:text-red-700"
+                          disabled={actionLoading === sample.id}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          <span>Delete</span>
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -481,6 +645,49 @@ export default function NanoporeDashboard() {
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onSubmit={handleSampleSubmit}
+      />
+      
+      {/* Edit Sample Modal */}
+      <EditTaskModal
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false)
+          setSelectedSample(null)
+        }}
+        onSave={handleSampleUpdate}
+        sample={selectedSample ? mapApiToModal(selectedSample) : null}
+        isLoading={actionLoading === selectedSample?.id}
+      />
+      
+      {/* View Sample Modal */}
+      <ViewTaskModal
+        isOpen={showViewModal}
+        onClose={() => {
+          setShowViewModal(false)
+          setSelectedSample(null)
+        }}
+        sample={selectedSample ? mapApiToModal(selectedSample) : null}
+      />
+      
+      {/* Assign Sample Modal */}
+      <AssignModal
+        isOpen={showAssignModal}
+        onClose={() => {
+          setShowAssignModal(false)
+          setSelectedSample(null)
+        }}
+        onAssign={handleSampleAssignment}
+        currentAssignment={{
+          assignedTo: selectedSample?.assigned_to || null,
+          libraryPrepBy: selectedSample?.library_prep_by || null,
+        }}
+        sampleName={selectedSample?.sample_name || ''}
+      />
+      
+      {/* Export Modal */}
+      <ExportModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
       />
     </div>
   )
