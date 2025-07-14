@@ -1,10 +1,10 @@
 import type { JsonValue } from '@app/db/types'
 import { z } from 'zod'
 
-import * as fileStorage from '../actions/nanopore/file-storage'
-import * as nanoporeGetters from '../actions/nanopore/getters'
-import * as nanoporeSetters from '../actions/nanopore/setters'
-import * as nanoporeExport from '../actions/nanopore/export'
+import * as fileStorage from './nanopore/file-storage'
+import * as nanoporeGetters from './nanopore/getters'
+import * as nanoporeSetters from './nanopore/setters'
+import * as nanoporeExport from './nanopore/export'
 import { router, publicProcedure } from '../trpc'
 import { TRPCError } from '@trpc/server'
 
