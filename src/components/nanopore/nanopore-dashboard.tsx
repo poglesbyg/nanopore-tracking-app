@@ -8,6 +8,7 @@ import { Separator } from '../ui/separator'
 import { Skeleton } from '../ui/skeleton'
 import CreateSampleModal from './create-sample-modal'
 import { useAuth } from '../auth/auth-wrapper'
+import { apiClient, type NanoporeSample } from '@/lib/api-client'
 import { 
   Plus, 
   Search, 
@@ -20,7 +21,6 @@ import {
   User,
   TestTube,
   Zap,
-  Archive,
   TrendingUp,
   Activity,
   Calendar,
@@ -28,28 +28,6 @@ import {
   LogOut,
   ChevronDown
 } from 'lucide-react'
-
-interface NanoporeSample {
-  id: string
-  sample_name: string
-  project_id: string | null
-  submitter_name: string
-  submitter_email: string
-  lab_name: string | null
-  sample_type: string
-  status: 'submitted' | 'prep' | 'sequencing' | 'analysis' | 'completed' | 'archived'
-  priority: 'low' | 'normal' | 'high' | 'urgent'
-  assigned_to: string | null
-  library_prep_by: string | null
-  submitted_at: string
-  created_at: string
-  updated_at: string
-  created_by: string
-  concentration?: number | null
-  volume?: number | null
-  flow_cell_type?: string | null
-  chart_field: string
-}
 
 interface DashboardStats {
   total: number

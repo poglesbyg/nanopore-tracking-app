@@ -11,6 +11,12 @@ export default defineConfig({
   vite: {
     define: {
       'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
+    },
+    ssr: {
+      external: ['pg', 'pg-native', 'pg-pool', 'pg-protocol', 'pg-types', 'pgpass']
+    },
+    optimizeDeps: {
+      exclude: ['pg', 'pg-native', 'pg-pool', 'pg-protocol', 'pg-types', 'pgpass']
     }
   }
 });
