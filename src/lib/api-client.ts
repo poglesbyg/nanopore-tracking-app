@@ -22,6 +22,10 @@ export interface NanoporeSample {
   chart_field: string
 }
 
+// Use static dates for consistent hydration
+const MOCK_DATE_TODAY = '2024-01-14T10:00:00.000Z'
+const MOCK_DATE_YESTERDAY = '2024-01-13T10:00:00.000Z'
+
 class ApiClient {
   private baseUrl = '/api'
 
@@ -57,9 +61,9 @@ class ApiClient {
         priority: 'normal',
         assigned_to: 'John Doe',
         library_prep_by: 'Jane Smith',
-        submitted_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        submitted_at: MOCK_DATE_TODAY,
+        created_at: MOCK_DATE_TODAY,
+        updated_at: MOCK_DATE_TODAY,
         created_by: 'user-1',
         concentration: 50.5,
         volume: 100,
@@ -78,9 +82,9 @@ class ApiClient {
         priority: 'high',
         assigned_to: 'Jane Smith',
         library_prep_by: 'John Doe',
-        submitted_at: new Date(Date.now() - 86400000).toISOString(),
-        created_at: new Date(Date.now() - 86400000).toISOString(),
-        updated_at: new Date().toISOString(),
+        submitted_at: MOCK_DATE_YESTERDAY,
+        created_at: MOCK_DATE_YESTERDAY,
+        updated_at: MOCK_DATE_TODAY,
         created_by: 'user-2',
         concentration: 75.2,
         volume: 150,
@@ -91,14 +95,15 @@ class ApiClient {
   }
 
   async createSample(data: any): Promise<NanoporeSample> {
-    // Mock implementation
+    // Mock implementation with static ID
+    const id = `sample-${Date.now()}`
     return {
-      id: Math.random().toString(36).substr(2, 9),
+      id,
       ...data,
       status: 'submitted',
-      submitted_at: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      submitted_at: MOCK_DATE_TODAY,
+      created_at: MOCK_DATE_TODAY,
+      updated_at: MOCK_DATE_TODAY,
       created_by: 'current-user'
     }
   }
@@ -112,7 +117,7 @@ class ApiClient {
     return {
       ...sample,
       ...data,
-      updated_at: new Date().toISOString()
+      updated_at: MOCK_DATE_TODAY
     }
   }
 
