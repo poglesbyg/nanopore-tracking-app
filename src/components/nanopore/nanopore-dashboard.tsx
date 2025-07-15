@@ -15,6 +15,8 @@ import { MemoryOptimizationPanel } from './memory-optimization-panel'
 import { AdminLogin } from '../auth/admin-login'
 import AuditPanel from './audit-panel'
 import ConfigPanel from './config-panel'
+import ShutdownPanel from './shutdown-panel'
+import MigrationPanel from './migration-panel'
 import type { UserSession } from '../../lib/auth/AdminAuth'
 import PDFUpload from './pdf-upload'
 import { useAuth } from '../auth/auth-wrapper'
@@ -631,6 +633,20 @@ export default function NanoporeDashboard() {
           {adminSession && adminSession.permissions.includes('security_settings') && (
             <div className="mt-6">
               <ConfigPanel />
+            </div>
+          )}
+
+          {/* Shutdown Panel - Admin Only */}
+          {adminSession && adminSession.permissions.includes('system_monitoring') && (
+            <div className="mt-6">
+              <ShutdownPanel />
+            </div>
+          )}
+
+          {/* Migration Panel - Admin Only */}
+          {adminSession && adminSession.permissions.includes('system_monitoring') && (
+            <div className="mt-6">
+              <MigrationPanel />
             </div>
           )}
         </div>
