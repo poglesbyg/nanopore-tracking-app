@@ -163,7 +163,7 @@ class PdfTextExtractionService {
     tracker: PdfProgressTracker
   ): Promise<PdfExtractionResult> {
     return withPdfRetry(async () => {
-      tracker.startStep('text_extraction')
+      tracker.updateStep(ProcessingStep.EXTRACTING_TEXT, 0, 'Extracting text from PDF...')
       
       try {
         // Convert File to Buffer for pdf-parse
@@ -173,24 +173,57 @@ class PdfTextExtractionService {
         // Extract text using pdf-parse
         const result = await this.pdfParseModule(buffer)
         
-        tracker.completeStep('text_extraction')
-        tracker.startStep('pattern_matching')
+        tracker.updateStep(ProcessingStep.EXTRACTING_TEXT, 50, 'Text extraction completed')
+        tracker.updateStep(ProcessingStep.PATTERN_MATCHING, 0, 'Extracting structured data...')
         
         // Extract structured data using pattern matching
-        const extractedFields = pdfPatternMatcher.extractFields(result.text)
+        const extractedFields = pdfPatternMatcher.extractAllFields(result.text)
         
-        tracker.completeStep('pattern_matching')
+        tracker.updateStep(ProcessingStep.PATTERN_MATCHING, 100, 'Pattern matching completed')
         
         // Build metadata from pdf-parse result
         const metadata = this.buildMetadata(result.info || {})
+        
+        // Convert pattern matching results to our format
+        const sampleName = extractedFields.sampleName?.[0]?.value
+        const submitterName = extractedFields.submitterName?.[0]?.value
+        const submitterEmail = extractedFields.submitterEmail?.[0]?.value
+        const labName = extractedFields.labName?.[0]?.value
+        const projectName = extractedFields.projectName?.[0]?.value
+        const sequencingType = extractedFields.sequencingType?.[0]?.value
+        const sampleType = extractedFields.sampleType?.[0]?.value
+        const libraryType = extractedFields.libraryType?.[0]?.value
+        const flowCellType = extractedFields.flowCellType?.[0]?.value
+        const priority = extractedFields.priority?.[0]?.value
+        
+        // Calculate confidence
+        const totalFields = 10
+        const extractedCount = [sampleName, submitterName, submitterEmail, labName, projectName, 
+                               sequencingType, sampleType, libraryType, flowCellType, priority]
+                               .filter(Boolean).length
+        const confidence = extractedCount / totalFields
         
         const extractedData: ExtractedPdfData = {
           rawText: result.text,
           pageCount: result.numpages || 1,
           metadata,
-          extractedFields
+          extractedFields: {
+            sampleName,
+            submitterName,
+            submitterEmail,
+            labName,
+            projectName,
+            sequencingType,
+            sampleType,
+            libraryType,
+            flowCellType,
+            priority,
+            confidence
+          }
         }
 
+        tracker.complete('PDF processing completed successfully')
+        
         return {
           success: true,
           data: extractedData
@@ -198,12 +231,12 @@ class PdfTextExtractionService {
         
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-        tracker.failStep('text_extraction', errorMessage)
+        tracker.error(`PDF extraction failed: ${errorMessage}`)
         
         throw createPdfError(
-          PdfErrorType.PARSING_ERROR,
+          PdfErrorType.PARSER_ERROR,
           `pdf-parse extraction failed: ${errorMessage}`,
-          { originalError: error }
+          { fileName: file.name, fileSize: file.size }
         )
       }
     })
