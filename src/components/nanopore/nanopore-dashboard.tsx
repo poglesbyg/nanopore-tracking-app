@@ -11,6 +11,7 @@ import { EditTaskModal } from './edit-task-modal'
 import { ViewTaskModal } from './view-task-modal'
 import { AssignModal } from './assign-modal'
 import { ExportModal } from './export-modal'
+import { MemoryOptimizationPanel } from './memory-optimization-panel'
 import PDFUpload from './pdf-upload'
 import { useAuth } from '../auth/auth-wrapper'
 import { trpc } from '@/client/trpc'
@@ -597,6 +598,11 @@ export default function NanoporeDashboard() {
             color="text-red-600"
             change={{ value: 2, positive: false }}
           />
+        </div>
+
+        {/* Memory Optimization Panel */}
+        <div className="mb-8">
+          <MemoryOptimizationPanel />
         </div>
 
         {/* Filters and Search */}

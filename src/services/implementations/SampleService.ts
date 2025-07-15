@@ -11,6 +11,7 @@ import type { IEventEmitter } from '../interfaces/IEventEmitter'
 import { ValidationError, NotFoundError, BusinessLogicError } from '../../middleware/errors/ErrorTypes'
 import { getComponentLogger } from '../../lib/logging/StructuredLogger'
 import { applicationMetrics } from '../../lib/monitoring/MetricsCollector'
+import { withCache, cacheManager } from '../../lib/cache/CacheManager'
 
 export class SampleService implements ISampleService {
   private readonly logger = getComponentLogger('SampleService')
@@ -71,6 +72,9 @@ export class SampleService implements ISampleService {
       // Emit domain event
       this.eventEmitter.emitSampleCreated(sample)
       
+      // Invalidate cache
+      await this.invalidateSampleCache()
+      
       timer()
       return sample
     } catch (error) {
@@ -120,11 +124,42 @@ export class SampleService implements ISampleService {
   }
 
   async getAllSamples(): Promise<Sample[]> {
-    return await this.sampleRepository.findAll()
+    return await withCache(
+      'all-samples',
+      async () => await this.sampleRepository.findAll(),
+      {
+        ttl: 300, // 5 minutes
+        namespace: 'samples'
+      }
+    )
   }
 
   async searchSamples(criteria: SearchCriteria): Promise<Sample[]> {
     return await this.sampleRepository.search(criteria)
+  }
+
+  /**
+   * Invalidate sample-related cache entries
+   */
+  private async invalidateSampleCache(): Promise<void> {
+    try {
+      // Clear all sample-related cache entries
+      await cacheManager.clear('samples:*')
+      
+      this.logger.debug('Sample cache invalidated', {
+        action: 'cache_invalidated',
+        metadata: {
+          pattern: 'samples:*'
+        }
+      })
+    } catch (error) {
+      this.logger.warn('Failed to invalidate sample cache', {
+        errorType: error instanceof Error ? error.name : 'Unknown',
+        metadata: {
+          pattern: 'samples:*'
+        }
+      })
+    }
   }
 
   async deleteSample(id: string): Promise<{ success: boolean }> {

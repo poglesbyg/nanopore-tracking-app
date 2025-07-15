@@ -2,6 +2,8 @@ import type { APIRoute } from 'astro'
 import { applicationMetrics } from '../lib/monitoring/MetricsCollector'
 import { getComponentLogger } from '../lib/logging/StructuredLogger'
 import { db } from '../lib/database'
+import { cacheManager } from '../lib/cache/CacheManager'
+import { memoryManager } from '../lib/performance/MemoryManager'
 
 const logger = getComponentLogger('HealthCheck')
 
@@ -34,6 +36,7 @@ interface HealthResponse {
     database: ComponentHealth
     memory: ComponentHealth
     system: ComponentHealth
+    cache: ComponentHealth
   }
   metrics: {
     memoryUsage: {
@@ -95,31 +98,48 @@ async function checkDatabaseHealth(): Promise<ComponentHealth> {
  * Check memory health
  */
 function checkMemoryHealth(): ComponentHealth {
-  const memUsage = process.memoryUsage()
-  const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024)
-  const heapTotalMB = Math.round(memUsage.heapTotal / 1024 / 1024)
-  const heapUsagePercent = Math.round((memUsage.heapUsed / memUsage.heapTotal) * 100)
+  const memoryStats = memoryManager.getMemoryStats()
+  const resourceStats = memoryManager.getResourceStats()
+  
+  const heapUsedMB = Math.round(memoryStats.heapUsed / 1024 / 1024)
+  const heapTotalMB = Math.round(memoryStats.heapTotal / 1024 / 1024)
+  const rssMB = Math.round(memoryStats.rss / 1024 / 1024)
+  const heapUsagePercent = Math.round(memoryStats.heapUsedPercent)
   
   let status: HealthStatus = 'healthy'
   let message = `Memory usage: ${heapUsedMB}MB/${heapTotalMB}MB (${heapUsagePercent}%)`
   
-  if (heapUsagePercent > 90) {
+  // Check for critical memory usage
+  if (heapUsagePercent > 90 || rssMB > 300) {
     status = 'unhealthy'
-    message = `Critical memory usage: ${heapUsagePercent}%`
-  } else if (heapUsagePercent > 75) {
+    message = `Critical memory usage: ${heapUsagePercent}% heap, ${rssMB}MB RSS`
+  } else if (heapUsagePercent > 80 || rssMB > 250) {
     status = 'degraded'
-    message = `High memory usage: ${heapUsagePercent}%`
+    message = `High memory usage: ${heapUsagePercent}% heap, ${rssMB}MB RSS`
+  }
+  
+  // Check for memory leaks
+  if (resourceStats.activeTimers > 100 || resourceStats.activeIntervals > 50) {
+    status = status === 'healthy' ? 'degraded' : status
+    message += ` | Resource leak detected`
   }
   
   return {
     status,
     message,
     details: {
-      heapUsed: memUsage.heapUsed,
-      heapTotal: memUsage.heapTotal,
-      external: memUsage.external,
-      rss: memUsage.rss,
-      usagePercent: heapUsagePercent
+      heapUsed: memoryStats.heapUsed,
+      heapTotal: memoryStats.heapTotal,
+      external: memoryStats.external,
+      rss: memoryStats.rss,
+      arrayBuffers: memoryStats.arrayBuffers,
+      usagePercent: heapUsagePercent,
+      trend: memoryStats.trend,
+      gcRuns: memoryStats.gcRuns,
+      gcDuration: memoryStats.gcDuration,
+      activeTimers: resourceStats.activeTimers,
+      activeIntervals: resourceStats.activeIntervals,
+      activeListeners: resourceStats.activeListeners
     }
   }
 }
@@ -140,6 +160,65 @@ function checkSystemHealth(): ComponentHealth {
       platform: process.platform,
       arch: process.arch,
       pid: process.pid
+    }
+  }
+}
+
+/**
+ * Check cache health
+ */
+async function checkCacheHealth(): Promise<ComponentHealth> {
+  try {
+    const start = Date.now()
+    
+    // Check cache health
+    const isHealthy = await cacheManager.isHealthy()
+    const responseTime = Date.now() - start
+    
+    if (isHealthy) {
+      const stats = cacheManager.getStats()
+      
+      return {
+        status: 'healthy',
+        message: 'Cache is operational',
+        responseTime,
+        details: {
+          type: 'in-memory',
+          connected: true,
+          hitRate: stats.hitRate,
+          totalOperations: stats.totalOperations,
+          currentSize: stats.currentSize,
+          maxSize: stats.maxSize
+        }
+      }
+    } else {
+      return {
+        status: 'degraded',
+        message: 'Cache health check failed',
+        responseTime,
+        details: {
+          type: 'in-memory',
+          connected: false
+        }
+      }
+    }
+    
+  } catch (error) {
+    logger.error('Cache health check failed', {
+      errorType: error instanceof Error ? error.name : 'Unknown',
+      metadata: {
+        component: 'cache'
+      }
+    }, error instanceof Error ? error : undefined)
+    
+    return {
+      status: 'unhealthy',
+      message: 'Cache health check error',
+      details: {
+        type: 'in-memory',
+        connected: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }
     }
   }
 }
@@ -166,16 +245,18 @@ export const GET: APIRoute = async ({ request }) => {
   
   try {
     // Check all components
-    const [databaseHealth, memoryHealth, systemHealth] = await Promise.all([
+    const [databaseHealth, memoryHealth, systemHealth, cacheHealth] = await Promise.all([
       checkDatabaseHealth(),
       Promise.resolve(checkMemoryHealth()),
-      Promise.resolve(checkSystemHealth())
+      Promise.resolve(checkSystemHealth()),
+      checkCacheHealth()
     ])
     
     const components = {
       database: databaseHealth,
       memory: memoryHealth,
-      system: systemHealth
+      system: systemHealth,
+      cache: cacheHealth
     }
     
     // Determine overall status
