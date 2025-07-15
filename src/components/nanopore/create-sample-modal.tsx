@@ -43,23 +43,21 @@ interface FormData {
 }
 
 const SAMPLE_TYPES = [
-  'Genomic DNA',
-  'Total RNA',
-  'mRNA',
-  'Amplicon',
-  'Plasmid DNA',
-  'PCR Product',
-  'cDNA',
-  'Other'
+  { value: 'DNA', label: 'Genomic DNA' },
+  { value: 'RNA', label: 'Total RNA' },
+  { value: 'RNA', label: 'mRNA' },
+  { value: 'DNA', label: 'Amplicon' },
+  { value: 'DNA', label: 'Plasmid DNA' },
+  { value: 'DNA', label: 'PCR Product' },
+  { value: 'DNA', label: 'cDNA' },
+  { value: 'Other', label: 'Other' }
 ]
 
 const FLOW_CELL_TYPES = [
   'R9.4.1',
   'R10.4.1',
-  'R10.4.2',
-  'MinION',
-  'GridION',
-  'PromethION'
+  'R10.5.1',
+  'Other'
 ]
 
 const CHART_FIELDS = [
@@ -139,17 +137,17 @@ export default function CreateSampleModal({ isOpen, onClose, onSubmit }: CreateS
       // Convert form data to API format
       const sampleData = {
         sampleName: formData.sampleName,
-        projectId: formData.projectId || null,
+        projectId: formData.projectId || undefined,
         submitterName: formData.submitterName,
         submitterEmail: formData.submitterEmail,
-        labName: formData.labName || null,
+        labName: formData.labName || undefined,
         sampleType: formData.sampleType,
-        concentration: formData.concentration ? Number(formData.concentration) : null,
-        volume: formData.volume ? Number(formData.volume) : null,
-        flowCellType: formData.flowCellType || null,
+        concentration: formData.concentration ? Number(formData.concentration) : undefined,
+        volume: formData.volume ? Number(formData.volume) : undefined,
+        flowCellType: formData.flowCellType || undefined,
         priority: formData.priority,
         chartField: formData.chartField,
-        specialInstructions: formData.specialInstructions || null
+        specialInstructions: formData.specialInstructions || undefined
       }
       
       await onSubmit(sampleData)
@@ -360,7 +358,7 @@ export default function CreateSampleModal({ isOpen, onClose, onSubmit }: CreateS
                 >
                   <option value="">Select sample type</option>
                   {SAMPLE_TYPES.map(type => (
-                    <option key={type} value={type}>{type}</option>
+                    <option key={type.value} value={type.value}>{type.label}</option>
                   ))}
                 </select>
                 {validationErrors.sampleType && (

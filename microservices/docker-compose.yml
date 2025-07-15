@@ -1,0 +1,303 @@
+version: '3.8'
+
+services:
+  # Infrastructure Services
+  postgres:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_DB: nanopore_microservices
+      POSTGRES_USER: nanopore
+      POSTGRES_PASSWORD: nanopore123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - nanopore-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - nanopore-network
+
+  nats:
+    image: nats:2.9-alpine
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    networks:
+      - nanopore-network
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - NATS_URL=nats://nats:4222
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+      - nats
+    networks:
+      - nanopore-network
+
+  # Workflow Orchestrator
+  workflow-orchestrator:
+    build:
+      context: ./services/workflow-orchestrator
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - DATABASE_URL=postgresql://nanopore:nanopore123@postgres:5432/nanopore_microservices
+      - NATS_URL=nats://nats:4222
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+      - nats
+    networks:
+      - nanopore-network
+
+  # Workflow Step Services
+  sample-qc:
+    build:
+      context: ./services/sample-qc
+      dockerfile: Dockerfile
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=development
+      - PORT=3002
+      - DATABASE_URL=postgresql://nanopore:nanopore123@postgres:5432/nanopore_microservices
+      - NATS_URL=nats://nats:4222
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+      - nats
+    networks:
+      - nanopore-network
+
+  library-prep:
+    build:
+      context: ./services/library-prep
+      dockerfile: Dockerfile
+    ports:
+      - "3003:3003"
+    environment:
+      - NODE_ENV=development
+      - PORT=3003
+      - DATABASE_URL=postgresql://nanopore:nanopore123@postgres:5432/nanopore_microservices
+      - NATS_URL=nats://nats:4222
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+      - nats
+    networks:
+      - nanopore-network
+
+  library-qc:
+    build:
+      context: ./services/library-qc
+      dockerfile: Dockerfile
+    ports:
+      - "3004:3004"
+    environment:
+      - NODE_ENV=development
+      - PORT=3004
+      - DATABASE_URL=postgresql://nanopore:nanopore123@postgres:5432/nanopore_microservices
+      - NATS_URL=nats://nats:4222
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+      - nats
+    networks:
+      - nanopore-network
+
+  sequencing-setup:
+    build:
+      context: ./services/sequencing-setup
+      dockerfile: Dockerfile
+    ports:
+      - "3005:3005"
+    environment:
+      - NODE_ENV=development
+      - PORT=3005
+      - DATABASE_URL=postgresql://nanopore:nanopore123@postgres:5432/nanopore_microservices
+      - NATS_URL=nats://nats:4222
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+      - nats
+    networks:
+      - nanopore-network
+
+  sequencing-run:
+    build:
+      context: ./services/sequencing-run
+      dockerfile: Dockerfile
+    ports:
+      - "3006:3006"
+    environment:
+      - NODE_ENV=development
+      - PORT=3006
+      - DATABASE_URL=postgresql://nanopore:nanopore123@postgres:5432/nanopore_microservices
+      - NATS_URL=nats://nats:4222
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+      - nats
+    networks:
+      - nanopore-network
+
+  basecalling:
+    build:
+      context: ./services/basecalling
+      dockerfile: Dockerfile
+    ports:
+      - "3007:3007"
+    environment:
+      - NODE_ENV=development
+      - PORT=3007
+      - DATABASE_URL=postgresql://nanopore:nanopore123@postgres:5432/nanopore_microservices
+      - NATS_URL=nats://nats:4222
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+      - nats
+    networks:
+      - nanopore-network
+
+  quality-assessment:
+    build:
+      context: ./services/quality-assessment
+      dockerfile: Dockerfile
+    ports:
+      - "3008:3008"
+    environment:
+      - NODE_ENV=development
+      - PORT=3008
+      - DATABASE_URL=postgresql://nanopore:nanopore123@postgres:5432/nanopore_microservices
+      - NATS_URL=nats://nats:4222
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+      - nats
+    networks:
+      - nanopore-network
+
+  data-delivery:
+    build:
+      context: ./services/data-delivery
+      dockerfile: Dockerfile
+    ports:
+      - "3009:3009"
+    environment:
+      - NODE_ENV=development
+      - PORT=3009
+      - DATABASE_URL=postgresql://nanopore:nanopore123@postgres:5432/nanopore_microservices
+      - NATS_URL=nats://nats:4222
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+      - nats
+    networks:
+      - nanopore-network
+
+  # Support Services
+  ai-extraction:
+    build:
+      context: ./services/ai-extraction
+      dockerfile: Dockerfile
+    ports:
+      - "3010:3010"
+    environment:
+      - NODE_ENV=development
+      - PORT=3010
+      - DATABASE_URL=postgresql://nanopore:nanopore123@postgres:5432/nanopore_microservices
+      - NATS_URL=nats://nats:4222
+      - REDIS_URL=redis://redis:6379
+      - OLLAMA_HOST=http://ollama:11434
+    depends_on:
+      - postgres
+      - redis
+      - nats
+    networks:
+      - nanopore-network
+
+  pdf-processing:
+    build:
+      context: ./services/pdf-processing
+      dockerfile: Dockerfile
+    ports:
+      - "3011:3011"
+    environment:
+      - NODE_ENV=development
+      - PORT=3011
+      - DATABASE_URL=postgresql://nanopore:nanopore123@postgres:5432/nanopore_microservices
+      - NATS_URL=nats://nats:4222
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+      - nats
+    networks:
+      - nanopore-network
+
+  export-service:
+    build:
+      context: ./services/export-service
+      dockerfile: Dockerfile
+    ports:
+      - "3012:3012"
+    environment:
+      - NODE_ENV=development
+      - PORT=3012
+      - DATABASE_URL=postgresql://nanopore:nanopore123@postgres:5432/nanopore_microservices
+      - NATS_URL=nats://nats:4222
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+      - nats
+    networks:
+      - nanopore-network
+
+  # Optional: Ollama for AI features
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - nanopore-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  ollama_data:
+
+networks:
+  nanopore-network:
+    driver: bridge 

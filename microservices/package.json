@@ -1,0 +1,70 @@
+{
+  "name": "nanopore-microservices",
+  "version": "1.0.0",
+  "description": "Microservices architecture for nanopore sequencing workflow",
+  "main": "index.js",
+  "scripts": {
+    "install:all": "npm run install:services && npm run install:infrastructure",
+    "install:services": "for dir in services/*; do cd \"$dir\" && npm install && cd ../..; done",
+    "install:infrastructure": "for dir in infrastructure/*; do cd \"$dir\" && npm install && cd ../..; done",
+    "dev": "concurrently \"npm run dev:infrastructure\" \"npm run dev:services\"",
+    "dev:infrastructure": "concurrently \"npm run dev:message-queue\" \"npm run dev:service-discovery\"",
+    "dev:services": "concurrently \"npm run dev:api-gateway\" \"npm run dev:workflow-orchestrator\" \"npm run dev:sample-qc\" \"npm run dev:library-prep\" \"npm run dev:library-qc\" \"npm run dev:sequencing-setup\" \"npm run dev:sequencing-run\" \"npm run dev:basecalling\" \"npm run dev:quality-assessment\" \"npm run dev:data-delivery\"",
+    "dev:api-gateway": "cd services/api-gateway && npm run dev",
+    "dev:workflow-orchestrator": "cd services/workflow-orchestrator && npm run dev",
+    "dev:sample-qc": "cd services/sample-qc && npm run dev",
+    "dev:library-prep": "cd services/library-prep && npm run dev",
+    "dev:library-qc": "cd services/library-qc && npm run dev",
+    "dev:sequencing-setup": "cd services/sequencing-setup && npm run dev",
+    "dev:sequencing-run": "cd services/sequencing-run && npm run dev",
+    "dev:basecalling": "cd services/basecalling && npm run dev",
+    "dev:quality-assessment": "cd services/quality-assessment && npm run dev",
+    "dev:data-delivery": "cd services/data-delivery && npm run dev",
+    "dev:message-queue": "cd infrastructure/message-queue && npm run dev",
+    "dev:service-discovery": "cd infrastructure/service-discovery && npm run dev",
+    "build": "npm run build:services && npm run build:infrastructure",
+    "build:services": "for dir in services/*; do cd \"$dir\" && npm run build && cd ../..; done",
+    "build:infrastructure": "for dir in infrastructure/*; do cd \"$dir\" && npm run build && cd ../..; done",
+    "test": "npm run test:services && npm run test:infrastructure",
+    "test:services": "for dir in services/*; do cd \"$dir\" && npm test && cd ../..; done",
+    "test:infrastructure": "for dir in infrastructure/*; do cd \"$dir\" && npm test && cd ../..; done",
+    "test:integration": "jest --config=jest.integration.config.js",
+    "lint": "eslint . --ext .ts,.js",
+    "lint:fix": "eslint . --ext .ts,.js --fix",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "k8s:deploy": "kubectl apply -f k8s/",
+    "k8s:delete": "kubectl delete -f k8s/",
+    "generate:service": "node scripts/generate-service.js"
+  },
+  "keywords": [
+    "microservices",
+    "nanopore",
+    "sequencing",
+    "workflow",
+    "kubernetes",
+    "docker"
+  ],
+  "author": "Nanopore Tracking Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@typescript-eslint/eslint-plugin": "^5.0.0",
+    "@typescript-eslint/parser": "^5.0.0",
+    "concurrently": "^7.6.0",
+    "eslint": "^8.0.0",
+    "jest": "^29.0.0",
+    "nodemon": "^2.0.20",
+    "ts-jest": "^29.0.0",
+    "typescript": "^4.8.0"
+  },
+  "dependencies": {
+    "cross-env": "^7.0.3"
+  },
+  "workspaces": [
+    "services/*",
+    "infrastructure/*"
+  ]
+} 
