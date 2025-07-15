@@ -4,6 +4,13 @@ export async function runMigrations() {
   try {
     console.log('🔗 Starting database migrations...')
 
+    // Drop existing table if it exists to ensure clean migration
+    console.log('🗑️  Dropping existing nanopore_samples table...')
+    await db.executeQuery({
+      sql: `DROP TABLE IF EXISTS nanopore_samples CASCADE;`,
+      parameters: []
+    })
+
     // Create users table first (referenced by nanopore_samples)
     console.log('👤 Creating users table...')
     await db.executeQuery({
@@ -23,8 +30,8 @@ export async function runMigrations() {
     await db.executeQuery({
       sql: `
         INSERT INTO users (id, email, name) 
-        VALUES ('demo-user', 'demo@example.com', 'Demo User') 
-        ON CONFLICT (id) DO NOTHING;
+        VALUES ('550e8400-e29b-41d4-a716-446655440000', 'demo@example.com', 'Demo User') 
+        ON CONFLICT (email) DO NOTHING;
       `,
       parameters: []
     })
