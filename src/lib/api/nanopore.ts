@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { router, publicProcedure } from '../trpc'
 import { TRPCError } from '@trpc/server'
+import { getSampleService } from '../../container'
 
 // Valid chart fields for intake validation
 const VALID_CHART_FIELDS = [
@@ -53,18 +54,15 @@ const updateNanoporeSampleSchema = z.object({
 
 export const nanoporeRouter = router({
   // Get all nanopore samples
-  getAll: publicProcedure.query(async ({ ctx }) => {
-    return await ctx.db
-      .selectFrom('nanopore_samples')
-      .selectAll()
-      .orderBy('submitted_at', 'desc')
-      .execute()
+  getAll: publicProcedure.query(async () => {
+    const sampleService = getSampleService()
+    return await sampleService.getAllSamples()
   }),
 
   // Create new nanopore sample
   create: publicProcedure
     .input(createNanoporeSampleSchema)
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ input }) => {
       // Validate chart field before creating the sample
       if (!validateChartField(input.chartField)) {
         throw new TRPCError({
@@ -73,35 +71,25 @@ export const nanoporeRouter = router({
         })
       }
 
-      const now = new Date()
-      return await ctx.db
-        .insertInto('nanopore_samples')
-        .values({
-          id: crypto.randomUUID(),
-          sample_name: input.sampleName,
-          project_id: input.projectId || null,
-          submitter_name: input.submitterName,
-          submitter_email: input.submitterEmail,
-          lab_name: input.labName || null,
-          sample_type: input.sampleType,
-          sample_buffer: input.sampleBuffer || null,
-          concentration: input.concentration || null,
-          volume: input.volume || null,
-          total_amount: input.totalAmount || null,
-          flow_cell_type: input.flowCellType || null,
-          flow_cell_count: input.flowCellCount,
-          status: 'submitted',
-          priority: input.priority,
-          assigned_to: input.assignedTo || null,
-          library_prep_by: input.libraryPrepBy || null,
-          chart_field: input.chartField,
-          submitted_at: now,
-          created_at: now,
-          updated_at: now,
-          created_by: 'demo-user',
-        })
-        .returningAll()
-        .executeTakeFirstOrThrow()
+      const sampleService = getSampleService()
+      return await sampleService.createSample({
+        sampleName: input.sampleName,
+        projectId: input.projectId,
+        submitterName: input.submitterName,
+        submitterEmail: input.submitterEmail,
+        labName: input.labName,
+        sampleType: input.sampleType,
+        sampleBuffer: input.sampleBuffer,
+        concentration: input.concentration,
+        volume: input.volume,
+        totalAmount: input.totalAmount,
+        flowCellType: input.flowCellType,
+        flowCellCount: input.flowCellCount,
+        priority: input.priority,
+        assignedTo: input.assignedTo,
+        libraryPrepBy: input.libraryPrepBy,
+        chartField: input.chartField,
+      })
     }),
 
   // Update nanopore sample

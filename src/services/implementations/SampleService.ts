@@ -1,0 +1,195 @@
+import type { 
+  ISampleService, 
+  CreateSampleData, 
+  UpdateSampleData, 
+  Sample, 
+  SearchCriteria 
+} from '../interfaces/ISampleService'
+import type { ISampleRepository } from '../interfaces/ISampleRepository'
+import type { IAuditLogger } from '../interfaces/IAuditLogger'
+import type { IEventEmitter } from '../interfaces/IEventEmitter'
+
+export class SampleService implements ISampleService {
+  constructor(
+    private readonly sampleRepository: ISampleRepository,
+    private readonly auditLogger: IAuditLogger,
+    private readonly eventEmitter: IEventEmitter
+  ) {}
+
+  async createSample(data: CreateSampleData): Promise<Sample> {
+    // Validate required fields
+    this.validateCreateData(data)
+    
+    // Create the sample
+    const sample = await this.sampleRepository.create(data)
+    
+    // Log the action
+    await this.auditLogger.logSampleCreated(sample.id, sample.created_by, {
+      sampleName: data.sampleName,
+      submitterName: data.submitterName,
+      sampleType: data.sampleType,
+    })
+    
+    // Emit domain event
+    this.eventEmitter.emitSampleCreated(sample)
+    
+    return sample
+  }
+
+  async updateSample(id: string, data: UpdateSampleData): Promise<Sample> {
+    // Get existing sample for comparison
+    const existingSample = await this.sampleRepository.findById(id)
+    if (!existingSample) {
+      throw new Error('Sample not found')
+    }
+    
+    // Update the sample
+    const updatedSample = await this.sampleRepository.update(id, data)
+    
+    // Calculate changes for audit
+    const changes = this.calculateChanges(existingSample, data)
+    
+    // Log the action
+    await this.auditLogger.logSampleUpdated(id, updatedSample.created_by, changes)
+    
+    // Emit domain event
+    this.eventEmitter.emitSampleUpdated(updatedSample, changes)
+    
+    return updatedSample
+  }
+
+  async getSampleById(id: string): Promise<Sample | null> {
+    return await this.sampleRepository.findById(id)
+  }
+
+  async getAllSamples(): Promise<Sample[]> {
+    return await this.sampleRepository.findAll()
+  }
+
+  async searchSamples(criteria: SearchCriteria): Promise<Sample[]> {
+    return await this.sampleRepository.search(criteria)
+  }
+
+  async deleteSample(id: string): Promise<void> {
+    const existingSample = await this.sampleRepository.findById(id)
+    if (!existingSample) {
+      throw new Error('Sample not found')
+    }
+    
+    await this.sampleRepository.delete(id)
+    
+    // Log the action
+    await this.auditLogger.logSampleDeleted(id, existingSample.created_by)
+    
+    // Emit domain event
+    this.eventEmitter.emitSampleDeleted(id)
+  }
+
+  async assignSample(id: string, assignedTo: string, libraryPrepBy?: string): Promise<Sample> {
+    const existingSample = await this.sampleRepository.findById(id)
+    if (!existingSample) {
+      throw new Error('Sample not found')
+    }
+    
+    const updatedSample = await this.sampleRepository.assign(id, assignedTo, libraryPrepBy)
+    
+    // Log the action
+    await this.auditLogger.logSampleAssigned(id, updatedSample.created_by, assignedTo)
+    
+    // Emit domain event
+    this.eventEmitter.emitSampleAssigned(updatedSample, assignedTo)
+    
+    return updatedSample
+  }
+
+  async updateSampleStatus(
+    id: string, 
+    status: 'submitted' | 'prep' | 'sequencing' | 'analysis' | 'completed' | 'archived'
+  ): Promise<Sample> {
+    const existingSample = await this.sampleRepository.findById(id)
+    if (!existingSample) {
+      throw new Error('Sample not found')
+    }
+    
+    const oldStatus = existingSample.status
+    const updatedSample = await this.sampleRepository.updateStatus(id, status)
+    
+    // Log the action
+    await this.auditLogger.logStatusChange(id, updatedSample.created_by, oldStatus, status)
+    
+    // Emit domain event
+    this.eventEmitter.emitStatusChanged(updatedSample, oldStatus, status)
+    
+    return updatedSample
+  }
+
+  async getSamplesByStatus(status: string): Promise<Sample[]> {
+    return await this.sampleRepository.findByStatus(status)
+  }
+
+  async getSamplesByUser(userId: string): Promise<Sample[]> {
+    return await this.sampleRepository.findByUser(userId)
+  }
+
+  private validateCreateData(data: CreateSampleData): void {
+    const errors: string[] = []
+    
+    if (!data.sampleName?.trim()) {
+      errors.push('Sample name is required')
+    }
+    
+    if (!data.submitterName?.trim()) {
+      errors.push('Submitter name is required')
+    }
+    
+    if (!data.submitterEmail?.trim()) {
+      errors.push('Submitter email is required')
+    }
+    
+    if (!data.sampleType?.trim()) {
+      errors.push('Sample type is required')
+    }
+    
+    if (!data.chartField?.trim()) {
+      errors.push('Chart field is required')
+    }
+    
+    // Email validation
+    if (data.submitterEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.submitterEmail)) {
+      errors.push('Invalid email format')
+    }
+    
+    // Numeric validations
+    if (data.concentration !== undefined && data.concentration < 0) {
+      errors.push('Concentration must be positive')
+    }
+    
+    if (data.volume !== undefined && data.volume < 0) {
+      errors.push('Volume must be positive')
+    }
+    
+    if (data.flowCellCount !== undefined && data.flowCellCount < 1) {
+      errors.push('Flow cell count must be at least 1')
+    }
+    
+    if (errors.length > 0) {
+      throw new Error(`Validation failed: ${errors.join(', ')}`)
+    }
+  }
+
+  private calculateChanges(existing: Sample, updates: UpdateSampleData): Record<string, any> {
+    const changes: Record<string, any> = {}
+    
+    Object.entries(updates).forEach(([key, value]) => {
+      const existingValue = (existing as any)[key]
+      if (existingValue !== value) {
+        changes[key] = {
+          from: existingValue,
+          to: value,
+        }
+      }
+    })
+    
+    return changes
+  }
+} 
