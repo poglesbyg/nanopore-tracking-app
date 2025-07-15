@@ -12,6 +12,10 @@ import { ViewTaskModal } from './view-task-modal'
 import { AssignModal } from './assign-modal'
 import { ExportModal } from './export-modal'
 import { MemoryOptimizationPanel } from './memory-optimization-panel'
+import { AdminLogin } from '../auth/admin-login'
+import AuditPanel from './audit-panel'
+import ConfigPanel from './config-panel'
+import type { UserSession } from '../../lib/auth/AdminAuth'
 import PDFUpload from './pdf-upload'
 import { useAuth } from '../auth/auth-wrapper'
 import { trpc } from '@/client/trpc'
@@ -118,6 +122,9 @@ export default function NanoporeDashboard() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [priorityFilter, setPriorityFilter] = useState<string>('all')
   const [showCreateModal, setShowCreateModal] = useState(false)
+  
+  // Admin session state
+  const [adminSession, setAdminSession] = useState<UserSession | null>(null)
   
   // Modal state management
   const [showEditModal, setShowEditModal] = useState(false)
@@ -600,9 +607,32 @@ export default function NanoporeDashboard() {
           />
         </div>
 
-        {/* Memory Optimization Panel */}
+        {/* Admin Login and Memory Optimization Panel */}
         <div className="mb-8">
-          <MemoryOptimizationPanel />
+          <AdminLogin
+            onLogin={setAdminSession}
+            onLogout={() => setAdminSession(null)}
+            session={adminSession}
+          />
+          
+          {/* Memory Optimization Panel - Admin Only */}
+          {adminSession && adminSession.permissions.includes('memory_optimization') && (
+            <MemoryOptimizationPanel />
+          )}
+
+          {/* Audit Panel - Admin Only */}
+          {adminSession && adminSession.permissions.includes('audit_logs') && (
+            <div className="mt-6">
+              <AuditPanel />
+            </div>
+          )}
+
+          {/* Configuration Panel - Admin Only */}
+          {adminSession && adminSession.permissions.includes('security_settings') && (
+            <div className="mt-6">
+              <ConfigPanel />
+            </div>
+          )}
         </div>
 
         {/* Filters and Search */}
