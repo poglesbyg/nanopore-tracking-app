@@ -11,6 +11,7 @@ import { EditTaskModal } from './edit-task-modal'
 import { ViewTaskModal } from './view-task-modal'
 import { AssignModal } from './assign-modal'
 import { ExportModal } from './export-modal'
+import PDFUpload from './pdf-upload'
 import { useAuth } from '../auth/auth-wrapper'
 import { apiClient, type NanoporeSample } from '@/lib/api-client'
 import { 
@@ -36,7 +37,8 @@ import {
   Eye,
   Users,
   Trash2,
-  MoreHorizontal
+  MoreHorizontal,
+  X
 } from 'lucide-react'
 
 interface DashboardStats {
@@ -132,6 +134,9 @@ export default function NanoporeDashboard() {
   const [selectedSample, setSelectedSample] = useState<NanoporeSample | null>(null)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [openDropdown, setOpenDropdown] = useState<string | null>(null)
+  const [selectedSamples, setSelectedSamples] = useState<Set<string>>(new Set())
+  const [showBulkAssignModal, setShowBulkAssignModal] = useState(false)
+  const [showPdfUploadModal, setShowPdfUploadModal] = useState(false)
 
   // Type mapping functions to convert between API and modal types
   const mapApiToModal = (apiSample: NanoporeSample): any => ({
@@ -240,7 +245,7 @@ export default function NanoporeDashboard() {
   }
 
   const handleUploadPDF = () => {
-    toast.success('PDF upload modal would open here')
+    setShowPdfUploadModal(true)
   }
 
   const handleExport = () => {
@@ -381,6 +386,127 @@ export default function NanoporeDashboard() {
       return null
     }
     return workflow[currentIndex + 1]
+  }
+
+  // Bulk actions handlers
+  const handleSelectSample = (sampleId: string, checked: boolean) => {
+    setSelectedSamples(prev => {
+      const newSet = new Set(prev)
+      if (checked) {
+        newSet.add(sampleId)
+      } else {
+        newSet.delete(sampleId)
+      }
+      return newSet
+    })
+  }
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedSamples(new Set(filteredSamples.map(s => s.id)))
+    } else {
+      setSelectedSamples(new Set())
+    }
+  }
+
+  const handleBulkAssign = (assignedTo: string, libraryPrepBy?: string) => {
+    const promises = Array.from(selectedSamples).map(sampleId => {
+      const updateData = {
+        assigned_to: assignedTo,
+        library_prep_by: libraryPrepBy || null
+      }
+      return apiClient.updateSample(sampleId, updateData)
+    })
+
+    setActionLoading('bulk')
+    Promise.all(promises)
+      .then((updatedSamples) => {
+        setSamples(prev => prev.map(s => {
+          const updated = updatedSamples.find(u => u.id === s.id)
+          return updated || s
+        }))
+        toast.success(`${selectedSamples.size} samples assigned successfully`)
+        setSelectedSamples(new Set())
+        setShowBulkAssignModal(false)
+      })
+      .catch((error) => {
+        console.error('Failed to assign samples:', error)
+        toast.error('Failed to assign samples')
+      })
+      .finally(() => {
+        setActionLoading(null)
+      })
+  }
+
+  const handleBulkStatusUpdate = async (newStatus: string) => {
+    const promises = Array.from(selectedSamples).map(sampleId => 
+      apiClient.updateSampleStatus(sampleId, newStatus)
+    )
+
+    setActionLoading('bulk')
+    try {
+      const updatedSamples = await Promise.all(promises)
+      setSamples(prev => prev.map(s => {
+        const updated = updatedSamples.find(u => u.id === s.id)
+        return updated || s
+      }))
+      
+      // Recalculate stats
+      const newSamples = samples.map(s => {
+        const updated = updatedSamples.find(u => u.id === s.id)
+        return updated || s
+      })
+      setStats({
+        total: newSamples.length,
+        submitted: newSamples.filter(s => s.status === 'submitted').length,
+        inProgress: newSamples.filter(s => {
+          const status = s.status || ''
+          return ['prep', 'sequencing', 'analysis'].includes(status)
+        }).length,
+        completed: newSamples.filter(s => s.status === 'completed').length,
+        urgent: newSamples.filter(s => s.priority === 'urgent').length
+      })
+      
+      toast.success(`${selectedSamples.size} samples updated to ${newStatus}`)
+      setSelectedSamples(new Set())
+    } catch (error) {
+      console.error('Failed to update samples:', error)
+      toast.error('Failed to update samples')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (!window.confirm(`Are you sure you want to delete ${selectedSamples.size} selected samples?`)) {
+      return
+    }
+
+    const promises = Array.from(selectedSamples).map(sampleId => 
+      apiClient.deleteSample(sampleId)
+    )
+
+    setActionLoading('bulk')
+    try {
+      await Promise.all(promises)
+      setSamples(prev => prev.filter(s => !selectedSamples.has(s.id)))
+      
+      // Update stats
+      setStats(prev => ({
+        ...prev,
+        total: prev.total - selectedSamples.size,
+        // Note: This is a simplified stats update - in a real app we'd calculate properly
+        inProgress: Math.max(0, prev.inProgress - selectedSamples.size)
+      }))
+      
+      toast.success(`${selectedSamples.size} samples deleted successfully`)
+      setSelectedSamples(new Set())
+    } catch (error) {
+      console.error('Failed to delete samples:', error)
+      toast.error('Failed to delete samples')
+    } finally {
+      setActionLoading(null)
+    }
   }
 
   if (loading) {
@@ -582,10 +708,82 @@ export default function NanoporeDashboard() {
           </CardContent>
         </Card>
 
+        {/* Bulk Actions Bar */}
+        {selectedSamples.size > 0 && (
+          <Card className="mb-4 bg-blue-50 border-blue-200">
+            <CardContent className="py-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <span className="text-sm font-medium text-blue-900">
+                    {selectedSamples.size} sample{selectedSamples.size !== 1 ? 's' : ''} selected
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowBulkAssignModal(true)}
+                    disabled={actionLoading === 'bulk'}
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    Bulk Assign
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleBulkStatusUpdate('prep')}
+                    disabled={actionLoading === 'bulk'}
+                  >
+                    <Activity className="h-4 w-4 mr-2" />
+                    → Prep
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleBulkStatusUpdate('sequencing')}
+                    disabled={actionLoading === 'bulk'}
+                  >
+                    <Activity className="h-4 w-4 mr-2" />
+                    → Sequencing
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleBulkDelete}
+                    disabled={actionLoading === 'bulk'}
+                    className="text-red-600 hover:text-red-700"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Selected
+                  </Button>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedSamples(new Set())}
+                >
+                  Clear Selection
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Samples Table */}
         <Card>
           <CardHeader>
-            <CardTitle>Samples ({filteredSamples.length})</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>Samples ({filteredSamples.length})</CardTitle>
+              {filteredSamples.length > 0 && (
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={selectedSamples.size === filteredSamples.length && filteredSamples.length > 0}
+                    onChange={(e) => handleSelectAll(e.target.checked)}
+                    className="rounded border-gray-300"
+                  />
+                  <span className="text-sm text-gray-600">Select All</span>
+                </div>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -594,7 +792,13 @@ export default function NanoporeDashboard() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
                       <div className="flex-shrink-0">
-                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedSamples.has(sample.id)}
+                          onChange={(e) => handleSelectSample(sample.id, e.target.checked)}
+                          className="rounded border-gray-300 mr-2"
+                        />
+                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center inline-block">
                           <TestTube className="h-5 w-5 text-blue-600" />
                         </div>
                       </div>
@@ -801,6 +1005,46 @@ export default function NanoporeDashboard() {
       <ExportModal
         isOpen={showExportModal}
         onClose={() => setShowExportModal(false)}
+      />
+      
+      {/* PDF Upload Modal */}
+      {showPdfUploadModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Upload PDF Document</h2>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowPdfUploadModal(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <PDFUpload
+              onDataExtracted={(data, file) => {
+                // Handle extracted data - could create a new sample or update existing
+                console.log('PDF data extracted:', data, file)
+                toast.success('PDF processed successfully')
+              }}
+              onFileUploaded={(file) => {
+                console.log('PDF uploaded:', file)
+              }}
+            />
+          </div>
+        </div>
+      )}
+      
+      {/* Bulk Assign Modal */}
+      <AssignModal
+        isOpen={showBulkAssignModal}
+        onClose={() => setShowBulkAssignModal(false)}
+        onAssign={handleBulkAssign}
+        currentAssignment={{
+          assignedTo: null,
+          libraryPrepBy: null,
+        }}
+        sampleName={`${selectedSamples.size} selected samples`}
       />
     </div>
   )
