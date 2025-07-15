@@ -8,6 +8,7 @@ import type {
 import type { ISampleRepository } from '../interfaces/ISampleRepository'
 import type { IAuditLogger } from '../interfaces/IAuditLogger'
 import type { IEventEmitter } from '../interfaces/IEventEmitter'
+import { ValidationError, NotFoundError, BusinessLogicError } from '../../middleware/errors/ErrorTypes'
 
 export class SampleService implements ISampleService {
   constructor(
@@ -59,6 +60,10 @@ export class SampleService implements ISampleService {
   }
 
   async getSampleById(id: string): Promise<Sample | null> {
+    if (!id?.trim()) {
+      throw new ValidationError('Sample ID is required', 'id')
+    }
+    
     return await this.sampleRepository.findById(id)
   }
 
@@ -70,10 +75,14 @@ export class SampleService implements ISampleService {
     return await this.sampleRepository.search(criteria)
   }
 
-  async deleteSample(id: string): Promise<void> {
+  async deleteSample(id: string): Promise<{ success: boolean }> {
+    if (!id?.trim()) {
+      throw new ValidationError('Sample ID is required', 'id')
+    }
+    
     const existingSample = await this.sampleRepository.findById(id)
     if (!existingSample) {
-      throw new Error('Sample not found')
+      throw new NotFoundError('Sample', id)
     }
     
     await this.sampleRepository.delete(id)
@@ -83,6 +92,8 @@ export class SampleService implements ISampleService {
     
     // Emit domain event
     this.eventEmitter.emitSampleDeleted(id)
+    
+    return { success: true }
   }
 
   async assignSample(id: string, assignedTo: string, libraryPrepBy?: string): Promise<Sample> {
@@ -173,7 +184,7 @@ export class SampleService implements ISampleService {
     }
     
     if (errors.length > 0) {
-      throw new Error(`Validation failed: ${errors.join(', ')}`)
+      throw new ValidationError(`Validation failed: ${errors.join(', ')}`)
     }
   }
 

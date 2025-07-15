@@ -2,6 +2,15 @@ import { z } from 'zod'
 import { router, publicProcedure } from '../trpc'
 import { TRPCError } from '@trpc/server'
 import { getSampleService } from '../../container'
+import { handleTRPCProcedureError, withErrorHandling, extractRequestContext } from '../../middleware/errors/TRPCErrorMiddleware'
+import { 
+  createSampleValidation, 
+  updateSampleValidation, 
+  assignSampleValidation, 
+  updateStatusValidation,
+  searchValidation,
+  validators 
+} from '../../middleware/validation/ValidationRules'
 
 // Valid chart fields for intake validation
 const VALID_CHART_FIELDS = [
@@ -11,85 +20,55 @@ const VALID_CHART_FIELDS = [
 ]
 
 function validateChartField(chartField: string): boolean {
-  return VALID_CHART_FIELDS.includes(chartField)
+  return VALID_CHART_FIELDS.includes(chartField) || validators.isValidChartField(chartField)
 }
-
-const createNanoporeSampleSchema = z.object({
-  sampleName: z.string().min(1, 'Sample name is required').max(255),
-  projectId: z.string().optional(),
-  submitterName: z.string().min(1, 'Submitter name is required').max(255),
-  submitterEmail: z.string().email('Invalid email address'),
-  labName: z.string().optional(),
-  sampleType: z.string().min(1, 'Sample type is required'),
-  sampleBuffer: z.string().optional(),
-  concentration: z.number().positive().optional(),
-  volume: z.number().positive().optional(),
-  totalAmount: z.number().positive().optional(),
-  flowCellType: z.string().optional(),
-  flowCellCount: z.number().int().positive().default(1),
-  priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
-  assignedTo: z.string().optional(),
-  libraryPrepBy: z.string().optional(),
-  chartField: z.string().min(1, 'Chart field is required for intake validation').max(255),
-})
-
-const updateNanoporeSampleSchema = z.object({
-  sampleName: z.string().max(255).optional(),
-  projectId: z.string().optional(),
-  submitterName: z.string().max(255).optional(),
-  submitterEmail: z.string().email().optional(),
-  labName: z.string().optional(),
-  sampleType: z.string().optional(),
-  sampleBuffer: z.string().optional(),
-  concentration: z.number().positive().optional(),
-  volume: z.number().positive().optional(),
-  totalAmount: z.number().positive().optional(),
-  flowCellType: z.string().optional(),
-  flowCellCount: z.number().int().positive().optional(),
-  status: z.enum(['submitted', 'prep', 'sequencing', 'analysis', 'completed', 'archived']).optional(),
-  priority: z.enum(['low', 'normal', 'high', 'urgent']).optional(),
-  assignedTo: z.string().optional(),
-  libraryPrepBy: z.string().optional(),
-})
 
 export const nanoporeRouter = router({
   // Get all nanopore samples
-  getAll: publicProcedure.query(async () => {
-    const sampleService = getSampleService()
-    return await sampleService.getAllSamples()
+  getAll: publicProcedure.query(async ({ ctx }) => {
+    try {
+      const sampleService = getSampleService()
+      return await sampleService.getAllSamples()
+    } catch (error) {
+      handleTRPCProcedureError(error as Error, extractRequestContext(ctx))
+    }
   }),
 
   // Create new nanopore sample
   create: publicProcedure
-    .input(createNanoporeSampleSchema)
-    .mutation(async ({ input }) => {
-      // Validate chart field before creating the sample
-      if (!validateChartField(input.chartField)) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: `Invalid chart field: ${input.chartField}. Chart field must be part of the intake validation list.`,
-        })
-      }
+    .input(createSampleValidation)
+    .mutation(async ({ input, ctx }) => {
+      try {
+        // Validate chart field before creating the sample
+        if (!validateChartField(input.chartField)) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Invalid chart field: ${input.chartField}. Chart field must be part of the intake validation list.`,
+          })
+        }
 
-      const sampleService = getSampleService()
-      return await sampleService.createSample({
-        sampleName: input.sampleName,
-        projectId: input.projectId,
-        submitterName: input.submitterName,
-        submitterEmail: input.submitterEmail,
-        labName: input.labName,
-        sampleType: input.sampleType,
-        sampleBuffer: input.sampleBuffer,
-        concentration: input.concentration,
-        volume: input.volume,
-        totalAmount: input.totalAmount,
-        flowCellType: input.flowCellType,
-        flowCellCount: input.flowCellCount,
-        priority: input.priority,
-        assignedTo: input.assignedTo,
-        libraryPrepBy: input.libraryPrepBy,
-        chartField: input.chartField,
-      })
+        const sampleService = getSampleService()
+        return await sampleService.createSample({
+          sampleName: input.sampleName,
+          projectId: input.projectId,
+          submitterName: input.submitterName,
+          submitterEmail: input.submitterEmail,
+          labName: input.labName,
+          sampleType: input.sampleType,
+          sampleBuffer: input.sampleBuffer,
+          concentration: input.concentration,
+          volume: input.volume,
+          totalAmount: input.totalAmount,
+          flowCellType: input.flowCellType,
+          flowCellCount: input.flowCellCount,
+          priority: input.priority,
+          assignedTo: input.assignedTo,
+          libraryPrepBy: input.libraryPrepBy,
+          chartField: input.chartField,
+        })
+      } catch (error) {
+        handleTRPCProcedureError(error as Error, extractRequestContext(ctx))
+      }
     }),
 
   // Update nanopore sample
@@ -97,82 +76,72 @@ export const nanoporeRouter = router({
     .input(
       z.object({
         id: z.string().uuid(),
-        data: updateNanoporeSampleSchema,
+        data: updateSampleValidation,
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const updateData: any = {}
-      
-      if (input.data.sampleName !== undefined) updateData.sample_name = input.data.sampleName
-      if (input.data.projectId !== undefined) updateData.project_id = input.data.projectId
-      if (input.data.submitterName !== undefined) updateData.submitter_name = input.data.submitterName
-      if (input.data.submitterEmail !== undefined) updateData.submitter_email = input.data.submitterEmail
-      if (input.data.labName !== undefined) updateData.lab_name = input.data.labName
-      if (input.data.sampleType !== undefined) updateData.sample_type = input.data.sampleType
-      if (input.data.sampleBuffer !== undefined) updateData.sample_buffer = input.data.sampleBuffer
-      if (input.data.concentration !== undefined) updateData.concentration = input.data.concentration
-      if (input.data.volume !== undefined) updateData.volume = input.data.volume
-      if (input.data.totalAmount !== undefined) updateData.total_amount = input.data.totalAmount
-      if (input.data.flowCellType !== undefined) updateData.flow_cell_type = input.data.flowCellType
-      if (input.data.flowCellCount !== undefined) updateData.flow_cell_count = input.data.flowCellCount
-      if (input.data.status !== undefined) updateData.status = input.data.status
-      if (input.data.priority !== undefined) updateData.priority = input.data.priority
-      if (input.data.assignedTo !== undefined) updateData.assigned_to = input.data.assignedTo
-      if (input.data.libraryPrepBy !== undefined) updateData.library_prep_by = input.data.libraryPrepBy
-      
-      updateData.updated_at = new Date()
-
-      return await ctx.db
-        .updateTable('nanopore_samples')
-        .set(updateData)
-        .where('id', '=', input.id)
-        .returningAll()
-        .executeTakeFirstOrThrow()
+      try {
+        const sampleService = getSampleService()
+        
+        // Convert undefined values to omit them from the update
+        const updateData: any = {}
+        
+        if (input.data.sampleName !== undefined) updateData.sampleName = input.data.sampleName
+        if (input.data.projectId !== undefined) updateData.projectId = input.data.projectId
+        if (input.data.submitterName !== undefined) updateData.submitterName = input.data.submitterName
+        if (input.data.submitterEmail !== undefined) updateData.submitterEmail = input.data.submitterEmail
+        if (input.data.labName !== undefined) updateData.labName = input.data.labName
+        if (input.data.sampleType !== undefined) updateData.sampleType = input.data.sampleType
+        if (input.data.sampleBuffer !== undefined) updateData.sampleBuffer = input.data.sampleBuffer
+        if (input.data.concentration !== undefined) updateData.concentration = input.data.concentration
+        if (input.data.volume !== undefined) updateData.volume = input.data.volume
+        if (input.data.totalAmount !== undefined) updateData.totalAmount = input.data.totalAmount
+        if (input.data.flowCellType !== undefined) updateData.flowCellType = input.data.flowCellType
+        if (input.data.flowCellCount !== undefined) updateData.flowCellCount = input.data.flowCellCount
+        if (input.data.status !== undefined) updateData.status = input.data.status
+        if (input.data.priority !== undefined) updateData.priority = input.data.priority
+        if (input.data.assignedTo !== undefined) updateData.assignedTo = input.data.assignedTo
+        if (input.data.libraryPrepBy !== undefined) updateData.libraryPrepBy = input.data.libraryPrepBy
+        
+        return await sampleService.updateSample(input.id, updateData)
+      } catch (error) {
+        handleTRPCProcedureError(error as Error, extractRequestContext(ctx))
+      }
     }),
 
   // Assign sample to team member
   assign: publicProcedure
-    .input(
-      z.object({
-        id: z.string().uuid(),
-        assignedTo: z.string(),
-        libraryPrepBy: z.string().optional(),
-      }),
-    )
-    .mutation(async ({ input }) => {
-      const sampleService = getSampleService()
-      return await sampleService.assignSample(input.id, input.assignedTo, input.libraryPrepBy)
+    .input(assignSampleValidation)
+    .mutation(async ({ input, ctx }) => {
+      try {
+        const sampleService = getSampleService()
+        return await sampleService.assignSample(input.id, input.assignedTo, input.libraryPrepBy)
+      } catch (error) {
+        handleTRPCProcedureError(error as Error, extractRequestContext(ctx))
+      }
     }),
 
   // Update sample status
   updateStatus: publicProcedure
-    .input(
-      z.object({
-        id: z.string().uuid(),
-        status: z.enum(['submitted', 'prep', 'sequencing', 'analysis', 'completed', 'archived']),
-      }),
-    )
-    .mutation(async ({ input }) => {
-      const sampleService = getSampleService()
-      return await sampleService.updateSampleStatus(input.id, input.status)
+    .input(updateStatusValidation)
+    .mutation(async ({ input, ctx }) => {
+      try {
+        const sampleService = getSampleService()
+        return await sampleService.updateSampleStatus(input.id, input.status)
+      } catch (error) {
+        handleTRPCProcedureError(error as Error, extractRequestContext(ctx))
+      }
     }),
 
   // Delete sample
   delete: publicProcedure
     .input(z.string().uuid())
     .mutation(async ({ input, ctx }) => {
-      const result = await ctx.db
-        .deleteFrom('nanopore_samples')
-        .where('id', '=', input)
-        .executeTakeFirst()
-      
-      if (result.numDeletedRows === 0n) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Sample not found',
-        })
+      try {
+        const sampleService = getSampleService()
+        return await sampleService.deleteSample(input)
+      } catch (error) {
+        handleTRPCProcedureError(error as Error, extractRequestContext(ctx))
       }
-      
-      return { success: true }
     }),
 })

@@ -81,7 +81,7 @@ export interface ISampleService {
   getSampleById(id: string): Promise<Sample | null>
   getAllSamples(): Promise<Sample[]>
   searchSamples(criteria: SearchCriteria): Promise<Sample[]>
-  deleteSample(id: string): Promise<void>
+  deleteSample(id: string): Promise<{ success: boolean }>
   assignSample(id: string, assignedTo: string, libraryPrepBy?: string): Promise<Sample>
   updateSampleStatus(id: string, status: 'submitted' | 'prep' | 'sequencing' | 'analysis' | 'completed' | 'archived'): Promise<Sample>
   getSamplesByStatus(status: string): Promise<Sample[]>
