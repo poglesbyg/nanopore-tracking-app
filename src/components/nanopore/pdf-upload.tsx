@@ -22,14 +22,12 @@ import {
   nanoporeFormService,
   type NanoporeFormData,
 } from '@/lib/ai/nanopore-llm-service'
-import { pdfErrorHandler, PdfErrorType } from '@/lib/pdf-error-handler'
 
 import PDFViewer from './pdf-viewer'
 
 interface PDFUploadProps {
   onDataExtracted?: (data: NanoporeFormData, file: File) => void
   onFileUploaded?: (file: File) => void
-  _sampleId?: string
 }
 
 interface UploadedFile {
@@ -44,7 +42,6 @@ interface UploadedFile {
 export default function PDFUpload({
   onDataExtracted,
   onFileUploaded,
-  _sampleId,
 }: PDFUploadProps) {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const [isProcessing, setIsProcessing] = useState(false)

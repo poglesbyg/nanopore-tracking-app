@@ -14,7 +14,8 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@app/db/types": ["src/lib/db/types"]
     }
   },
   "include": ["src/**/*"],

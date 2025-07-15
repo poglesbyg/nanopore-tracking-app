@@ -4,7 +4,6 @@ import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Input } from '../ui/input'
-import { Separator } from '../ui/separator'
 import { Skeleton } from '../ui/skeleton'
 import CreateSampleModal from './create-sample-modal'
 import { EditTaskModal } from './edit-task-modal'
@@ -26,7 +25,6 @@ import type { NanoporeSample } from '@/lib/api-client'
 import { 
   Plus, 
   Search, 
-  Filter, 
   Download, 
   Upload, 
   AlertCircle, 
@@ -42,11 +40,7 @@ import {
   LogOut,
   ChevronDown,
   Archive,
-  Edit,
-  Eye,
-  Users,
   Trash2,
-  MoreHorizontal,
   X
 } from 'lucide-react'
 
@@ -149,17 +143,33 @@ export default function NanoporeDashboard() {
   const deleteSampleMutation = trpc.nanopore.delete.useMutation()
   const updateStatusMutation = trpc.nanopore.updateStatus.useMutation()
 
+  // Stats state
+  const [stats, setStats] = useState<DashboardStats>({
+    total: 0,
+    submitted: 0,
+    inProgress: 0,
+    completed: 0,
+    urgent: 0
+  })
+
   // Calculate stats from samples
-  const stats: DashboardStats = {
-    total: samples.length,
-    submitted: samples.filter((s: any) => s.status === 'submitted').length,
-    inProgress: samples.filter((s: any) => {
+  const calculateStats = (sampleList: any[]): DashboardStats => ({
+    total: sampleList.length,
+    submitted: sampleList.filter((s: any) => s.status === 'submitted').length,
+    inProgress: sampleList.filter((s: any) => {
       const status = s.status || ''
       return ['prep', 'sequencing', 'analysis'].includes(status)
     }).length,
-    completed: samples.filter((s: any) => s.status === 'completed').length,
-    urgent: samples.filter((s: any) => s.priority === 'urgent').length,
-  }
+    completed: sampleList.filter((s: any) => s.status === 'completed').length,
+    urgent: sampleList.filter((s: any) => s.priority === 'urgent').length,
+  })
+
+  // Update stats when samples change
+  useEffect(() => {
+    if (samples) {
+      setStats(calculateStats(samples))
+    }
+  }, [samples])
 
   // Type mapping functions to convert between API and modal types
   const mapApiToModal = (apiSample: any): any => ({
@@ -180,19 +190,6 @@ export default function NanoporeDashboard() {
     createdBy: apiSample.created_by,
   })
 
-  const mapModalToApi = (modalData: any): any => ({
-    sample_name: modalData.sampleName,
-    project_id: modalData.projectId,
-    submitter_name: modalData.submitterName,
-    submitter_email: modalData.submitterEmail,
-    lab_name: modalData.labName,
-    sample_type: modalData.sampleType,
-    status: modalData.status,
-    priority: modalData.priority,
-    assigned_to: modalData.assignedTo,
-    library_prep_by: modalData.libraryPrepBy,
-  })
-
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -205,15 +202,10 @@ export default function NanoporeDashboard() {
     return () => document.removeEventListener('click', handleClickOutside)
   }, [openDropdown])
 
-  const filteredSamples = samples.filter((sample: any) => {
-    // Safely handle potentially undefined/null values
-    const sampleName = sample.sample_name || ''
-    const submitterName = sample.submitter_name || ''
-    const labName = sample.lab_name || ''
-    
-    const matchesSearch = sampleName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         submitterName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         labName.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredSamples = samples.filter((sample: NanoporeSample) => {
+    const matchesSearch = sample.sample_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         sample.submitter_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         sample.project_id?.toLowerCase().includes(searchTerm.toLowerCase())
     
     const matchesStatus = statusFilter === 'all' || sample.status === statusFilter
     const matchesPriority = priorityFilter === 'all' || sample.priority === priorityFilter
@@ -305,35 +297,35 @@ export default function NanoporeDashboard() {
         case 'qc_result':
           await updateSampleMutation.mutateAsync({
             id: sample.id,
-            data: { notes: `QC ${data?.result === 'pass' ? 'passed' : 'failed'} - ${new Date().toISOString()}` }
+            data: { }
           })
           toast.success(`QC ${data?.result === 'pass' ? 'passed' : 'failed'} recorded`)
           break
         case 'start_library_prep':
           await updateSampleMutation.mutateAsync({
             id: sample.id,
-            data: { notes: `Library prep started - ${new Date().toISOString()}` }
+            data: { }
           })
           toast.success('Library prep started')
           break
         case 'start_sequencing_run':
           await updateSampleMutation.mutateAsync({
             id: sample.id,
-            data: { notes: `Sequencing run started - ${new Date().toISOString()}` }
+            data: { }
           })
           toast.success('Sequencing run started')
           break
         case 'generate_report':
           await updateSampleMutation.mutateAsync({
             id: sample.id,
-            data: { notes: `Report generated - ${new Date().toISOString()}` }
+            data: { }
           })
           toast.success('Report generation initiated')
           break
         case 'deliver_results':
           await updateSampleMutation.mutateAsync({
             id: sample.id,
-            data: { notes: `Results delivered - ${new Date().toISOString()}` }
+            data: { }
           })
           toast.success('Results delivered')
           break
@@ -351,7 +343,7 @@ export default function NanoporeDashboard() {
         case 'reprocess_sample':
           await updateSampleMutation.mutateAsync({
             id: sample.id,
-            data: { status: 'submitted' as const, notes: `Reprocessed - ${new Date().toISOString()}` }
+            data: { status: 'submitted' as const }
           })
           toast.success('Sample marked for reprocessing')
           break
@@ -433,7 +425,7 @@ export default function NanoporeDashboard() {
     if (currentIndex === -1 || currentIndex === workflow.length - 1) {
       return null
     }
-    return workflow[currentIndex + 1]
+    return workflow[currentIndex + 1] || null
   }
 
   // Bulk actions handlers
@@ -451,7 +443,7 @@ export default function NanoporeDashboard() {
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedSamples(new Set(filteredSamples.map(s => s.id)))
+      setSelectedSamples(new Set(filteredSamples.map((s: NanoporeSample) => s.id)))
     } else {
       setSelectedSamples(new Set())
     }
@@ -487,7 +479,7 @@ export default function NanoporeDashboard() {
     const promises = Array.from(selectedSamples).map(sampleId => 
       updateStatusMutation.mutateAsync({
         id: sampleId,
-        status: newStatus,
+        status: newStatus as "submitted" | "prep" | "sequencing" | "analysis" | "completed" | "archived",
       })
     )
 
@@ -497,20 +489,11 @@ export default function NanoporeDashboard() {
       refetch()
       
       // Recalculate stats
-      const newSamples = samples.map(s => {
-        const updated = updatedSamples.find(u => u.id === s.id)
+      const newSamples = samples.map((s: any) => {
+        const updated = updatedSamples.find((u: any) => u.id === s.id)
         return updated || s
       })
-      setStats({
-        total: newSamples.length,
-        submitted: newSamples.filter(s => s.status === 'submitted').length,
-        inProgress: newSamples.filter(s => {
-          const status = s.status || ''
-          return ['prep', 'sequencing', 'analysis'].includes(status)
-        }).length,
-        completed: newSamples.filter(s => s.status === 'completed').length,
-        urgent: newSamples.filter(s => s.priority === 'urgent').length
-      })
+      setStats(calculateStats(newSamples))
       
       toast.success(`${selectedSamples.size} samples updated to ${newStatus}`)
       setSelectedSamples(new Set())
@@ -874,7 +857,7 @@ export default function NanoporeDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {filteredSamples.map((sample) => (
+              {filteredSamples.map((sample: NanoporeSample) => (
                 <div key={sample.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">

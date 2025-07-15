@@ -1,11 +1,6 @@
 import { 
   Edit, 
   Calendar, 
-  User, 
-  Mail, 
-  TestTube, 
-  Building, 
-  Flag,
   Save,
   X
 } from 'lucide-react'

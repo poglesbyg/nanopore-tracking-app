@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react'
 import { Card } from '../ui/card'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
-import { Separator } from '../ui/separator'
 import { Progress } from '../ui/progress'
 import type { UserSession } from '../../lib/auth/AdminAuth'
 
@@ -340,7 +339,7 @@ export function ShutdownPanel({ adminSession }: ShutdownPanelProps) {
               type="text"
               placeholder="Type confirmation text here..."
               value="I_UNDERSTAND_THIS_WILL_SHUTDOWN_THE_SERVER"
-              onChange={(e) => {}}
+              onChange={(_e) => {}}
               className="font-mono"
               disabled
             />

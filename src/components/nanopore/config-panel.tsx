@@ -199,7 +199,7 @@ export function ConfigPanel({ adminSession }: ConfigPanelProps) {
         credentials: 'include'
       })
 
-      const result = await response.json()
+      await response.json()
       // Handle validation result
     } catch (error) {
       console.error('Error validating configuration:', error)
@@ -213,6 +213,16 @@ export function ConfigPanel({ adminSession }: ConfigPanelProps) {
       fetchEnvironmentInfo()
     }
   }, [adminSession])
+
+  if (!adminSession) {
+    return (
+      <Card className="p-4 bg-red-50 border-red-200">
+        <div className="text-red-700">
+          <strong>Error:</strong> Admin session required to manage configuration.
+        </div>
+      </Card>
+    )
+  }
 
   // Get environment color
   const getEnvironmentColor = (env: string) => {

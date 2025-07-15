@@ -30,7 +30,7 @@ export async function createNanoporeSample(
   sampleData: CreateNanoporeSampleInput,
 ): Promise<Selectable<NanoporeSample>> {
   return await db
-    .insertInto('nanoporeSamples')
+    .insertInto('nanopore_samples')
     .values(sampleData)
     .returningAll()
     .executeTakeFirstOrThrow()
@@ -49,16 +49,16 @@ export async function createNanoporeSampleWithDetails(
 }> {
   return await db.transaction().execute(async (trx) => {
     const sample = await trx
-      .insertInto('nanoporeSamples')
+      .insertInto('nanopore_samples')
       .values(sampleData)
       .returningAll()
       .executeTakeFirstOrThrow()
 
     const details = await trx
-      .insertInto('nanoporeSampleDetails')
+      .insertInto('nanopore_sample_details')
       .values({
         ...detailsData,
-        sampleId: sample.id,
+        sample_id: sample.id,
       })
       .returningAll()
       .executeTakeFirstOrThrow()
@@ -73,14 +73,24 @@ export async function createNanoporeSampleWithDetails(
 export async function updateNanoporeSample(
   db: Kysely<DB>,
   sampleId: string,
-  userId: string,
   updateData: UpdateNanoporeSampleInput,
+  userId: string
 ): Promise<Selectable<NanoporeSample>> {
+  const { status, ...otherData } = updateData
+  
+  const finalUpdateData = {
+    ...otherData,
+    ...(status && { status }),
+    updated_at: new Date(),
+    ...(status === 'prep' && { started_at: new Date() }),
+    ...(status === 'completed' && { completed_at: new Date() }),
+  }
+
   return await db
-    .updateTable('nanoporeSamples')
-    .set(updateData)
+    .updateTable('nanopore_samples')
+    .set(finalUpdateData)
     .where('id', '=', sampleId)
-    .where('createdBy', '=', userId)
+    .where('created_by', '=', userId)
     .returningAll()
     .executeTakeFirstOrThrow()
 }
@@ -96,15 +106,15 @@ export async function updateNanoporeSampleStatus(
 ): Promise<Selectable<NanoporeSample>> {
   const updateData: UpdateNanoporeSampleInput = {
     status,
-    ...(status === 'prep' && { startedAt: new Date() }),
-    ...(status === 'completed' && { completedAt: new Date() }),
+    ...(status === 'prep' && { started_at: new Date() }),
+    ...(status === 'completed' && { completed_at: new Date() }),
   }
 
   return await db
-    .updateTable('nanoporeSamples')
+    .updateTable('nanopore_samples')
     .set(updateData)
     .where('id', '=', sampleId)
-    .where('createdBy', '=', userId)
+    .where('created_by', '=', userId)
     .returningAll()
     .executeTakeFirstOrThrow()
 }
@@ -115,16 +125,17 @@ export async function updateNanoporeSampleStatus(
 export async function assignNanoporeSample(
   db: Kysely<DB>,
   sampleId: string,
-  assignedTo: string,
-  libraryPrepBy?: string,
+  assigned_to: string,
+  library_prep_by?: string,
 ): Promise<Selectable<NanoporeSample>> {
-  const updateData: UpdateNanoporeSampleInput = {
-    assignedTo,
-    ...(libraryPrepBy && { libraryPrepBy }),
+  const updateData = {
+    assigned_to,
+    ...(library_prep_by && { library_prep_by }),
+    updated_at: new Date(),
   }
 
   return await db
-    .updateTable('nanoporeSamples')
+    .updateTable('nanopore_samples')
     .set(updateData)
     .where('id', '=', sampleId)
     .returningAll()
@@ -140,9 +151,9 @@ export async function deleteNanoporeSample(
   userId: string,
 ): Promise<void> {
   await db
-    .deleteFrom('nanoporeSamples')
+    .deleteFrom('nanopore_samples')
     .where('id', '=', sampleId)
-    .where('createdBy', '=', userId)
+    .where('created_by', '=', userId)
     .execute()
 }
 
@@ -154,7 +165,7 @@ export async function createNanoporeSampleDetails(
   detailsData: CreateNanoporeSampleDetailInput,
 ): Promise<Selectable<NanoporeSampleDetail>> {
   return await db
-    .insertInto('nanoporeSampleDetails')
+    .insertInto('nanopore_sample_details')
     .values(detailsData)
     .returningAll()
     .executeTakeFirstOrThrow()
@@ -364,17 +375,17 @@ export async function createCompleteNanoporeSample(
   return await db.transaction().execute(async (trx) => {
     // Create the sample
     const sample = await trx
-      .insertInto('nanoporeSamples')
+      .insertInto('nanopore_samples')
       .values(sampleData)
       .returningAll()
       .executeTakeFirstOrThrow()
 
     // Create sample details
     const details = await trx
-      .insertInto('nanoporeSampleDetails')
+      .insertInto('nanopore_sample_details')
       .values({
         ...detailsData,
-        sampleId: sample.id,
+        sample_id: sample.id,
       })
       .returningAll()
       .executeTakeFirstOrThrow()

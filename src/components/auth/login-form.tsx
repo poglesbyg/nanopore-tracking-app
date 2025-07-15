@@ -9,7 +9,6 @@ import {
   Lock, 
   Loader2, 
   AlertCircle,
-  CheckCircle,
   User,
   Shield
 } from 'lucide-react'

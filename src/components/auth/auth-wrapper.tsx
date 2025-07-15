@@ -27,7 +27,6 @@ interface AuthWrapperProps {
 
 export default function AuthWrapper({ children }: AuthWrapperProps) {
   const [user, setUser] = useState<User | null>(null)
-  const [sessionId, setSessionId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isHydrated, setIsHydrated] = useState(false)
 
@@ -41,7 +40,6 @@ export default function AuthWrapper({ children }: AuthWrapperProps) {
         const result = await authService.validateSession(storedSessionId)
         if (result) {
           setUser(result.user)
-          setSessionId(storedSessionId)
         } else {
           localStorage.removeItem('nanopore_session')
         }
@@ -57,7 +55,6 @@ export default function AuthWrapper({ children }: AuthWrapperProps) {
       const result = await authService.login(email, password)
       if (result) {
         setUser(result.user)
-        setSessionId(result.session.id)
         localStorage.setItem('nanopore_session', result.session.id)
         toast.success(`Welcome back, ${result.user.name}!`)
         return true
@@ -73,7 +70,6 @@ export default function AuthWrapper({ children }: AuthWrapperProps) {
     await authService.logout()
     localStorage.removeItem('nanopore_session')
     setUser(null)
-    setSessionId(null)
     toast.success('Logged out successfully')
   }
 
