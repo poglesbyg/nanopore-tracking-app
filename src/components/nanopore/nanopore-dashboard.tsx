@@ -13,7 +13,8 @@ import { AssignModal } from './assign-modal'
 import { ExportModal } from './export-modal'
 import PDFUpload from './pdf-upload'
 import { useAuth } from '../auth/auth-wrapper'
-import { apiClient, type NanoporeSample } from '@/lib/api-client'
+import { trpc } from '@/client/trpc'
+import type { NanoporeSample } from '@/lib/api-client'
 import { 
   Plus, 
   Search, 
@@ -111,19 +112,10 @@ const StatCard = ({ title, value, icon: Icon, color, change }: {
 
 export default function NanoporeDashboard() {
   const { user, logout } = useAuth()
-  const [samples, setSamples] = useState<NanoporeSample[]>([])
-  const [loading, setLoading] = useState(true)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [priorityFilter, setPriorityFilter] = useState<string>('all')
-  const [stats, setStats] = useState<DashboardStats>({
-    total: 0,
-    submitted: 0,
-    inProgress: 0,
-    completed: 0,
-    urgent: 0
-  })
   const [showCreateModal, setShowCreateModal] = useState(false)
   
   // Modal state management
@@ -138,8 +130,28 @@ export default function NanoporeDashboard() {
   const [showBulkAssignModal, setShowBulkAssignModal] = useState(false)
   const [showPdfUploadModal, setShowPdfUploadModal] = useState(false)
 
+  // tRPC hooks
+  const { data: samples = [], isLoading: loading, refetch } = trpc.nanopore.getAll.useQuery()
+  const createSampleMutation = trpc.nanopore.create.useMutation()
+  const updateSampleMutation = trpc.nanopore.update.useMutation()
+  const assignSampleMutation = trpc.nanopore.assign.useMutation()
+  const deleteSampleMutation = trpc.nanopore.delete.useMutation()
+  const updateStatusMutation = trpc.nanopore.updateStatus.useMutation()
+
+  // Calculate stats from samples
+  const stats: DashboardStats = {
+    total: samples.length,
+    submitted: samples.filter((s: any) => s.status === 'submitted').length,
+    inProgress: samples.filter((s: any) => {
+      const status = s.status || ''
+      return ['prep', 'sequencing', 'analysis'].includes(status)
+    }).length,
+    completed: samples.filter((s: any) => s.status === 'completed').length,
+    urgent: samples.filter((s: any) => s.priority === 'urgent').length,
+  }
+
   // Type mapping functions to convert between API and modal types
-  const mapApiToModal = (apiSample: NanoporeSample): any => ({
+  const mapApiToModal = (apiSample: any): any => ({
     id: apiSample.id,
     sampleName: apiSample.sample_name,
     projectId: apiSample.project_id,
@@ -157,7 +169,7 @@ export default function NanoporeDashboard() {
     createdBy: apiSample.created_by,
   })
 
-  const mapModalToApi = (modalData: any): Partial<NanoporeSample> => ({
+  const mapModalToApi = (modalData: any): any => ({
     sample_name: modalData.sampleName,
     project_id: modalData.projectId,
     submitter_name: modalData.submitterName,
@@ -169,36 +181,6 @@ export default function NanoporeDashboard() {
     assigned_to: modalData.assignedTo,
     library_prep_by: modalData.libraryPrepBy,
   })
-
-  // Load data on mount
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const samplesData = await apiClient.listSamples()
-        setSamples(samplesData)
-        
-        // Calculate stats
-        setStats({
-          total: samplesData.length,
-          submitted: samplesData.filter(s => s.status === 'submitted').length,
-          inProgress: samplesData.filter(s => ['prep', 'sequencing', 'analysis'].includes(s.status)).length,
-          completed: samplesData.filter(s => s.status === 'completed').length,
-          urgent: samplesData.filter(s => s.priority === 'urgent').length
-        })
-        
-        setLoading(false)
-      } catch (error) {
-        console.error('Failed to load samples:', error)
-        toast.error('Failed to load samples')
-        setLoading(false)
-      }
-    }
-
-    // Simulate loading time
-    setTimeout(() => {
-      loadData()
-    }, 1000)
-  }, [])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -212,7 +194,7 @@ export default function NanoporeDashboard() {
     return () => document.removeEventListener('click', handleClickOutside)
   }, [openDropdown])
 
-  const filteredSamples = samples.filter(sample => {
+  const filteredSamples = samples.filter((sample: any) => {
     // Safely handle potentially undefined/null values
     const sampleName = sample.sample_name || ''
     const submitterName = sample.submitter_name || ''
@@ -234,13 +216,8 @@ export default function NanoporeDashboard() {
 
   const handleSampleSubmit = async (sampleData: any) => {
     try {
-      const newSample = await apiClient.createSample(sampleData)
-      setSamples(prev => [newSample, ...prev])
-      setStats(prev => ({
-        ...prev,
-        total: prev.total + 1,
-        submitted: prev.submitted + 1
-      }))
+      await createSampleMutation.mutateAsync(sampleData)
+      refetch()
       toast.success('Sample created successfully!')
       setShowCreateModal(false)
     } catch (error) {
@@ -273,26 +250,15 @@ export default function NanoporeDashboard() {
     setShowAssignModal(true)
   }
 
-  const handleDeleteSample = async (sample: NanoporeSample) => {
+  const handleDeleteSample = async (sample: any) => {
     if (!window.confirm(`Are you sure you want to delete sample "${sample.sample_name}"?`)) {
       return
     }
 
     setActionLoading(sample.id)
     try {
-      await apiClient.deleteSample(sample.id)
-      setSamples(prev => prev.filter(s => s.id !== sample.id))
-      
-      // Update stats
-      setStats(prev => ({
-        ...prev,
-        total: prev.total - 1,
-        ...(sample.status === 'submitted' && { submitted: prev.submitted - 1 }),
-        ...(sample.status === 'completed' && { completed: prev.completed - 1 }),
-        ...(['prep', 'sequencing', 'analysis'].includes(sample.status || '') && { inProgress: prev.inProgress - 1 }),
-        ...(sample.priority === 'urgent' && { urgent: prev.urgent - 1 })
-      }))
-      
+      await deleteSampleMutation.mutateAsync(sample.id)
+      refetch()
       toast.success('Sample deleted successfully')
     } catch (error) {
       console.error('Failed to delete sample:', error)
@@ -305,23 +271,13 @@ export default function NanoporeDashboard() {
   const handleSampleUpdate = async (sampleId: string, updateData: any) => {
     setActionLoading(sampleId)
     try {
-      const apiUpdateData = mapModalToApi(updateData)
-      const updatedSample = await apiClient.updateSample(sampleId, apiUpdateData)
-      setSamples(prev => prev.map(s => s.id === sampleId ? updatedSample : s))
-      
-      // Recalculate stats
-      const updatedSamples = samples.map(s => s.id === sampleId ? updatedSample : s)
-      setStats({
-        total: updatedSamples.length,
-        submitted: updatedSamples.filter(s => s.status === 'submitted').length,
-        inProgress: updatedSamples.filter(s => ['prep', 'sequencing', 'analysis'].includes(s.status)).length,
-        completed: updatedSamples.filter(s => s.status === 'completed').length,
-        urgent: updatedSamples.filter(s => s.priority === 'urgent').length
+      await updateSampleMutation.mutateAsync({
+        id: sampleId,
+        data: updateData,
       })
-      
+      refetch()
       toast.success('Sample updated successfully')
       setShowEditModal(false)
-      setSelectedSample(null)
     } catch (error) {
       console.error('Failed to update sample:', error)
       toast.error('Failed to update sample')
@@ -330,22 +286,19 @@ export default function NanoporeDashboard() {
     }
   }
 
-  const handleSampleAssignment = async (assignedTo: string, libraryPrepBy?: string) => {
+  const handleSampleAssign = async (assignedTo: string, libraryPrepBy?: string) => {
     if (!selectedSample) return
     
     setActionLoading(selectedSample.id)
     try {
-      const updateData = {
-        assigned_to: assignedTo,
-        library_prep_by: libraryPrepBy || null
-      }
-      
-      const updatedSample = await apiClient.updateSample(selectedSample.id, updateData)
-      setSamples(prev => prev.map(s => s.id === selectedSample.id ? updatedSample : s))
-      
+      await assignSampleMutation.mutateAsync({
+        id: selectedSample.id,
+        assignedTo,
+        libraryPrepBy,
+      })
+      refetch()
       toast.success('Sample assigned successfully')
       setShowAssignModal(false)
-      setSelectedSample(null)
     } catch (error) {
       console.error('Failed to assign sample:', error)
       toast.error('Failed to assign sample')
@@ -354,25 +307,14 @@ export default function NanoporeDashboard() {
     }
   }
 
-  const handleStatusUpdate = async (sample: NanoporeSample, newStatus: string) => {
+  const handleStatusUpdate = async (sample: any, newStatus: string) => {
     setActionLoading(sample.id)
     try {
-      const updatedSample = await apiClient.updateSampleStatus(sample.id, newStatus)
-      setSamples(prev => prev.map(s => s.id === sample.id ? updatedSample : s))
-      
-      // Recalculate stats
-      const updatedSamples = samples.map(s => s.id === sample.id ? updatedSample : s)
-      setStats({
-        total: updatedSamples.length,
-        submitted: updatedSamples.filter(s => s.status === 'submitted').length,
-        inProgress: updatedSamples.filter(s => {
-          const status = s.status || ''
-          return ['prep', 'sequencing', 'analysis'].includes(status)
-        }).length,
-        completed: updatedSamples.filter(s => s.status === 'completed').length,
-        urgent: updatedSamples.filter(s => s.priority === 'urgent').length
+      await updateStatusMutation.mutateAsync({
+        id: sample.id,
+        status: newStatus,
       })
-      
+      refetch()
       toast.success(`Sample status updated to ${newStatus}`)
     } catch (error) {
       console.error('Failed to update status:', error)
@@ -416,20 +358,17 @@ export default function NanoporeDashboard() {
 
   const handleBulkAssign = (assignedTo: string, libraryPrepBy?: string) => {
     const promises = Array.from(selectedSamples).map(sampleId => {
-      const updateData = {
-        assigned_to: assignedTo,
-        library_prep_by: libraryPrepBy || null
-      }
-      return apiClient.updateSample(sampleId, updateData)
+      return assignSampleMutation.mutateAsync({
+        id: sampleId,
+        assignedTo,
+        libraryPrepBy,
+      })
     })
 
     setActionLoading('bulk')
     Promise.all(promises)
       .then((updatedSamples) => {
-        setSamples(prev => prev.map(s => {
-          const updated = updatedSamples.find(u => u.id === s.id)
-          return updated || s
-        }))
+        refetch()
         toast.success(`${selectedSamples.size} samples assigned successfully`)
         setSelectedSamples(new Set())
         setShowBulkAssignModal(false)
@@ -445,16 +384,16 @@ export default function NanoporeDashboard() {
 
   const handleBulkStatusUpdate = async (newStatus: string) => {
     const promises = Array.from(selectedSamples).map(sampleId => 
-      apiClient.updateSampleStatus(sampleId, newStatus)
+      updateStatusMutation.mutateAsync({
+        id: sampleId,
+        status: newStatus,
+      })
     )
 
     setActionLoading('bulk')
     try {
       const updatedSamples = await Promise.all(promises)
-      setSamples(prev => prev.map(s => {
-        const updated = updatedSamples.find(u => u.id === s.id)
-        return updated || s
-      }))
+      refetch()
       
       // Recalculate stats
       const newSamples = samples.map(s => {
@@ -488,13 +427,13 @@ export default function NanoporeDashboard() {
     }
 
     const promises = Array.from(selectedSamples).map(sampleId => 
-      apiClient.deleteSample(sampleId)
+      deleteSampleMutation.mutateAsync(sampleId)
     )
 
     setActionLoading('bulk')
     try {
       await Promise.all(promises)
-      setSamples(prev => prev.filter(s => !selectedSamples.has(s.id)))
+      refetch()
       
       // Update stats
       setStats(prev => ({
@@ -998,7 +937,7 @@ export default function NanoporeDashboard() {
           setShowAssignModal(false)
           setSelectedSample(null)
         }}
-        onAssign={handleSampleAssignment}
+        onAssign={handleSampleAssign}
         currentAssignment={{
           assignedTo: selectedSample?.assigned_to || null,
           libraryPrepBy: selectedSample?.library_prep_by || null,
