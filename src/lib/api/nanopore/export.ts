@@ -61,10 +61,10 @@ function convertToCSV(samples: Array<Selectable<NanoporeSample>>): string {
     'Submitter Email',
     'Lab Name',
     'Sample Type',
-    // 'Sample Buffer', // TODO: Fix database schema
-    // 'Concentration', // TODO: Fix database schema
-    // 'Volume', // TODO: Fix database schema
-    // 'Total Amount', // TODO: Fix database schema
+    'Sample Buffer',
+    'Concentration',
+    'Volume',
+    'Total Amount',
     'Flow Cell Type',
     'Flow Cell Count',
     'Status',
@@ -89,10 +89,10 @@ function convertToCSV(samples: Array<Selectable<NanoporeSample>>): string {
       escapeCSVField(sample.submitter_email),
       escapeCSVField(sample.lab_name || ''),
       escapeCSVField(sample.sample_type),
-      // escapeCSVField(sample.sample_buffer || ''), // TODO: Fix database schema
-      // sample.concentration || '', // TODO: Fix database schema
-      // sample.volume || '', // TODO: Fix database schema
-      // sample.total_amount || '', // TODO: Fix database schema
+      escapeCSVField(sample.sample_buffer || ''),
+      sample.concentration || '',
+      sample.volume || '',
+      sample.total_amount || '',
       escapeCSVField(sample.flow_cell_type || ''),
       sample.flow_cell_count || '',
       sample.status,
