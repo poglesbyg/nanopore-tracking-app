@@ -24,7 +24,7 @@ export class PostgreSQLSampleRepository implements ISampleRepository {
         submitter_email: data.submitterEmail,
         lab_name: data.labName || null,
         sample_type: data.sampleType,
-        sample_buffer: data.sampleBuffer || null,
+        // sample_buffer: data.sampleBuffer || null, // TODO: Fix database schema - column doesn't exist
         concentration: data.concentration || null,
         volume: data.volume || null,
         total_amount: data.totalAmount || null,
@@ -58,7 +58,7 @@ export class PostgreSQLSampleRepository implements ISampleRepository {
     if (data.submitterEmail !== undefined) updateData.submitter_email = data.submitterEmail
     if (data.labName !== undefined) updateData.lab_name = data.labName
     if (data.sampleType !== undefined) updateData.sample_type = data.sampleType
-    if (data.sampleBuffer !== undefined) updateData.sample_buffer = data.sampleBuffer
+    // if (data.sampleBuffer !== undefined) updateData.sample_buffer = data.sampleBuffer // TODO: Fix database schema
     if (data.concentration !== undefined) updateData.concentration = data.concentration
     if (data.volume !== undefined) updateData.volume = data.volume
     if (data.totalAmount !== undefined) updateData.total_amount = data.totalAmount

@@ -254,7 +254,13 @@ export function ShutdownPanel({ adminSession }: ShutdownPanelProps) {
           <div>
             <div className="text-sm text-gray-600">Elapsed Time</div>
             <div className="text-xl font-bold">
-              {shutdownData.status.startTime && shutdownData.status.endTime ? formatElapsedTime(shutdownData.status.endTime.getTime() - shutdownData.status.startTime.getTime()) : 'N/A'}
+              {shutdownData.status.startTime ? formatElapsedTime(
+                shutdownData.status.isShuttingDown 
+                  ? Date.now() - shutdownData.status.startTime.getTime()
+                  : shutdownData.status.progress === 100 
+                    ? Date.now() - shutdownData.status.startTime.getTime()
+                    : 0
+              ) : 'N/A'}
             </div>
           </div>
         </div>
