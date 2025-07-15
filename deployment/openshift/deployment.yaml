@@ -67,10 +67,10 @@ spec:
           mountPath: /app/uploads
         resources:
           requests:
-            memory: "150Mi"
+            memory: "200Mi"
             cpu: "200m"
           limits:
-            memory: "200Mi"
+            memory: "300Mi"
             cpu: "500m"
         livenessProbe:
           httpGet:
