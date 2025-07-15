@@ -4,6 +4,7 @@ import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { Separator } from '../ui/separator'
 import { Progress } from '../ui/progress'
+import type { UserSession } from '../../lib/auth/AdminAuth'
 
 interface AuditLogEntry {
   id: string
@@ -28,6 +29,11 @@ interface AuditStats {
   eventsByCategory: Record<string, number>
   successfulEvents: number
   failedEvents: number
+  recentActivity: Array<{
+    timestamp: Date
+    eventType: string
+    count: number
+  }>
 }
 
 interface AuditData {
@@ -38,7 +44,11 @@ interface AuditData {
   lastUpdated: Date | null
 }
 
-export default function AuditPanel() {
+interface AuditPanelProps {
+  adminSession: UserSession | null
+}
+
+export function AuditPanel({ adminSession }: AuditPanelProps) {
   const [auditData, setAuditData] = useState<AuditData>({
     logs: [],
     stats: {
@@ -46,7 +56,8 @@ export default function AuditPanel() {
       eventsByType: {},
       eventsByCategory: {},
       successfulEvents: 0,
-      failedEvents: 0
+      failedEvents: 0,
+      recentActivity: []
     },
     loading: false,
     error: null,
@@ -54,17 +65,25 @@ export default function AuditPanel() {
   })
 
   const [selectedFilter, setSelectedFilter] = useState<string>('all')
-  const [cleanupInProgress, setCleanupInProgress] = useState(false)
   const [autoRefresh, setAutoRefresh] = useState(false)
 
-  // Fetch audit data
+  // Fetch audit data with authentication
   const fetchAuditData = async () => {
+    if (!adminSession) {
+      setAuditData(prev => ({ ...prev, error: 'Admin session required' }))
+      return
+    }
+
     setAuditData(prev => ({ ...prev, loading: true, error: null }))
     
     try {
       const [logsResponse, statsResponse] = await Promise.all([
-        fetch('/api/audit?action=logs&limit=50'),
-        fetch('/api/audit?action=stats')
+        fetch('/api/audit?action=logs&limit=50', {
+          credentials: 'include' // Include cookies for session authentication
+        }),
+        fetch('/api/audit?action=stats', {
+          credentials: 'include' // Include cookies for session authentication
+        })
       ])
 
       if (!logsResponse.ok || !statsResponse.ok) {
@@ -90,50 +109,48 @@ export default function AuditPanel() {
       }
     } catch (error) {
       console.error('Error fetching audit data:', error)
-      setAuditData(prev => ({
-        ...prev,
-        loading: false,
-        error: error instanceof Error ? error.message : 'Failed to fetch audit data'
+      setAuditData(prev => ({ 
+        ...prev, 
+        loading: false, 
+        error: error instanceof Error ? error.message : 'Failed to fetch audit data' 
       }))
     }
   }
 
-  // Cleanup old logs
-  const cleanupLogs = async () => {
-    setCleanupInProgress(true)
-    
+  // Cleanup audit logs
+  const cleanupAuditLogs = async () => {
+    if (!adminSession) return
+
     try {
-      const response = await fetch('/api/audit?action=cleanup')
-      const data = await response.json()
-      
-      if (data.success) {
-        await fetchAuditData() // Refresh data after cleanup
-      } else {
-        throw new Error(data.error || 'Cleanup failed')
+      const response = await fetch('/api/audit?action=cleanup', {
+        method: 'POST',
+        credentials: 'include' // Include cookies for session authentication
+      })
+
+      const result = await response.json()
+      if (result.success) {
+        // Refresh data after cleanup
+        fetchAuditData()
       }
     } catch (error) {
-      console.error('Error during cleanup:', error)
-      setAuditData(prev => ({
-        ...prev,
-        error: error instanceof Error ? error.message : 'Cleanup failed'
-      }))
-    } finally {
-      setCleanupInProgress(false)
+      console.error('Error cleaning up audit logs:', error)
     }
   }
 
-  // Auto-refresh functionality
+  // Auto-refresh effect
   useEffect(() => {
     if (autoRefresh) {
-      const interval = setInterval(fetchAuditData, 30000) // Refresh every 30 seconds
+      const interval = setInterval(fetchAuditData, 10000) // Refresh every 10 seconds
       return () => clearInterval(interval)
     }
-  }, [autoRefresh])
+  }, [autoRefresh, adminSession])
 
-  // Initial load
+  // Initial load - only when admin session is available
   useEffect(() => {
-    fetchAuditData()
-  }, [])
+    if (adminSession) {
+      fetchAuditData()
+    }
+  }, [adminSession])
 
   // Filter logs based on selected filter
   const filteredLogs = auditData.logs.filter(log => {
@@ -195,10 +212,10 @@ export default function AuditPanel() {
           </Button>
           <Button 
             variant="outline" 
-            onClick={cleanupLogs}
-            disabled={cleanupInProgress}
+            onClick={cleanupAuditLogs}
+            disabled={!adminSession}
           >
-            {cleanupInProgress ? 'Cleaning...' : 'Cleanup Old Logs'}
+            {auditData.loading ? 'Cleaning...' : 'Cleanup Old Logs'}
           </Button>
         </div>
       </div>

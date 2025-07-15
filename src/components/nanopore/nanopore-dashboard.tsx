@@ -13,10 +13,11 @@ import { AssignModal } from './assign-modal'
 import { ExportModal } from './export-modal'
 import { MemoryOptimizationPanel } from './memory-optimization-panel'
 import { AdminLogin } from '../auth/admin-login'
-import AuditPanel from './audit-panel'
-import ConfigPanel from './config-panel'
-import ShutdownPanel from './shutdown-panel'
-import MigrationPanel from './migration-panel'
+import { AuditPanel } from './audit-panel'
+import { ConfigPanel } from './config-panel'
+import { ShutdownPanel } from './shutdown-panel'
+import { MigrationPanel } from './migration-panel'
+import { SampleActions } from './sample-actions'
 import type { UserSession } from '../../lib/auth/AdminAuth'
 import PDFUpload from './pdf-upload'
 import { useAuth } from '../auth/auth-wrapper'
@@ -291,6 +292,96 @@ export default function NanoporeDashboard() {
     } catch (error) {
       console.error('Failed to update sample:', error)
       toast.error('Failed to update sample')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  // Enhanced workflow action handler
+  const handleWorkflowAction = async (sample: any, action: string, data?: any) => {
+    setActionLoading(sample.id)
+    try {
+      switch (action) {
+        case 'qc_result':
+          await updateSampleMutation.mutateAsync({
+            id: sample.id,
+            data: { notes: `QC ${data?.result === 'pass' ? 'passed' : 'failed'} - ${new Date().toISOString()}` }
+          })
+          toast.success(`QC ${data?.result === 'pass' ? 'passed' : 'failed'} recorded`)
+          break
+        case 'start_library_prep':
+          await updateSampleMutation.mutateAsync({
+            id: sample.id,
+            data: { notes: `Library prep started - ${new Date().toISOString()}` }
+          })
+          toast.success('Library prep started')
+          break
+        case 'start_sequencing_run':
+          await updateSampleMutation.mutateAsync({
+            id: sample.id,
+            data: { notes: `Sequencing run started - ${new Date().toISOString()}` }
+          })
+          toast.success('Sequencing run started')
+          break
+        case 'generate_report':
+          await updateSampleMutation.mutateAsync({
+            id: sample.id,
+            data: { notes: `Report generated - ${new Date().toISOString()}` }
+          })
+          toast.success('Report generation initiated')
+          break
+        case 'deliver_results':
+          await updateSampleMutation.mutateAsync({
+            id: sample.id,
+            data: { notes: `Results delivered - ${new Date().toISOString()}` }
+          })
+          toast.success('Results delivered')
+          break
+        case 'duplicate_sample':
+          // Create a duplicate sample
+          const duplicateData = {
+            ...sample,
+            sampleName: `${sample.sample_name}_copy`,
+            status: 'submitted' as const,
+            submittedAt: new Date().toISOString()
+          }
+          await createSampleMutation.mutateAsync(duplicateData)
+          toast.success('Sample duplicated')
+          break
+        case 'reprocess_sample':
+          await updateSampleMutation.mutateAsync({
+            id: sample.id,
+            data: { status: 'submitted' as const, notes: `Reprocessed - ${new Date().toISOString()}` }
+          })
+          toast.success('Sample marked for reprocessing')
+          break
+        case 'update_priority':
+          await updateSampleMutation.mutateAsync({
+            id: sample.id,
+            data: { priority: data?.priority as 'low' | 'normal' | 'high' | 'urgent' }
+          })
+          toast.success(`Priority updated to ${data?.priority}`)
+          break
+        case 'add_note':
+          // This would open a modal for adding notes
+          toast.info('Note functionality coming soon')
+          break
+        case 'audit_trail':
+          // This would show audit trail
+          toast.info('Audit trail functionality coming soon')
+          break
+        case 'export_data':
+          // This would export sample data
+          toast.info('Export functionality coming soon')
+          break
+        default:
+          toast.info(`Workflow action: ${action}`)
+      }
+      
+      refetch()
+    } catch (error) {
+      console.error('Failed to execute workflow action:', error)
+      toast.error('Failed to execute workflow action')
     } finally {
       setActionLoading(null)
     }
@@ -625,28 +716,28 @@ export default function NanoporeDashboard() {
           {/* Audit Panel - Admin Only */}
           {adminSession && adminSession.permissions.includes('audit_logs') && (
             <div className="mt-6">
-              <AuditPanel />
+              <AuditPanel adminSession={adminSession} />
             </div>
           )}
 
           {/* Configuration Panel - Admin Only */}
           {adminSession && adminSession.permissions.includes('security_settings') && (
             <div className="mt-6">
-              <ConfigPanel />
+              <ConfigPanel adminSession={adminSession} />
             </div>
           )}
 
           {/* Shutdown Panel - Admin Only */}
           {adminSession && adminSession.permissions.includes('system_monitoring') && (
             <div className="mt-6">
-              <ShutdownPanel />
+              <ShutdownPanel adminSession={adminSession} />
             </div>
           )}
 
           {/* Migration Panel - Admin Only */}
           {adminSession && adminSession.permissions.includes('system_monitoring') && (
             <div className="mt-6">
-              <MigrationPanel />
+              <MigrationPanel adminSession={adminSession} />
             </div>
           )}
         </div>
@@ -845,88 +936,18 @@ export default function NanoporeDashboard() {
                         </div>
                       )}
                       
-                      {/* Action Buttons */}
-                      <div className="flex items-center space-x-1">
-                        {/* Quick Status Update Button */}
-                        {getNextStatus(sample.status || null) && (
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleStatusUpdate(sample, getNextStatus(sample.status || null)!)}
-                            className="flex items-center space-x-1 text-blue-600 hover:text-blue-700"
-                            disabled={actionLoading === sample.id}
-                          >
-                            <Activity className="h-3 w-3" />
-                            <span>→ {getNextStatus(sample.status || null)}</span>
-                          </Button>
-                        )}
-                        
-                        {/* Action Menu Dropdown */}
-                        <div className="relative">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => setOpenDropdown(openDropdown === sample.id ? null : sample.id)}
-                            className="flex items-center space-x-1"
-                            disabled={actionLoading === sample.id}
-                          >
-                            <MoreHorizontal className="h-3 w-3" />
-                            <span>Actions</span>
-                          </Button>
-                          
-                          {openDropdown === sample.id && (
-                            <div className="absolute right-0 mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-50">
-                              <div className="py-1">
-                                <button
-                                  onClick={() => {
-                                    handleViewSample(sample)
-                                    setOpenDropdown(null)
-                                  }}
-                                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
-                                >
-                                  <Eye className="h-4 w-4" />
-                                  <span>View Details</span>
-                                </button>
-                                
-                                <button
-                                  onClick={() => {
-                                    handleEditSample(sample)
-                                    setOpenDropdown(null)
-                                  }}
-                                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
-                                >
-                                  <Edit className="h-4 w-4" />
-                                  <span>Edit Sample</span>
-                                </button>
-                                
-                                <button
-                                  onClick={() => {
-                                    handleAssignSample(sample)
-                                    setOpenDropdown(null)
-                                  }}
-                                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
-                                >
-                                  <Users className="h-4 w-4" />
-                                  <span>Assign Staff</span>
-                                </button>
-                                
-                                <div className="border-t border-gray-100 my-1"></div>
-                                
-                                <button
-                                  onClick={() => {
-                                    handleDeleteSample(sample)
-                                    setOpenDropdown(null)
-                                  }}
-                                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                  <span>Delete Sample</span>
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                      {/* Enhanced Action Buttons */}
+                      <SampleActions
+                        sample={sample}
+                        onViewSample={handleViewSample}
+                        onEditSample={handleEditSample}
+                        onAssignSample={handleAssignSample}
+                        onDeleteSample={handleDeleteSample}
+                        onStatusUpdate={handleStatusUpdate}
+                        onWorkflowAction={handleWorkflowAction}
+                        actionLoading={actionLoading}
+                        isAdmin={adminSession ? adminSession.permissions.includes('system_monitoring') : false}
+                      />
                     </div>
                   </div>
                 </div>

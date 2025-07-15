@@ -5,6 +5,7 @@ import { Badge } from '../ui/badge'
 import { Progress } from '../ui/progress'
 import { Input } from '../ui/input'
 import { Separator } from '../ui/separator'
+import type { UserSession } from '../../lib/auth/AdminAuth'
 
 interface Migration {
   id: string
@@ -66,7 +67,11 @@ interface MigrationData {
   lastUpdated: Date | null
 }
 
-export default function MigrationPanel() {
+interface MigrationPanelProps {
+  adminSession: UserSession | null
+}
+
+export function MigrationPanel({ adminSession }: MigrationPanelProps) {
   const [migrationData, setMigrationData] = useState<MigrationData>({
     stats: {
       totalMigrations: 0,
@@ -101,51 +106,67 @@ export default function MigrationPanel() {
   const [confirmationAction, setConfirmationAction] = useState<'execute' | 'rollback' | null>(null)
   const [executing, setExecuting] = useState(false)
 
-  // Fetch migration data
+  // Fetch migration data with authentication
   const fetchMigrationData = async () => {
+    if (!adminSession) {
+      setMigrationData(prev => ({ ...prev, error: 'Admin session required' }))
+      return
+    }
+
     setMigrationData(prev => ({ ...prev, loading: true, error: null }))
     
     try {
       const [statsResponse, historyResponse, pendingResponse, appliedResponse, validationResponse] = await Promise.all([
-        fetch('/api/migration?action=status'),
-        fetch('/api/migration?action=history'),
-        fetch('/api/migration?action=pending'),
-        fetch('/api/migration?action=applied'),
-        fetch('/api/migration?action=validate')
+        fetch('/api/migration?action=status', {
+          credentials: 'include' // Include cookies for session authentication
+        }),
+        fetch('/api/migration?action=history', {
+          credentials: 'include' // Include cookies for session authentication
+        }),
+        fetch('/api/migration?action=pending', {
+          credentials: 'include' // Include cookies for session authentication
+        }),
+        fetch('/api/migration?action=applied', {
+          credentials: 'include' // Include cookies for session authentication
+        }),
+        fetch('/api/migration?action=validate', {
+          credentials: 'include' // Include cookies for session authentication
+        })
       ])
 
-      if (!statsResponse.ok || !historyResponse.ok || !pendingResponse.ok || !appliedResponse.ok || !validationResponse.ok) {
+      // Check if all responses are okay
+      const responses = [statsResponse, historyResponse, pendingResponse, appliedResponse, validationResponse]
+      const failedResponse = responses.find(r => !r.ok)
+      if (failedResponse) {
+        throw new Error(`HTTP error! status: ${failedResponse.status}`)
+      }
+
+      const [statsData, historyData, pendingData, appliedData, validationData] = await Promise.all(
+        responses.map(r => r.json())
+      )
+
+      // Check if all data is successful
+      const allSuccessful = [statsData, historyData, pendingData, appliedData, validationData].every(d => d.success)
+      if (!allSuccessful) {
         throw new Error('Failed to fetch migration data')
       }
 
-      const [statsData, historyData, pendingData, appliedData, validationData] = await Promise.all([
-        statsResponse.json(),
-        historyResponse.json(),
-        pendingResponse.json(),
-        appliedResponse.json(),
-        validationResponse.json()
-      ])
-
-      if (statsData.success && historyData.success && pendingData.success && appliedData.success && validationData.success) {
-        setMigrationData(prev => ({
-          ...prev,
-          stats: statsData.data,
-          history: historyData.data,
-          pending: pendingData.data,
-          applied: appliedData.data,
-          validation: validationData.data,
-          loading: false,
-          lastUpdated: new Date()
-        }))
-      } else {
-        throw new Error('Failed to fetch migration data')
-      }
-    } catch (error) {
-      console.error('Error fetching migration data:', error)
       setMigrationData(prev => ({
         ...prev,
+        stats: statsData.data,
+        history: historyData.data,
+        pending: pendingData.data,
+        applied: appliedData.data,
+        validation: validationData.data,
         loading: false,
-        error: error instanceof Error ? error.message : 'Failed to fetch migration data'
+        lastUpdated: new Date()
+      }))
+    } catch (error) {
+      console.error('Error fetching migration data:', error)
+      setMigrationData(prev => ({ 
+        ...prev, 
+        loading: false, 
+        error: error instanceof Error ? error.message : 'Failed to fetch migration data' 
       }))
     }
   }
@@ -155,7 +176,9 @@ export default function MigrationPanel() {
     setMigrationData(prev => ({ ...prev, error: null }))
     
     try {
-      const response = await fetch(`/api/migration?action=plan&version=${planConfig.targetVersion}&direction=${planConfig.direction}`)
+      const response = await fetch(`/api/migration?action=plan&version=${planConfig.targetVersion}&direction=${planConfig.direction}`, {
+        credentials: 'include' // Include cookies for session authentication
+      })
       const data = await response.json()
       
       if (data.success) {
@@ -186,6 +209,7 @@ export default function MigrationPanel() {
       const response = await fetch('/api/migration', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           action: 'execute_plan',
           targetVersion: migrationData.plan.targetVersion,
@@ -231,6 +255,7 @@ export default function MigrationPanel() {
       const response = await fetch('/api/migration', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           action: 'rollback',
           rollbackVersion: rollbackConfig.version,
@@ -265,14 +290,18 @@ export default function MigrationPanel() {
 
   // Auto-refresh data
   useEffect(() => {
-    fetchMigrationData()
+    if (adminSession) {
+      fetchMigrationData()
+    }
     
     const interval = setInterval(() => {
-      fetchMigrationData()
+      if (adminSession) {
+        fetchMigrationData()
+      }
     }, 10000) // Refresh every 10 seconds
 
     return () => clearInterval(interval)
-  }, [])
+  }, [adminSession])
 
   // Format duration
   const formatDuration = (ms: number) => {

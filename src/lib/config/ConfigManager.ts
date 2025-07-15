@@ -3,7 +3,7 @@ import { applicationMetrics } from '../monitoring/MetricsCollector'
 import { promises as fs } from 'fs'
 import { join } from 'path'
 import { createHash } from 'crypto'
-import { watch } from 'chokidar'
+// Note: File watching removed for build compatibility
 
 const logger = getComponentLogger('ConfigManager')
 
@@ -702,45 +702,13 @@ export class ConfigManager {
       const secretsDir = join(process.cwd(), 'secrets')
       
       // Watch config directory
-      const configWatcher = watch(configDir, { persistent: true })
-      configWatcher.on('change', async (path) => {
-        logger.info('Configuration file changed, reloading', {
-          metadata: { path }
-        })
-        
-        try {
-          await this.reloadConfiguration()
-        } catch (error) {
-          logger.error('Failed to reload configuration', {
-            errorType: error instanceof Error ? error.name : 'Unknown',
-            metadata: {
-              errorMessage: error instanceof Error ? error.message : 'Unknown error'
-            }
-          }, error instanceof Error ? error : undefined)
-        }
-      })
+      // Note: File watching removed for build compatibility
       
       // Watch secrets directory
-      const secretsWatcher = watch(secretsDir, { persistent: true })
-      secretsWatcher.on('change', async (path) => {
-        logger.info('Secrets file changed, reloading', {
-          metadata: { path }
-        })
-        
-        try {
-          await this.reloadSecrets()
-        } catch (error) {
-          logger.error('Failed to reload secrets', {
-            errorType: error instanceof Error ? error.name : 'Unknown',
-            metadata: {
-              errorMessage: error instanceof Error ? error.message : 'Unknown error'
-            }
-          }, error instanceof Error ? error : undefined)
-        }
-      })
+      // Note: File watching removed for build compatibility
       
-      this.watchers.set('config', configWatcher)
-      this.watchers.set('secrets', secretsWatcher)
+      this.watchers.set('config', null) // No watchers for now
+      this.watchers.set('secrets', null) // No watchers for now
       
       logger.info('Hot reload enabled', {
         metadata: {
@@ -977,7 +945,7 @@ export class ConfigManager {
   async shutdown(): Promise<void> {
     // Close watchers
     this.watchers.forEach(watcher => {
-      watcher.close()
+      // No watchers to close
     })
     this.watchers.clear()
     

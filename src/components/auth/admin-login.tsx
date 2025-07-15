@@ -41,6 +41,9 @@ export function AdminLogin({ onLogin, onLogout, session }: AdminLoginProps) {
         // Store session in localStorage
         localStorage.setItem('adminSessionId', result.sessionId)
         
+        // Also set the admin_session cookie for API authentication
+        document.cookie = `admin_session=${result.sessionId}; path=/; samesite=strict; max-age=86400${location.protocol === 'https:' ? '; secure' : ''}`
+        
         // Get session details
         const sessionResponse = await fetch('/api/admin/session', {
           headers: {
@@ -79,6 +82,8 @@ export function AdminLogin({ onLogin, onLogout, session }: AdminLoginProps) {
         // Ignore logout errors
       }
       localStorage.removeItem('adminSessionId')
+      // Clear the admin_session cookie
+      document.cookie = 'admin_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
     }
     onLogout()
   }
@@ -95,13 +100,19 @@ export function AdminLogin({ onLogin, onLogout, session }: AdminLoginProps) {
       .then(response => response.json())
       .then(result => {
         if (result.success) {
+          // Set the admin_session cookie for API authentication
+          document.cookie = `admin_session=${sessionId}; path=/; samesite=strict; max-age=86400${location.protocol === 'https:' ? '; secure' : ''}`
           onLogin(result.session)
         } else {
           localStorage.removeItem('adminSessionId')
+          // Clear the admin_session cookie
+          document.cookie = 'admin_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
         }
       })
       .catch(() => {
         localStorage.removeItem('adminSessionId')
+        // Clear the admin_session cookie
+        document.cookie = 'admin_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
       })
     }
   }, [session, onLogin])

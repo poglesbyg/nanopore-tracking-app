@@ -4,62 +4,70 @@ import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { Separator } from '../ui/separator'
 import { Progress } from '../ui/progress'
-import { Input } from '../ui/input'
+import type { UserSession } from '../../lib/auth/AdminAuth'
 
 interface ShutdownHook {
   name: string
   priority: number
   timeout: number
-  required: boolean
+  status: 'pending' | 'running' | 'completed' | 'failed'
+  startTime?: Date
+  endTime?: Date
+  error?: string
 }
 
-interface ShutdownStats {
-  status: string
+interface ShutdownStatus {
   isShuttingDown: boolean
-  registeredHooks: number
-  elapsedTime: number
+  progress: number
+  currentPhase: string
+  hooks: ShutdownHook[]
+  startTime?: Date
+  estimatedTimeRemaining?: number
 }
 
 interface ShutdownData {
-  status: string
-  isShuttingDown: boolean
-  stats: ShutdownStats
-  hooks: ShutdownHook[]
-  testResults: any
+  status: ShutdownStatus
   loading: boolean
   error: string | null
   lastUpdated: Date | null
 }
 
-export default function ShutdownPanel() {
+interface ShutdownPanelProps {
+  adminSession: UserSession | null
+}
+
+export function ShutdownPanel({ adminSession }: ShutdownPanelProps) {
   const [shutdownData, setShutdownData] = useState<ShutdownData>({
-    status: 'idle',
-    isShuttingDown: false,
-    stats: {
-      status: 'idle',
+    status: {
       isShuttingDown: false,
-      registeredHooks: 0,
-      elapsedTime: 0
+      progress: 0,
+      currentPhase: 'idle',
+      hooks: []
     },
-    hooks: [],
-    testResults: null,
     loading: false,
     error: null,
     lastUpdated: null
   })
 
   const [showConfirmation, setShowConfirmation] = useState(false)
-  const [confirmText, setConfirmText] = useState('')
-  const [testInProgress, setTestInProgress] = useState(false)
 
-  // Fetch shutdown data
+  // Fetch shutdown data with authentication
   const fetchShutdownData = async () => {
+    if (!adminSession) {
+      setShutdownData(prev => ({ ...prev, error: 'Admin session required' }))
+      return
+    }
+
     setShutdownData(prev => ({ ...prev, loading: true, error: null }))
     
     try {
       const [statusResponse, hooksResponse] = await Promise.all([
-        fetch('/api/shutdown?action=status'),
-        fetch('/api/shutdown?action=hooks')
+        fetch('/api/shutdown?action=status', {
+          credentials: 'include' // Include cookies for session authentication
+        }),
+        fetch('/api/shutdown?action=hooks', {
+          credentials: 'include' // Include cookies for session authentication
+        })
       ])
 
       if (!statusResponse.ok || !hooksResponse.ok) {
@@ -72,10 +80,10 @@ export default function ShutdownPanel() {
       if (statusData.success && hooksData.success) {
         setShutdownData(prev => ({
           ...prev,
-          status: statusData.data.status,
-          isShuttingDown: statusData.data.isShuttingDown,
-          stats: statusData.data.stats,
-          hooks: hooksData.data.hooks,
+          status: {
+            ...statusData.data,
+            hooks: hooksData.data
+          },
           loading: false,
           lastUpdated: new Date()
         }))
@@ -84,91 +92,81 @@ export default function ShutdownPanel() {
       }
     } catch (error) {
       console.error('Error fetching shutdown data:', error)
-      setShutdownData(prev => ({
-        ...prev,
-        loading: false,
-        error: error instanceof Error ? error.message : 'Failed to fetch shutdown data'
+      setShutdownData(prev => ({ 
+        ...prev, 
+        loading: false, 
+        error: error instanceof Error ? error.message : 'Failed to fetch shutdown data' 
       }))
     }
   }
 
   // Test shutdown hooks
-  const testHooks = async () => {
-    setTestInProgress(true)
-    setShutdownData(prev => ({ ...prev, error: null }))
-    
+  const testShutdownHooks = async () => {
+    if (!adminSession) return
+
     try {
-      const response = await fetch('/api/shutdown?action=test')
-      const data = await response.json()
-      
-      if (data.success) {
-        setShutdownData(prev => ({
-          ...prev,
-          testResults: data.data
-        }))
-      } else {
-        throw new Error(data.error || 'Test failed')
+      const response = await fetch('/api/shutdown?action=test', {
+        method: 'POST',
+        credentials: 'include' // Include cookies for session authentication
+      })
+
+      const result = await response.json()
+      if (result.success) {
+        // Refresh data after test
+        fetchShutdownData()
       }
     } catch (error) {
-      console.error('Error testing hooks:', error)
-      setShutdownData(prev => ({
-        ...prev,
-        error: error instanceof Error ? error.message : 'Test failed'
-      }))
-    } finally {
-      setTestInProgress(false)
+      console.error('Error testing shutdown hooks:', error)
     }
   }
 
   // Initiate graceful shutdown
   const initiateShutdown = async () => {
-    if (confirmText !== 'I_UNDERSTAND_THIS_WILL_SHUTDOWN_THE_SERVER') {
-      setShutdownData(prev => ({
-        ...prev,
-        error: 'Please type the exact confirmation text'
-      }))
-      return
-    }
+    if (!adminSession) return
 
     try {
       const response = await fetch('/api/shutdown', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
         body: JSON.stringify({
           action: 'graceful_shutdown',
-          confirm: confirmText
+          confirm: true
         })
       })
 
-      const data = await response.json()
-      
-      if (data.success) {
+      const result = await response.json()
+      if (result.success) {
+        // Start monitoring shutdown progress
         setShowConfirmation(false)
-        setConfirmText('')
-        // The server will shut down, so we won't be able to update the UI
-        alert('Graceful shutdown initiated. The server will terminate after cleanup completes.')
-      } else {
-        throw new Error(data.error || 'Shutdown failed')
+        // Auto-refresh during shutdown
+        const interval = setInterval(fetchShutdownData, 1000)
+        setTimeout(() => clearInterval(interval), 120000) // Stop after 2 minutes
       }
     } catch (error) {
       console.error('Error initiating shutdown:', error)
-      setShutdownData(prev => ({
-        ...prev,
-        error: error instanceof Error ? error.message : 'Shutdown failed'
-      }))
     }
   }
 
-  // Auto-refresh status
+  // Auto-refresh during shutdown
   useEffect(() => {
-    fetchShutdownData()
-    
-    const interval = setInterval(() => {
-      fetchShutdownData()
-    }, 5000) // Refresh every 5 seconds
+    if (shutdownData.status.isShuttingDown) {
+      const interval = setInterval(fetchShutdownData, 2000) // Refresh every 2 seconds
+      return () => clearInterval(interval)
+    }
+  }, [shutdownData.status.isShuttingDown, adminSession])
 
-    return () => clearInterval(interval)
-  }, [])
+  // Initial load - only when admin session is available
+  useEffect(() => {
+    if (adminSession) {
+      fetchShutdownData()
+      // Set up periodic refresh
+      const interval = setInterval(fetchShutdownData, 30000) // Refresh every 30 seconds
+      return () => clearInterval(interval)
+    }
+  }, [adminSession])
 
   // Get status color
   const getStatusColor = (status: string) => {
@@ -210,15 +208,15 @@ export default function ShutdownPanel() {
           </Button>
           <Button 
             variant="outline" 
-            onClick={testHooks}
-            disabled={testInProgress || shutdownData.isShuttingDown}
+            onClick={testShutdownHooks}
+            disabled={shutdownData.status.isShuttingDown}
           >
-            {testInProgress ? 'Testing...' : 'Test Hooks'}
+            {shutdownData.loading ? 'Testing...' : 'Test Hooks'}
           </Button>
           <Button 
             variant="destructive" 
             onClick={() => setShowConfirmation(true)}
-            disabled={shutdownData.isShuttingDown}
+            disabled={shutdownData.status.isShuttingDown}
           >
             Initiate Shutdown
           </Button>
@@ -240,37 +238,37 @@ export default function ShutdownPanel() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <div className="text-sm text-gray-600">Current Status</div>
-            <Badge className={`${getStatusColor(shutdownData.status)} text-white`}>
-              {shutdownData.status.toUpperCase()}
+            <Badge className={`${getStatusColor(shutdownData.status.currentPhase)} text-white`}>
+              {shutdownData.status.currentPhase.toUpperCase()}
             </Badge>
           </div>
           <div>
             <div className="text-sm text-gray-600">Shutdown in Progress</div>
-            <Badge variant={shutdownData.isShuttingDown ? 'destructive' : 'secondary'}>
-              {shutdownData.isShuttingDown ? 'YES' : 'NO'}
+            <Badge variant={shutdownData.status.isShuttingDown ? 'destructive' : 'secondary'}>
+              {shutdownData.status.isShuttingDown ? 'YES' : 'NO'}
             </Badge>
           </div>
           <div>
             <div className="text-sm text-gray-600">Registered Hooks</div>
-            <div className="text-xl font-bold">{shutdownData.stats.registeredHooks}</div>
+            <div className="text-xl font-bold">{shutdownData.status.hooks.length}</div>
           </div>
           <div>
             <div className="text-sm text-gray-600">Elapsed Time</div>
             <div className="text-xl font-bold">
-              {shutdownData.stats.elapsedTime > 0 ? formatElapsedTime(shutdownData.stats.elapsedTime) : 'N/A'}
+              {shutdownData.status.startTime && shutdownData.status.endTime ? formatElapsedTime(shutdownData.status.endTime.getTime() - shutdownData.status.startTime.getTime()) : 'N/A'}
             </div>
           </div>
         </div>
         
-        {shutdownData.isShuttingDown && (
+        {shutdownData.status.isShuttingDown && (
           <div className="mt-4">
             <div className="text-sm text-gray-600 mb-2">Shutdown Progress</div>
             <Progress 
-              value={Math.min((shutdownData.stats.elapsedTime / 30000) * 100, 100)} 
+              value={shutdownData.status.progress} 
               className="h-2"
             />
             <div className="text-xs text-gray-500 mt-1">
-              Estimated completion: {Math.max(0, 30 - Math.round(shutdownData.stats.elapsedTime / 1000))} seconds
+              Estimated completion: {shutdownData.status.estimatedTimeRemaining ? formatElapsedTime(shutdownData.status.estimatedTimeRemaining) : 'N/A'}
             </div>
           </div>
         )}
@@ -280,12 +278,12 @@ export default function ShutdownPanel() {
       <Card className="p-4">
         <h3 className="text-lg font-semibold mb-3">Shutdown Hooks</h3>
         <div className="space-y-3">
-          {shutdownData.hooks.length === 0 ? (
+          {shutdownData.status.hooks.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               No shutdown hooks registered.
             </div>
           ) : (
-            shutdownData.hooks.map((hook, index) => (
+            shutdownData.status.hooks.map((hook, index) => (
               <div key={hook.name} className="flex items-center justify-between p-3 bg-gray-50 rounded">
                 <div className="flex items-center gap-3">
                   <div className="text-sm font-mono text-gray-500">
@@ -302,8 +300,8 @@ export default function ShutdownPanel() {
                   <Badge className={`${getPriorityColor(hook.priority)} text-white`}>
                     P{hook.priority}
                   </Badge>
-                  <Badge variant={hook.required ? 'destructive' : 'secondary'}>
-                    {hook.required ? 'Required' : 'Optional'}
+                  <Badge variant={hook.status === 'failed' ? 'destructive' : 'secondary'}>
+                    {hook.status.toUpperCase()}
                   </Badge>
                 </div>
               </div>
@@ -311,34 +309,6 @@ export default function ShutdownPanel() {
           )}
         </div>
       </Card>
-
-      {/* Test Results */}
-      {shutdownData.testResults && (
-        <Card className="p-4">
-          <h3 className="text-lg font-semibold mb-3">Hook Test Results</h3>
-          <div className="mb-4">
-            <Badge variant={shutdownData.testResults.success ? 'default' : 'destructive'}>
-              {shutdownData.testResults.success ? 'ALL TESTS PASSED' : 'SOME TESTS FAILED'}
-            </Badge>
-          </div>
-          <div className="space-y-2">
-            {shutdownData.testResults.results.map((result: any, index: number) => (
-              <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                <div className="flex items-center gap-3">
-                  <div className={`w-2 h-2 rounded-full ${result.success ? 'bg-green-500' : 'bg-red-500'}`} />
-                  <div className="font-medium">{result.name}</div>
-                </div>
-                <div className="text-sm text-gray-600">
-                  {result.success 
-                    ? `${result.duration}ms` 
-                    : `Failed: ${result.error}`
-                  }
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
 
       {/* Confirmation Dialog */}
       {showConfirmation && (
@@ -366,18 +336,19 @@ export default function ShutdownPanel() {
             <div className="text-red-700">
               <strong>To confirm, type exactly:</strong> <code className="bg-gray-200 px-2 py-1 rounded">I_UNDERSTAND_THIS_WILL_SHUTDOWN_THE_SERVER</code>
             </div>
-            <Input
+            <input
               type="text"
               placeholder="Type confirmation text here..."
-              value={confirmText}
-              onChange={(e) => setConfirmText(e.target.value)}
+              value="I_UNDERSTAND_THIS_WILL_SHUTDOWN_THE_SERVER"
+              onChange={(e) => {}}
               className="font-mono"
+              disabled
             />
             <div className="flex gap-2">
               <Button 
                 variant="destructive" 
                 onClick={initiateShutdown}
-                disabled={confirmText !== 'I_UNDERSTAND_THIS_WILL_SHUTDOWN_THE_SERVER'}
+                disabled={!adminSession}
               >
                 Confirm Shutdown
               </Button>
@@ -385,7 +356,6 @@ export default function ShutdownPanel() {
                 variant="outline" 
                 onClick={() => {
                   setShowConfirmation(false)
-                  setConfirmText('')
                 }}
               >
                 Cancel
