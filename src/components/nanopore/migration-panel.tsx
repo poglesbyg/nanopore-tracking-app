@@ -625,17 +625,17 @@ export function MigrationPanel({ adminSession }: MigrationPanelProps) {
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
                       <div className="text-sm text-gray-600">Direction</div>
-                      <Badge variant={migrationData.plan.direction === 'up' ? 'default' : 'destructive'}>
-                        {migrationData.plan.direction.toUpperCase()}
+                      <Badge variant={migrationData.plan?.direction === 'up' ? 'default' : 'destructive'}>
+                        {migrationData.plan?.direction?.toUpperCase() || 'UNKNOWN'}
                       </Badge>
                     </div>
                     <div>
                       <div className="text-sm text-gray-600">Target Version</div>
-                      <div className="font-medium">{migrationData.plan.targetVersion}</div>
+                      <div className="font-medium">{migrationData.plan?.targetVersion || 'Unknown'}</div>
                     </div>
                     <div>
                       <div className="text-sm text-gray-600">Migrations</div>
-                      <div className="font-medium">{migrationData.plan.migrations.length}</div>
+                      <div className="font-medium">{migrationData.plan?.migrations?.length || 0}</div>
                     </div>
                     <div>
                       <div className="text-sm text-gray-600">Estimated Duration</div>
