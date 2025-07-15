@@ -42,7 +42,6 @@ interface MemoryOptimizationPanelProps {
 
 export function MemoryOptimizationPanel({ className }: MemoryOptimizationPanelProps) {
   const [memoryStats, setMemoryStats] = useState<MemoryStats | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
   const [isOptimizing, setIsOptimizing] = useState(false)
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [lastOptimization, setLastOptimization] = useState<Date | null>(null)
@@ -140,6 +139,8 @@ export function MemoryOptimizationPanel({ className }: MemoryOptimizationPanelPr
       const interval = setInterval(fetchMemoryStats, 5000) // Refresh every 5 seconds
       return () => clearInterval(interval)
     }
+    // No cleanup needed when autoRefresh is false
+    return undefined
   }, [autoRefresh])
 
   // Initial load
@@ -162,13 +163,6 @@ export function MemoryOptimizationPanel({ className }: MemoryOptimizationPanelPr
 
   const heapPercent = parseFloat(memoryStats.memory.heapUsedPercent)
   const cacheHitRate = parseFloat(memoryStats.cache.hitRate)
-
-  const getMemoryStatusColor = (percent: number) => {
-    if (percent > 90) return 'bg-red-500'
-    if (percent > 80) return 'bg-yellow-500'
-    if (percent > 70) return 'bg-orange-500'
-    return 'bg-green-500'
-  }
 
   const getMemoryStatusBadge = (percent: number) => {
     if (percent > 90) return <Badge variant="destructive">Critical</Badge>
@@ -211,7 +205,7 @@ export function MemoryOptimizationPanel({ className }: MemoryOptimizationPanelPr
               variant="outline"
               size="sm"
               onClick={fetchMemoryStats}
-              disabled={isLoading}
+              disabled={false} // isLoading is removed
             >
               🔄 Refresh
             </Button>

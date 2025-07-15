@@ -1,5 +1,4 @@
 import { getComponentLogger } from '../logging/StructuredLogger'
-import { applicationMetrics } from '../monitoring/MetricsCollector'
 import { auditLogger } from '../audit/AuditLogger'
 import { db } from '../database'
 import { promises as fs } from 'fs'
@@ -92,8 +91,8 @@ export interface MigrationContext {
   migration: Migration
   direction: MigrationDirection
   dryRun: boolean
-  userId?: string
-  username?: string
+  userId?: string | undefined
+  username?: string | undefined
   startTime: Date
   lockAcquired: boolean
   backupCreated: boolean
@@ -291,7 +290,7 @@ export class MigrationManager {
     
     // Extract version from filename (e.g., 001_create_users.sql)
     const versionMatch = filename.match(/^(\d+)_(.+)\.(sql|js|ts)$/)
-    if (versionMatch) {
+    if (versionMatch && versionMatch[1] && versionMatch[2]) {
       metadata.version = versionMatch[1]
       metadata.name = versionMatch[2].replace(/_/g, ' ')
       metadata.id = `${metadata.version}_${versionMatch[2]}`
@@ -302,7 +301,7 @@ export class MigrationManager {
       const trimmed = line.trim()
       if (trimmed.startsWith('--') || trimmed.startsWith('/*')) {
         const metaMatch = trimmed.match(/[@#](\w+):\s*(.+)/)
-        if (metaMatch) {
+        if (metaMatch && metaMatch[1] && metaMatch[2]) {
           const key = metaMatch[1]
           const value = metaMatch[2]
           
@@ -320,7 +319,7 @@ export class MigrationManager {
               metadata.tags = value.split(',').map(t => t.trim())
               break
             case 'estimatedDuration':
-              metadata.estimatedDuration = parseInt(value)
+              metadata.estimatedDuration = parseInt(value, 10)
               break
             case 'requiresDowntime':
               metadata.requiresDowntime = value.toLowerCase() === 'true'
@@ -343,7 +342,7 @@ export class MigrationManager {
     const upMatch = content.match(/-- \+goose Up([\s\S]*?)-- \+goose Down/i)
     const downMatch = content.match(/-- \+goose Down([\s\S]*?)$/i)
     
-    if (upMatch && downMatch) {
+    if (upMatch && downMatch && upMatch[1] && downMatch[1]) {
       return {
         up: upMatch[1].trim(),
         down: downMatch[1].trim()
@@ -460,10 +459,12 @@ export class MigrationManager {
         warnings.push('Rollback operations may result in data loss')
       }
       
+      const finalTargetVersion = targetVersion || (migrations.length > 0 ? migrations[migrations.length - 1]?.version || '' : '')
+      
       return {
         migrations,
         direction,
-        targetVersion: targetVersion || (migrations.length > 0 ? migrations[migrations.length - 1].version : ''),
+        targetVersion: finalTargetVersion,
         estimatedDuration,
         requiresDowntime,
         backupRequired,
@@ -528,8 +529,8 @@ export class MigrationManager {
       for (const migration of plan.migrations) {
         const result = await this.executeMigration(migration, plan.direction, {
           dryRun: options.dryRun || false,
-          userId: options.userId,
-          username: options.username
+          ...(options.userId && { userId: options.userId }),
+          ...(options.username && { username: options.username })
         })
         
         results.push(result)
@@ -617,7 +618,12 @@ export class MigrationManager {
       
       if (migrationSQL && !options.dryRun) {
         const result = await sql`${sql.raw(migrationSQL)}`.execute(db as any)
-        affectedRows = result.length || 0
+        // Handle different result types from Kysely
+        if (Array.isArray(result)) {
+          affectedRows = result.length
+        } else if (result && typeof result === 'object' && 'numAffectedRows' in result) {
+          affectedRows = Number(result.numAffectedRows) || 0
+        }
       }
       
       const duration = Date.now() - startTime

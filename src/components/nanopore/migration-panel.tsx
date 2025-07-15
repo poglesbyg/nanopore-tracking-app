@@ -2,9 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Card } from '../ui/card'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
-import { Progress } from '../ui/progress'
 import { Input } from '../ui/input'
-import { Separator } from '../ui/separator'
 import type { UserSession } from '../../lib/auth/AdminAuth'
 
 interface Migration {
@@ -97,10 +95,6 @@ export function MigrationPanel({ adminSession }: MigrationPanelProps) {
     targetVersion: '',
     direction: 'up' as 'up' | 'down',
     dryRun: true
-  })
-  const [rollbackConfig, setRollbackConfig] = useState({
-    version: '',
-    force: false
   })
   const [showConfirmation, setShowConfirmation] = useState(false)
   const [confirmationAction, setConfirmationAction] = useState<'execute' | 'rollback' | null>(null)
@@ -258,8 +252,8 @@ export function MigrationPanel({ adminSession }: MigrationPanelProps) {
         credentials: 'include',
         body: JSON.stringify({
           action: 'rollback',
-          rollbackVersion: rollbackConfig.version,
-          rollbackForce: rollbackConfig.force
+          rollbackVersion: '', // No version specified for rollback
+          rollbackForce: false
         })
       })
 
@@ -469,7 +463,7 @@ export function MigrationPanel({ adminSession }: MigrationPanelProps) {
                   No pending migrations.
                 </div>
               ) : (
-                migrationData.pending.map((migration, index) => (
+                migrationData.pending.map((migration, _index) => (
                   <div key={migration.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
                     <div className="flex items-center gap-3">
                       <div className="text-sm font-mono text-gray-500">
@@ -512,7 +506,7 @@ export function MigrationPanel({ adminSession }: MigrationPanelProps) {
                   No applied migrations.
                 </div>
               ) : (
-                migrationData.applied.map((migration, index) => (
+                migrationData.applied.map((migration, _index) => (
                   <div key={migration.id} className="flex items-center justify-between p-3 bg-green-50 rounded">
                     <div className="flex items-center gap-3">
                       <div className="text-sm font-mono text-gray-500">

@@ -198,7 +198,7 @@ export class HealthChecker {
       // Basic SMTP configuration check
       const nodemailer = await import('nodemailer')
       
-      const transporter = nodemailer.default.createTransporter({
+      const transporter = nodemailer.default.createTransport({
         host: config.email.smtp.host,
         port: config.email.smtp.port,
         secure: config.email.smtp.port === 465,
@@ -255,16 +255,21 @@ export class HealthChecker {
       
       const responseTime = Date.now() - start
       
-      // Determine health based on resource usage
+      // Calculate process memory usage as percentage of heap
+      const heapUsagePercent = (processMemory.heapUsed / processMemory.heapTotal) * 100
+      const rssUsageMB = processMemory.rss / 1024 / 1024
+      
+      // Determine health based on process memory usage (more appropriate for containers)
       let status: 'healthy' | 'degraded' | 'unhealthy' = 'healthy'
       let message = 'System resources normal'
       
-      if (memoryUsage > 90) {
+      // Use process memory thresholds instead of system memory
+      if (heapUsagePercent > 95 || rssUsageMB > 350) {
         status = 'unhealthy'
-        message = 'High memory usage detected'
-      } else if (memoryUsage > 80) {
+        message = 'High process memory usage detected'
+      } else if (heapUsagePercent > 90 || rssUsageMB > 300) {
         status = 'degraded'
-        message = 'Elevated memory usage'
+        message = 'Elevated process memory usage'
       }
       
       return {
@@ -283,7 +288,8 @@ export class HealthChecker {
           process: {
             rss: Math.round(processMemory.rss / 1024 / 1024),
             heapUsed: Math.round(processMemory.heapUsed / 1024 / 1024),
-            heapTotal: Math.round(processMemory.heapTotal / 1024 / 1024)
+            heapTotal: Math.round(processMemory.heapTotal / 1024 / 1024),
+            heapUsagePercent: Math.round(heapUsagePercent)
           },
           cpu: {
             loadAverage: cpuUsage,

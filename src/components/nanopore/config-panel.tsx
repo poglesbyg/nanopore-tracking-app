@@ -224,17 +224,6 @@ export function ConfigPanel({ adminSession }: ConfigPanelProps) {
     )
   }
 
-  // Get environment color
-  const getEnvironmentColor = (env: string) => {
-    switch (env) {
-      case 'production': return 'bg-red-500'
-      case 'staging': return 'bg-yellow-500'
-      case 'development': return 'bg-blue-500'
-      case 'test': return 'bg-gray-500'
-      default: return 'bg-gray-500'
-    }
-  }
-
   // Get feature color
   const getFeatureColor = (enabled: boolean) => {
     return enabled ? 'bg-green-500' : 'bg-red-500'

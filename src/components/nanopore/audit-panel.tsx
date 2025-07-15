@@ -143,6 +143,8 @@ export function AuditPanel({ adminSession }: AuditPanelProps) {
       const interval = setInterval(fetchAuditData, 10000) // Refresh every 10 seconds
       return () => clearInterval(interval)
     }
+    // No cleanup needed when autoRefresh is false
+    return undefined
   }, [autoRefresh, adminSession])
 
   // Initial load - only when admin session is available

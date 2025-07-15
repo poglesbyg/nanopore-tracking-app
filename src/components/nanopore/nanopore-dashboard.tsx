@@ -41,7 +41,8 @@ import {
   ChevronDown,
   Archive,
   Trash2,
-  X
+  X,
+  Users
 } from 'lucide-react'
 
 interface DashboardStats {
@@ -164,45 +165,26 @@ export default function NanoporeDashboard() {
     urgent: sampleList.filter((s: any) => s.priority === 'urgent').length,
   })
 
-  // Update stats when samples change
-  useEffect(() => {
-    if (samples) {
-      setStats(calculateStats(samples))
-    }
-  }, [samples])
-
-  // Type mapping functions to convert between API and modal types
-  const mapApiToModal = (apiSample: any): any => ({
-    id: apiSample.id,
-    sampleName: apiSample.sample_name,
-    projectId: apiSample.project_id,
-    submitterName: apiSample.submitter_name,
-    submitterEmail: apiSample.submitter_email,
-    labName: apiSample.lab_name,
-    sampleType: apiSample.sample_type,
-    status: apiSample.status,
-    priority: apiSample.priority,
-    assignedTo: apiSample.assigned_to,
-    libraryPrepBy: apiSample.library_prep_by,
-    submittedAt: new Date(apiSample.submitted_at),
-    createdAt: new Date(apiSample.created_at),
-    updatedAt: new Date(apiSample.updated_at),
-    createdBy: apiSample.created_by,
-  })
-
   // Close dropdown when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = () => {
       if (openDropdown) {
         setOpenDropdown(null)
       }
     }
-
     document.addEventListener('click', handleClickOutside)
     return () => document.removeEventListener('click', handleClickOutside)
   }, [openDropdown])
 
-  const filteredSamples = samples.filter((sample: NanoporeSample) => {
+  // Update stats when samples change
+  useEffect(() => {
+    if (samples.length > 0) {
+      setStats(calculateStats(samples))
+    }
+  }, [samples])
+
+  // Filter samples based on search criteria
+  const filteredSamples = samples.filter((sample: any) => {
     const matchesSearch = sample.sample_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          sample.submitter_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          sample.project_id?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -417,17 +399,6 @@ export default function NanoporeDashboard() {
     }
   }
 
-  // Get next available status for workflow progression
-  const getNextStatus = (currentStatus: string | null | undefined): string | null => {
-    if (!currentStatus) return null
-    const workflow = ['submitted', 'prep', 'sequencing', 'analysis', 'completed', 'archived']
-    const currentIndex = workflow.indexOf(currentStatus)
-    if (currentIndex === -1 || currentIndex === workflow.length - 1) {
-      return null
-    }
-    return workflow[currentIndex + 1] || null
-  }
-
   // Bulk actions handlers
   const handleSelectSample = (sampleId: string, checked: boolean) => {
     setSelectedSamples(prev => {
@@ -476,32 +447,30 @@ export default function NanoporeDashboard() {
   }
 
   const handleBulkStatusUpdate = async (newStatus: string) => {
+    const validStatuses = ['submitted', 'prep', 'sequencing', 'analysis', 'completed', 'archived'] as const
+    if (!validStatuses.includes(newStatus as any)) {
+      console.error('Invalid status:', newStatus)
+      return
+    }
+
     const promises = Array.from(selectedSamples).map(sampleId => 
       updateStatusMutation.mutateAsync({
         id: sampleId,
-        status: newStatus as "submitted" | "prep" | "sequencing" | "analysis" | "completed" | "archived",
+        status: newStatus as typeof validStatuses[number],
       })
     )
 
-    setActionLoading('bulk')
     try {
-      const updatedSamples = await Promise.all(promises)
-      refetch()
-      
-      // Recalculate stats
-      const newSamples = samples.map((s: any) => {
-        const updated = updatedSamples.find((u: any) => u.id === s.id)
-        return updated || s
-      })
-      setStats(calculateStats(newSamples))
-      
-      toast.success(`${selectedSamples.size} samples updated to ${newStatus}`)
+      await Promise.all(promises)
       setSelectedSamples(new Set())
+      
+      // Update stats after bulk update
+      setStats(calculateStats(samples))
+      
+      toast.success(`Updated ${selectedSamples.size} samples to ${newStatus}`)
     } catch (error) {
-      console.error('Failed to update samples:', error)
-      toast.error('Failed to update samples')
-    } finally {
-      setActionLoading(null)
+      console.error('Bulk update failed:', error)
+      toast.error('Failed to update some samples')
     }
   }
 
