@@ -1,8 +1,19 @@
-import { pipeline, env } from '@xenova/transformers'
+// Dynamic import to prevent server-side loading issues
+let transformersModule: any = null
 
-// Configure transformers to use local models
-env.allowLocalModels = false
-env.useBrowserCache = true
+const loadTransformers = async () => {
+  if (!transformersModule) {
+    // Only load transformers when needed and on client side
+    if (typeof window !== 'undefined') {
+      transformersModule = await import('@xenova/transformers')
+      
+      // Configure transformers to use local models
+      transformersModule.env.allowLocalModels = false
+      transformersModule.env.useBrowserCache = true
+    }
+  }
+  return transformersModule
+}
 
 export interface FieldMapping {
   fieldName: string

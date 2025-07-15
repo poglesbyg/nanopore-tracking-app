@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
+import { configurePdfWorker } from '@/lib/pdf-worker-config'
 import type { NanoporeFormData } from '@/lib/ai/nanopore-llm-service'
 
 // Dynamic imports for PDF.js to avoid SSR issues
@@ -57,8 +58,15 @@ export default function PDFViewer({
         Page = pdfModule.Page
         pdfjs = pdfModule.pdfjs
 
-        // Configure PDF.js worker
-        pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`
+        // Configure PDF.js worker with intelligent fallback
+        try {
+          await configurePdfWorker(pdfjs, pdfjs.version)
+          console.log('PDF.js worker configured successfully')
+        } catch (workerError) {
+          console.error('Failed to configure PDF.js worker:', workerError)
+          setError('Failed to configure PDF worker')
+          return
+        }
 
         setPdfLoaded(true)
       } catch (error) {

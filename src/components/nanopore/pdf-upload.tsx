@@ -22,6 +22,7 @@ import {
   nanoporeFormService,
   type NanoporeFormData,
 } from '@/lib/ai/nanopore-llm-service'
+import { pdfErrorHandler, PdfErrorType } from '@/lib/pdf-error-handler'
 
 import PDFViewer from './pdf-viewer'
 
@@ -86,8 +87,8 @@ export default function PDFUpload({
                 f.id === uploadedFile.id
                   ? {
                       ...f,
-                      status: 'completed',
-                      extractedData: result.data,
+                      status: 'completed' as const,
+                      ...(result.data && { extractedData: result.data }),
                       processingTime,
                     }
                   : f,
@@ -234,7 +235,7 @@ export default function PDFUpload({
         <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full h-full max-w-7xl max-h-[95vh] overflow-hidden">
           <PDFViewer
             file={viewingFile.file}
-            extractedData={viewingFile.extractedData}
+            {...(viewingFile.extractedData && { extractedData: viewingFile.extractedData })}
             isProcessing={viewingFile.status === 'processing'}
             onClose={closeViewer}
           />
