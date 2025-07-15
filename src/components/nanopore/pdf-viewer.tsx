@@ -2,7 +2,6 @@
 
 import {
   Download,
-  Eye,
   FileText,
   Brain,
   AlertCircle,

@@ -85,7 +85,7 @@ class NanoporeFormExtractionService {
       let extractionMethod: 'llm' | 'pattern' | 'hybrid' | 'rag' = 'pattern'
 
       // Step 3: Try LLM extraction first if available
-      if (aiService.isAIAvailable()) {
+      if (aiService.isAvailable()) {
         try {
           const llmResult = await this.extractWithLLM(rawText)
           if (llmResult) {

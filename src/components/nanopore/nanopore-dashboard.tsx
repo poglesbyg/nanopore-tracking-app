@@ -382,7 +382,7 @@ export default function NanoporeDashboard() {
     }
   }
 
-  const handleStatusUpdate = async (sample: any, newStatus: string) => {
+  const handleStatusUpdate = async (sample: any, newStatus: 'submitted' | 'prep' | 'sequencing' | 'analysis' | 'completed' | 'archived') => {
     setActionLoading(sample.id)
     try {
       await updateStatusMutation.mutateAsync({
@@ -393,7 +393,7 @@ export default function NanoporeDashboard() {
       toast.success(`Sample status updated to ${newStatus}`)
     } catch (error) {
       console.error('Failed to update status:', error)
-      toast.error('Failed to update status')
+      toast.error('Failed to update sample status')
     } finally {
       setActionLoading(null)
     }
@@ -431,7 +431,7 @@ export default function NanoporeDashboard() {
 
     setActionLoading('bulk')
     Promise.all(promises)
-      .then((updatedSamples) => {
+      .then(() => {
         refetch()
         toast.success(`${selectedSamples.size} samples assigned successfully`)
         setSelectedSamples(new Set())
@@ -503,6 +503,15 @@ export default function NanoporeDashboard() {
       toast.error('Failed to delete samples')
     } finally {
       setActionLoading(null)
+    }
+  }
+
+  // Helper function to map API data to modal format
+  const mapApiToModal = (sample: any) => {
+    return {
+      ...sample,
+      status: sample.status as 'submitted' | 'prep' | 'sequencing' | 'analysis' | 'completed' | 'archived',
+      priority: sample.priority as 'low' | 'normal' | 'high' | 'urgent',
     }
   }
 
