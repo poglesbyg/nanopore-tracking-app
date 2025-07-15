@@ -1,6 +1,8 @@
 import { TRPCError } from '@trpc/server'
-import { logger } from '../../lib/logger'
+import { getComponentLogger } from '../../lib/logging/StructuredLogger'
 import { BaseError, classifyError, isBaseError, isOperationalError } from './ErrorTypes'
+
+const logger = getComponentLogger('ErrorHandler')
 
 /**
  * Standard error response format for API responses

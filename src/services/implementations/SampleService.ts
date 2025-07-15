@@ -9,8 +9,12 @@ import type { ISampleRepository } from '../interfaces/ISampleRepository'
 import type { IAuditLogger } from '../interfaces/IAuditLogger'
 import type { IEventEmitter } from '../interfaces/IEventEmitter'
 import { ValidationError, NotFoundError, BusinessLogicError } from '../../middleware/errors/ErrorTypes'
+import { getComponentLogger } from '../../lib/logging/StructuredLogger'
+import { applicationMetrics } from '../../lib/monitoring/MetricsCollector'
 
 export class SampleService implements ISampleService {
+  private readonly logger = getComponentLogger('SampleService')
+
   constructor(
     private readonly sampleRepository: ISampleRepository,
     private readonly auditLogger: IAuditLogger,
@@ -18,23 +22,71 @@ export class SampleService implements ISampleService {
   ) {}
 
   async createSample(data: CreateSampleData): Promise<Sample> {
-    // Validate required fields
-    this.validateCreateData(data)
+    const timer = this.logger.startTimer('createSample')
     
-    // Create the sample
-    const sample = await this.sampleRepository.create(data)
-    
-    // Log the action
-    await this.auditLogger.logSampleCreated(sample.id, sample.created_by, {
-      sampleName: data.sampleName,
-      submitterName: data.submitterName,
-      sampleType: data.sampleType,
+    this.logger.info('Creating new sample', {
+      action: 'create_sample',
+      workflowStage: 'validation',
+      metadata: {
+        sampleName: data.sampleName,
+        sampleType: data.sampleType,
+        submitterName: data.submitterName
+      }
     })
     
-    // Emit domain event
-    this.eventEmitter.emitSampleCreated(sample)
-    
-    return sample
+    try {
+      // Validate required fields
+      this.validateCreateData(data)
+      
+      this.logger.debug('Sample validation passed', {
+        action: 'validation_passed',
+        metadata: {
+          sampleName: data.sampleName
+        }
+      })
+      
+      // Create the sample
+      const sample = await this.sampleRepository.create(data)
+      
+      this.logger.info('Sample created successfully', {
+        sampleId: sample.id,
+        action: 'sample_created',
+        workflowStage: 'created',
+        metadata: {
+          sampleName: sample.sample_name,
+          sampleType: sample.sample_type
+        }
+      })
+      
+      // Record business metrics
+      applicationMetrics.recordSampleCreated(sample.sample_type, sample.priority)
+      
+      // Log the action
+      await this.auditLogger.logSampleCreated(sample.id, sample.created_by, {
+        sampleName: data.sampleName,
+        submitterName: data.submitterName,
+        sampleType: data.sampleType,
+      })
+      
+      // Emit domain event
+      this.eventEmitter.emitSampleCreated(sample)
+      
+      timer()
+      return sample
+    } catch (error) {
+      this.logger.error('Failed to create sample', {
+        action: 'create_sample_failed',
+        workflowStage: 'error',
+        errorType: error instanceof Error ? error.name : 'Unknown',
+        metadata: {
+          sampleName: data.sampleName,
+          sampleType: data.sampleType
+        }
+      }, error instanceof Error ? error : undefined)
+      
+      timer()
+      throw error
+    }
   }
 
   async updateSample(id: string, data: UpdateSampleData): Promise<Sample> {
