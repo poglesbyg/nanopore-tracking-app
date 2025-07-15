@@ -139,17 +139,9 @@ export const nanoporeRouter = router({
         libraryPrepBy: z.string().optional(),
       }),
     )
-    .mutation(async ({ input, ctx }) => {
-      return await ctx.db
-        .updateTable('nanopore_samples')
-        .set({
-          assigned_to: input.assignedTo,
-          library_prep_by: input.libraryPrepBy || null,
-          updated_at: new Date(),
-        })
-        .where('id', '=', input.id)
-        .returningAll()
-        .executeTakeFirstOrThrow()
+    .mutation(async ({ input }) => {
+      const sampleService = getSampleService()
+      return await sampleService.assignSample(input.id, input.assignedTo, input.libraryPrepBy)
     }),
 
   // Update sample status
@@ -160,25 +152,9 @@ export const nanoporeRouter = router({
         status: z.enum(['submitted', 'prep', 'sequencing', 'analysis', 'completed', 'archived']),
       }),
     )
-    .mutation(async ({ input, ctx }) => {
-      const updateData: any = {
-        status: input.status,
-        updated_at: new Date(),
-      }
-      
-      // Add timestamps for specific status changes
-      if (input.status === 'prep') {
-        updateData.started_at = new Date()
-      } else if (input.status === 'completed') {
-        updateData.completed_at = new Date()
-      }
-
-      return await ctx.db
-        .updateTable('nanopore_samples')
-        .set(updateData)
-        .where('id', '=', input.id)
-        .returningAll()
-        .executeTakeFirstOrThrow()
+    .mutation(async ({ input }) => {
+      const sampleService = getSampleService()
+      return await sampleService.updateSampleStatus(input.id, input.status)
     }),
 
   // Delete sample

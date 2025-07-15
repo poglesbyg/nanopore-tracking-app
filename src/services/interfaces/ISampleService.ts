@@ -1,19 +1,19 @@
 export interface CreateSampleData {
   sampleName: string
-  projectId?: string
+  projectId?: string | undefined
   submitterName: string
   submitterEmail: string
-  labName?: string
+  labName?: string | undefined
   sampleType: string
-  sampleBuffer?: string
-  concentration?: number
-  volume?: number
-  totalAmount?: number
-  flowCellType?: string
-  flowCellCount?: number
-  priority?: 'low' | 'normal' | 'high' | 'urgent'
-  assignedTo?: string
-  libraryPrepBy?: string
+  sampleBuffer?: string | undefined
+  concentration?: number | undefined
+  volume?: number | undefined
+  totalAmount?: number | undefined
+  flowCellType?: string | undefined
+  flowCellCount?: number | undefined
+  priority?: 'low' | 'normal' | 'high' | 'urgent' | undefined
+  assignedTo?: string | undefined
+  libraryPrepBy?: string | undefined
   chartField: string
 }
 

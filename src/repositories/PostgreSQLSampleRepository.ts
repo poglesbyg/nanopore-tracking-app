@@ -38,7 +38,7 @@ export class PostgreSQLSampleRepository implements ISampleRepository {
         submitted_at: now,
         created_at: now,
         updated_at: now,
-        created_by: 'system', // TODO: Get from context
+        created_by: '00000000-0000-0000-0000-000000000000', // System user UUID
       })
       .returningAll()
       .executeTakeFirstOrThrow()
