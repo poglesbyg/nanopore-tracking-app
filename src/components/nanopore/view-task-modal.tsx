@@ -20,6 +20,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription
 } from '../ui/dialog'
 
 type NanoporeSample = {
@@ -116,6 +117,9 @@ export function ViewTaskModal({
             <ExternalLink className="h-5 w-5" />
             Sample Details
           </DialogTitle>
+          <DialogDescription>
+            View detailed information and processing status for {sample.sampleName}.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 py-4">

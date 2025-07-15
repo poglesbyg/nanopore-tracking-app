@@ -18,6 +18,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription
 } from '../ui/dialog'
 import { Input } from '../ui/input'
 
@@ -169,6 +170,9 @@ export function EditTaskModal({
             <Edit className="h-5 w-5" />
             Edit Sample
           </DialogTitle>
+          <DialogDescription>
+            Edit sample details and update processing information for {sample.sampleName}.
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
