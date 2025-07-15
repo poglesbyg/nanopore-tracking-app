@@ -213,9 +213,14 @@ export default function NanoporeDashboard() {
   }, [openDropdown])
 
   const filteredSamples = samples.filter(sample => {
-    const matchesSearch = sample.sample_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         sample.submitter_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         sample.lab_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    // Safely handle potentially undefined/null values
+    const sampleName = sample.sample_name || ''
+    const submitterName = sample.submitter_name || ''
+    const labName = sample.lab_name || ''
+    
+    const matchesSearch = sampleName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         submitterName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         labName.toLowerCase().includes(searchTerm.toLowerCase())
     
     const matchesStatus = statusFilter === 'all' || sample.status === statusFilter
     const matchesPriority = priorityFilter === 'all' || sample.priority === priorityFilter
