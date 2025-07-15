@@ -25,9 +25,9 @@ export class PostgreSQLSampleRepository implements ISampleRepository {
         lab_name: data.labName || null,
         sample_type: data.sampleType,
         // sample_buffer: data.sampleBuffer || null, // TODO: Fix database schema - column doesn't exist
-        concentration: data.concentration || null,
-        volume: data.volume || null,
-        total_amount: data.totalAmount || null,
+        // concentration: data.concentration || null, // TODO: Fix database schema - column doesn't exist
+        // volume: data.volume || null, // TODO: Fix database schema - column doesn't exist
+        // total_amount: data.totalAmount || null, // TODO: Fix database schema - column doesn't exist
         flow_cell_type: data.flowCellType || null,
         flow_cell_count: data.flowCellCount || 1,
         status: 'submitted',
@@ -59,9 +59,9 @@ export class PostgreSQLSampleRepository implements ISampleRepository {
     if (data.labName !== undefined) updateData.lab_name = data.labName
     if (data.sampleType !== undefined) updateData.sample_type = data.sampleType
     // if (data.sampleBuffer !== undefined) updateData.sample_buffer = data.sampleBuffer // TODO: Fix database schema
-    if (data.concentration !== undefined) updateData.concentration = data.concentration
-    if (data.volume !== undefined) updateData.volume = data.volume
-    if (data.totalAmount !== undefined) updateData.total_amount = data.totalAmount
+    // if (data.concentration !== undefined) updateData.concentration = data.concentration // TODO: Fix database schema
+    // if (data.volume !== undefined) updateData.volume = data.volume // TODO: Fix database schema
+    // if (data.totalAmount !== undefined) updateData.total_amount = data.totalAmount // TODO: Fix database schema
     if (data.flowCellType !== undefined) updateData.flow_cell_type = data.flowCellType
     if (data.flowCellCount !== undefined) updateData.flow_cell_count = data.flowCellCount
     if (data.status !== undefined) updateData.status = data.status
