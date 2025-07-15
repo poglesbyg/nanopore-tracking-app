@@ -6,6 +6,21 @@ import { Separator } from '../ui/separator'
 import { Input } from '../ui/input'
 import type { UserSession } from '../../lib/auth/AdminAuth'
 
+// Helper function to format uptime
+function formatUptime(uptimeSeconds: number): string {
+  const hours = Math.floor(uptimeSeconds / 3600)
+  const minutes = Math.floor((uptimeSeconds % 3600) / 60)
+  const seconds = Math.floor(uptimeSeconds % 60)
+  
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${seconds}s`
+  } else if (minutes > 0) {
+    return `${minutes}m ${seconds}s`
+  } else {
+    return `${seconds}s`
+  }
+}
+
 interface ConfigData {
   config: Record<string, any>
   environment: string
@@ -270,7 +285,7 @@ export function ConfigPanel({ adminSession }: ConfigPanelProps) {
             </div>
             <div>
               <div className="text-sm text-gray-600">Uptime</div>
-              <div className="font-mono text-sm">{new Date(environmentInfo.uptime).toISOString()}</div>
+              <div className="font-mono text-sm">{environmentInfo.uptime ? formatUptime(environmentInfo.uptime) : 'Unknown'}</div>
             </div>
             <div>
               <div className="text-sm text-gray-600">Memory Usage</div>

@@ -347,21 +347,21 @@ export class SampleQCService {
   }
 
   // Public API methods
-  async getQCStatus(stepId: string): Promise<ServiceResponse<ProcessingStep>> {
+  async getQCStatus(stepId: string): Promise<ServiceResponse<ProcessingStep | null>> {
     try {
       const step = await this.database.getStep(stepId)
       if (!step) {
-        return createServiceResponse(false, undefined, 'Step not found')
+        return createServiceResponse(false, null, 'Step not found')
       }
 
       if (step.stepName !== 'Sample QC') {
-        return createServiceResponse(false, undefined, 'Step is not a Sample QC step')
+        return createServiceResponse(false, null, 'Step is not a Sample QC step')
       }
 
       return createServiceResponse(true, step)
     } catch (error) {
       this.logger.error('Error getting QC status:', error)
-      return createServiceResponse(false, undefined, 'Internal server error')
+      return createServiceResponse(false, null, 'Internal server error')
     }
   }
 
@@ -372,7 +372,7 @@ export class SampleQCService {
       return createServiceResponse(true, [])
     } catch (error) {
       this.logger.error('Error getting QC history:', error)
-      return createServiceResponse(false, undefined, 'Internal server error')
+      return createServiceResponse(false, [], 'Internal server error')
     }
   }
 
@@ -392,7 +392,12 @@ export class SampleQCService {
       })
     } catch (error) {
       this.logger.error('Error getting service status:', error)
-      return createServiceResponse(false, undefined, 'Internal server error')
+      return createServiceResponse(false, {
+        activeSteps: 0,
+        completedSteps: 0,
+        failedSteps: 0,
+        averageProcessingTime: 0
+      }, 'Internal server error')
     }
   }
 } 

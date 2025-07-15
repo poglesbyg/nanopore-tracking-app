@@ -5,6 +5,7 @@ import { db } from '../database'
 import { promises as fs } from 'fs'
 import { join } from 'path'
 import { createHash } from 'crypto'
+import { sql } from 'kysely'
 
 const logger = getComponentLogger('MigrationManager')
 
@@ -196,7 +197,7 @@ export class MigrationManager {
       );
     `
     
-    await db.executeQuery(createTableSQL)
+    await sql`${sql.raw(createTableSQL)}`.execute(db as any)
   }
 
   /**
@@ -368,13 +369,13 @@ export class MigrationManager {
    */
   async getAppliedMigrations(): Promise<Migration[]> {
     try {
-      const result = await db.executeQuery(`
-        SELECT * FROM ${this.config.tableName}
-        WHERE status = 'completed'
-        ORDER BY version ASC
-      `)
+      const result = await (db as any).selectFrom(this.config.tableName)
+        .selectAll()
+        .where('status', '=', 'completed')
+        .orderBy('version', 'asc')
+        .execute()
       
-      return result.rows.map(row => this.mapRowToMigration(row))
+      return result.map((row: any) => this.mapRowToMigration(row))
     } catch (error) {
       logger.error('Failed to get applied migrations', {
         errorType: error instanceof Error ? error.name : 'Unknown',
@@ -610,13 +611,13 @@ export class MigrationManager {
       }
       
       // Execute migration SQL
-      const sql = direction === 'up' ? migration.up : migration.down
+      const migrationSQL = direction === 'up' ? migration.up : migration.down
       let affectedRows = 0
       const warnings: string[] = []
       
-      if (sql && !options.dryRun) {
-        const result = await db.executeQuery(sql)
-        affectedRows = result.rowCount || 0
+      if (migrationSQL && !options.dryRun) {
+        const result = await sql`${sql.raw(migrationSQL)}`.execute(db as any)
+        affectedRows = result.length || 0
       }
       
       const duration = Date.now() - startTime
@@ -720,22 +721,7 @@ export class MigrationManager {
     const migration = this.currentContext?.migration
     if (!migration) return
     
-    await db.executeQuery(updateSQL, [
-      migrationId,
-      migration.version,
-      migration.name,
-      migration.description,
-      migration.filename,
-      migration.checksum,
-      status,
-      direction,
-      status === 'completed' ? new Date() : null,
-      duration || null,
-      userId || null,
-      affectedRows || 0,
-      warnings || [],
-      errorMessage || null
-    ])
+    await sql`${sql.raw(updateSQL)}`.execute(db as any)
   }
 
   /**
@@ -746,10 +732,10 @@ export class MigrationManager {
     const expiresAt = new Date(Date.now() + this.config.lockTimeout)
     
     try {
-      await db.executeQuery(`
+      await sql`
         INSERT INTO migration_locks (id, acquired_at, expires_at, acquired_by, operation)
-        VALUES ($1, $2, $3, $4, $5)
-      `, [lockId, new Date(), expiresAt, userId || 'system', operation])
+        VALUES (${lockId}, ${new Date()}, ${expiresAt}, ${userId || 'system'}, ${operation})
+      `.execute(db as any)
       
       this.isLocked = true
       this.lockExpiry = expiresAt
@@ -774,7 +760,7 @@ export class MigrationManager {
     if (!this.isLocked) return
     
     try {
-      await db.executeQuery('DELETE FROM migration_locks WHERE expires_at > NOW()')
+      await sql`DELETE FROM migration_locks WHERE expires_at < NOW()`.execute(db as any)
       this.isLocked = false
       this.lockExpiry = null
       
@@ -794,7 +780,7 @@ export class MigrationManager {
    */
   private async cleanupExpiredLocks(): Promise<void> {
     try {
-      await db.executeQuery('DELETE FROM migration_locks WHERE expires_at < NOW()')
+      await sql`DELETE FROM migration_locks WHERE expires_at < NOW()`.execute(db as any)
     } catch (error) {
       logger.error('Failed to cleanup expired locks', {
         errorType: error instanceof Error ? error.name : 'Unknown',
@@ -861,12 +847,12 @@ export class MigrationManager {
    */
   async getMigrationHistory(): Promise<any[]> {
     try {
-      const result = await db.executeQuery(`
-        SELECT * FROM ${this.config.tableName}
-        ORDER BY applied_at DESC
-      `)
+      const result = await (db as any).selectFrom(this.config.tableName)
+        .selectAll()
+        .orderBy('applied_at', 'desc')
+        .execute()
       
-      return result.rows
+      return result
     } catch (error) {
       logger.error('Failed to get migration history', {
         errorType: error instanceof Error ? error.name : 'Unknown',
