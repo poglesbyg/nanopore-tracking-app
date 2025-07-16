@@ -73,7 +73,7 @@ services:
   authentication:
     build:
       context: ../..
-      dockerfile: deployment/docker/Dockerfile.auth-service
+      dockerfile: services/authentication/Dockerfile
     ports:
       - "3004:3004"
     environment:
@@ -83,6 +83,7 @@ services:
       - JWT_SECRET=your-jwt-secret-key
       - SERVICE_NAME=authentication
       - SERVICE_VERSION=1.0.0
+      - CORS_ORIGIN=http://localhost:3001
     depends_on:
       - auth-db
     networks:
