@@ -199,14 +199,17 @@ export function ConfigPanel({ adminSession }: ConfigPanelProps) {
         credentials: 'include'
       })
 
-      await response.json()
-      // Handle validation result
+      const result = await response.json()
+      if (result.success) {
+        // Show validation result
+        console.log('Configuration validation:', result.data)
+      }
     } catch (error) {
       console.error('Error validating configuration:', error)
     }
   }
 
-  // Initial load - only when admin session is available
+  // Load data on component mount
   useEffect(() => {
     if (adminSession) {
       fetchConfigData()
@@ -214,176 +217,192 @@ export function ConfigPanel({ adminSession }: ConfigPanelProps) {
     }
   }, [adminSession])
 
+  // Auto-refresh environment info every 30 seconds
+  useEffect(() => {
+    if (adminSession) {
+      const interval = setInterval(fetchEnvironmentInfo, 30000)
+      return () => clearInterval(interval)
+    }
+  }, [adminSession])
+
   if (!adminSession) {
     return (
-      <Card className="p-4 bg-red-50 border-red-200">
-        <div className="text-red-700">
-          <strong>Error:</strong> Admin session required to manage configuration.
+      <Card className="p-6">
+        <div className="text-center">
+          <h3 className="text-lg font-semibold mb-2">Configuration Panel</h3>
+          <p className="text-gray-600">Admin authentication required</p>
         </div>
       </Card>
     )
   }
 
-  // Get feature color
-  const getFeatureColor = (enabled: boolean) => {
-    return enabled ? 'bg-green-500' : 'bg-red-500'
-  }
-
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Configuration Management</h2>
-        <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            onClick={fetchConfigData}
-            disabled={configData.loading}
-          >
-            {configData.loading ? 'Loading...' : 'Refresh'}
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={validateConfig}
-          >
-            Validate Config
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={() => setShowConfigEditor(!showConfigEditor)}
-          >
-            {showConfigEditor ? 'Hide Config' : 'Show Config'}
-          </Button>
-        </div>
-      </div>
-
-      {/* Error Display */}
-      {configData.error && (
-        <Card className="p-4 bg-red-50 border-red-200">
-          <div className="text-red-700">
-            <strong>Error:</strong> {configData.error}
+      {/* Configuration Section */}
+      <Card className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold">Application Configuration</h3>
+          <div className="flex space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchConfigData}
+              disabled={configData.loading}
+            >
+              {configData.loading ? 'Loading...' : 'Refresh'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={reloadConfig}
+            >
+              Reload
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={validateConfig}
+            >
+              Validate
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowConfigEditor(!showConfigEditor)}
+            >
+              Edit
+            </Button>
           </div>
-        </Card>
-      )}
+        </div>
 
-      {/* Validation Result */}
-      {/* This section was removed as per the new_code, as the validation logic was moved to updateConfig */}
+        {configData.error && (
+          <div className="bg-red-50 border border-red-200 rounded p-3 mb-4">
+            <p className="text-red-700 text-sm">{configData.error}</p>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <span className="text-sm text-gray-600">Environment:</span>
+            <div className="font-mono text-sm">{configData.environment || 'Unknown'}</div>
+          </div>
+          <div>
+            <span className="text-sm text-gray-600">Config Hash:</span>
+            <div className="font-mono text-sm">{configData.configHash || 'N/A'}</div>
+          </div>
+          <div>
+            <span className="text-sm text-gray-600">Last Updated:</span>
+            <div className="font-mono text-sm">
+              {configData.lastUpdated ? configData.lastUpdated.toLocaleString() : 'Never'}
+            </div>
+          </div>
+        </div>
+
+        {/* Feature Flags */}
+        <Separator className="my-4" />
+        <div>
+          <h4 className="text-md font-medium mb-2">Feature Flags</h4>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(configData.features).map(([feature, enabled]) => (
+              <Badge 
+                key={feature} 
+                variant={enabled ? "default" : "secondary"}
+                className={enabled ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}
+              >
+                {feature}: {enabled ? 'ON' : 'OFF'}
+              </Badge>
+            ))}
+          </div>
+        </div>
+
+        {/* Configuration Editor */}
+        {showConfigEditor && (
+          <div className="mt-4">
+            <Separator className="mb-4" />
+            <h4 className="text-md font-medium mb-2">Configuration Editor</h4>
+            <div className="space-y-2">
+              <Input
+                placeholder="Enter JSON configuration..."
+                value={editingConfig}
+                onChange={(e) => setEditingConfig(e.target.value)}
+                className="font-mono text-sm"
+              />
+              <div className="flex space-x-2">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    try {
+                      const newConfig = JSON.parse(editingConfig)
+                      updateConfig(newConfig)
+                    } catch (error) {
+                      console.error('Invalid JSON:', error)
+                    }
+                  }}
+                >
+                  Apply
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowConfigEditor(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </Card>
 
       {/* Environment Information */}
-      {environmentInfo && (
-        <Card className="p-4">
-          <h3 className="text-lg font-semibold mb-3">Environment Information</h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <Card className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold">Environment Information</h3>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchEnvironmentInfo}
+          >
+            Refresh
+          </Button>
+        </div>
+
+        {environmentInfo ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <div className="text-sm text-gray-600">Node Version</div>
+              <span className="text-sm text-gray-600">Node Version:</span>
               <div className="font-mono text-sm">{environmentInfo.nodeVersion}</div>
             </div>
             <div>
-              <div className="text-sm text-gray-600">Platform</div>
+              <span className="text-sm text-gray-600">Platform:</span>
               <div className="font-mono text-sm">{environmentInfo.platform}</div>
             </div>
             <div>
-              <div className="text-sm text-gray-600">Uptime</div>
-              <div className="font-mono text-sm">{environmentInfo.uptime ? formatUptime(environmentInfo.uptime) : 'Unknown'}</div>
+              <span className="text-sm text-gray-600">Uptime:</span>
+              <div className="font-mono text-sm">{formatUptime(environmentInfo.uptime)}</div>
             </div>
             <div>
-              <div className="text-sm text-gray-600">Memory Usage</div>
-              <div className="font-mono text-sm">{environmentInfo.memory.percentage}%</div>
-            </div>
-            <div>
-              <div className="text-sm text-gray-600">CPU Usage</div>
-              <div className="font-mono text-sm">{environmentInfo.cpu.usage}%</div>
-            </div>
-            <div>
-              <div className="text-sm text-gray-600">Disk Space</div>
-              <div className="font-mono text-sm">{environmentInfo.diskSpace.percentage}%</div>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {/* Feature Toggles */}
-      <Card className="p-4">
-        <h3 className="text-lg font-semibold mb-3">Feature Toggles</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          {Object.entries(configData.features).map(([feature, enabled]) => (
-            <div key={feature} className="flex items-center justify-between p-3 bg-gray-50 rounded">
-              <div>
-                <div className="font-medium">{feature}</div>
-                <Badge className={`${getFeatureColor(enabled)} text-white`}>
-                  {enabled ? 'Enabled' : 'Disabled'}
-                </Badge>
+              <span className="text-sm text-gray-600">Memory Usage:</span>
+              <div className="font-mono text-sm">
+                {environmentInfo.memory?.percentage ? `${environmentInfo.memory.percentage}%` : 'N/A'}
               </div>
-              {/* The toggleFeature function was removed as per the new_code */}
             </div>
-          ))}
-        </div>
-      </Card>
-
-      {/* Configuration Override */}
-      {/* This section was removed as per the new_code, as the override functionality was moved to updateConfig */}
-
-      {/* Configuration Display */}
-      {showConfigEditor && (
-        <Card className="p-4">
-          <h3 className="text-lg font-semibold mb-3">Current Configuration</h3>
-          <div className="text-sm text-gray-600 mb-3">
-            {configData.lastUpdated && (
-              <>Last updated: {configData.lastUpdated.toLocaleString()}</>
-            )}
-          </div>
-          <div className="bg-gray-50 p-4 rounded overflow-x-auto">
-            {configData.loading ? (
-              <div className="space-y-2">
-                {/* Skeleton was removed as per the new_code */}
+            <div>
+              <span className="text-sm text-gray-600">CPU Usage:</span>
+              <div className="font-mono text-sm">{environmentInfo.cpu?.usage?.toFixed(1) || 'N/A'}%</div>
+            </div>
+            <div>
+              <span className="text-sm text-gray-600">Disk Usage:</span>
+              <div className="font-mono text-sm">
+                {environmentInfo.diskSpace?.percentage ? `${environmentInfo.diskSpace.percentage}%` : 'N/A'}
               </div>
-            ) : (
-              <pre className="text-xs">
-                {JSON.stringify(configData.config, null, 2)}
-              </pre>
-            )}
+            </div>
           </div>
-          <Separator className="my-4" />
-          <h4 className="text-md font-semibold mb-2">Edit Configuration</h4>
-          <Input
-            placeholder="Enter JSON path (e.g., server.port)"
-            value={editingConfig}
-            onChange={(e) => setEditingConfig(e.target.value)}
-            className="mb-2"
-          />
-          <Button 
-            onClick={() => updateConfig({ [editingConfig]: !configData.config[editingConfig] })}
-            disabled={!editingConfig || configData.loading}
-          >
-            Toggle {editingConfig}
-          </Button>
-          <Button 
-            onClick={() => updateConfig({ [editingConfig]: 8080 })}
-            disabled={!editingConfig || configData.loading}
-            className="ml-2"
-          >
-            Set {editingConfig} to 8080
-          </Button>
-          <Button 
-            onClick={reloadConfig}
-            disabled={configData.loading}
-            className="ml-2"
-          >
-            Reload Configuration
-          </Button>
-        </Card>
-      )}
-
-      {/* Configuration Help */}
-      <Card className="p-4">
-        <h3 className="text-lg font-semibold mb-3">Configuration Help</h3>
-        <div className="space-y-2 text-sm">
-          <div><strong>Environment Variables:</strong> Configuration can be overridden using environment variables (e.g., DB_HOST, SERVER_PORT)</div>
-          <div><strong>Configuration Files:</strong> Files are loaded in order: default.json → {configData.environment}.json → local.json</div>
-          <div><strong>Secrets:</strong> Sensitive data should be stored in the secrets/ directory</div>
-          <div><strong>Hot Reload:</strong> Configuration changes are automatically reloaded in development mode</div>
-          <div><strong>Validation:</strong> All configuration changes are validated before being applied</div>
-        </div>
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-gray-600">Loading environment information...</p>
+          </div>
+        )}
       </Card>
     </div>
   )

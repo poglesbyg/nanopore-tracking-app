@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { inputSanitizer } from '../security/InputSanitizer'
 
 /**
  * Common validation patterns
@@ -34,10 +35,10 @@ const messages = {
  * Base validation schemas
  */
 export const baseValidations = {
-  // String validations
-  requiredString: z.string().min(1, messages.required).trim(),
-  optionalString: z.string().optional(),
-  email: z.string().email(messages.email).trim(),
+  // String validations with sanitization
+  requiredString: z.string().min(1, messages.required).transform(val => inputSanitizer.sanitizeString(val)),
+  optionalString: z.string().optional().transform(val => val ? inputSanitizer.sanitizeString(val) : val),
+  email: z.string().email(messages.email).transform(val => inputSanitizer.sanitizeString(val)),
   uuid: z.string().uuid(messages.uuid),
   
   // Sample-specific validations

@@ -4,6 +4,7 @@ import { getComponentLogger } from '../lib/logging/StructuredLogger'
 import { db } from '../lib/database'
 import { cacheManager } from '../lib/cache/CacheManager'
 import { memoryManager } from '../lib/performance/MemoryManager'
+import { securityHeaders } from '../middleware/security/SecurityHeaders'
 
 const logger = getComponentLogger('HealthCheck')
 
@@ -304,20 +305,17 @@ export const GET: APIRoute = async ({ request }) => {
       }
     })
     
-    return new Response(JSON.stringify(health, null, 2), {
+    const response = new Response(JSON.stringify(health, null, 2), {
       status: statusCode,
       headers: {
         'Content-Type': 'application/json',
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
-        'Expires': '0',
-        'X-Content-Type-Options': 'nosniff',
-        'X-Frame-Options': 'DENY',
-        'X-XSS-Protection': '1; mode=block',
-        'Referrer-Policy': 'strict-origin-when-cross-origin',
-        'Cross-Origin-Resource-Policy': 'same-site'
+        'Expires': '0'
       }
     })
+    
+    return securityHeaders.applyHeaders(response)
   } catch (error) {
     const duration = (Date.now() - startTime) / 1000
     
@@ -332,7 +330,7 @@ export const GET: APIRoute = async ({ request }) => {
     applicationMetrics.recordError('health_check_error', 'health_endpoint')
     applicationMetrics.recordHttpRequest('GET', '/health', 503, duration)
     
-    return new Response(JSON.stringify({
+    const errorResponse = new Response(JSON.stringify({
       status: 'unhealthy',
       message: 'Health check failed',
       timestamp: new Date().toISOString(),
@@ -341,13 +339,10 @@ export const GET: APIRoute = async ({ request }) => {
       status: 503,
       headers: {
         'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'X-Content-Type-Options': 'nosniff',
-        'X-Frame-Options': 'DENY',
-        'X-XSS-Protection': '1; mode=block',
-        'Referrer-Policy': 'strict-origin-when-cross-origin',
-        'Cross-Origin-Resource-Policy': 'same-site'
+        'Cache-Control': 'no-cache, no-store, must-revalidate'
       }
     })
+    
+    return securityHeaders.applyHeaders(errorResponse)
   }
 } 

@@ -53,9 +53,30 @@ export async function GET(context: APIContext): Promise<Response> {
         break
 
       case 'environment':
+        const memoryUsage = process.memoryUsage()
+        const cpuUsage = process.cpuUsage()
+        const uptime = process.uptime()
+        
         result = {
           success: true,
           data: {
+            nodeVersion: process.version,
+            platform: process.platform,
+            uptime: uptime,
+            memory: {
+              used: memoryUsage.heapUsed,
+              total: memoryUsage.heapTotal,
+              percentage: (memoryUsage.heapUsed / memoryUsage.heapTotal) * 100
+            },
+            cpu: {
+              usage: ((cpuUsage.user + cpuUsage.system) / 1000000) / uptime * 100,
+              loadAverage: process.platform === 'linux' ? (await import('os')).loadavg() : [0, 0, 0]
+            },
+            diskSpace: {
+              used: 0, // Simplified - would need fs.stat in real implementation
+              total: 0,
+              percentage: 0
+            },
             environment: configManager.getEnvironment(),
             debug: configManager.get('debug'),
             version: configManager.get('version')
