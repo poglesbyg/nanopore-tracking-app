@@ -26,6 +26,7 @@ services:
       timeout: 10s
       retries: 3
 
+  # Main PostgreSQL database
   db:
     image: postgres:15-alpine
     environment:
@@ -44,6 +45,52 @@ services:
       timeout: 5s
       retries: 5
 
+  # Sample Management Service Database
+  sample-db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=sample_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - sample_postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Sample Management Service
+  sample-service:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile.sample-service
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=development
+      - PORT=3002
+      - DATABASE_URL=postgresql://postgres:password@sample-db:5432/sample_db
+      - LOG_LEVEL=debug
+      - ALLOWED_ORIGINS=http://localhost:3001,http://localhost:3000
+    depends_on:
+      sample-db:
+        condition: service_healthy
+    volumes:
+      - ../../services/sample-management:/app/src
+      - /app/node_modules
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   ollama:
     image: ollama/ollama:latest
     ports:
@@ -52,7 +99,12 @@ services:
       - ollama_data:/root/.ollama
     restart: unless-stopped
 
+networks:
+  nanopore-network:
+    driver: bridge
+
 volumes:
   postgres_data:
+  sample_postgres_data:
   ollama_data:
   uploads: 
