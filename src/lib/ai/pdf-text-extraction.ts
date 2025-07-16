@@ -71,7 +71,7 @@ class PdfTextExtractionService {
   }
 
   /**
-   * Initialize PDF parsing modules - using a more robust import approach
+   * Initialize PDF parsing modules - using only the working createRequire approach
    */
   private async initializePdfParsers(): Promise<{ server: boolean }> {
     const results = { server: false }
@@ -79,66 +79,18 @@ class PdfTextExtractionService {
     // Only try server-side initialization with pdf-parse
     if (this.isServerSide && !this.isServerSideInitialized) {
       try {
-        // First try: Use dynamic import with proper error handling
-        try {
-          const pdfModule = await import('pdf-parse')
-          this.pdfParseModule = pdfModule.default || pdfModule
-          this.isServerSideInitialized = true
-          results.server = true
-          console.log('PDF parsing initialized successfully via dynamic import')
-          return results
-        } catch (importError) {
-          const errorMessage = importError instanceof Error ? importError.message : 'Unknown import error'
-          console.warn('Dynamic import failed:', errorMessage)
-        }
-
-        // Second try: Use require if available
-        if (typeof require !== 'undefined') {
-          try {
-            // @ts-ignore - pdf-parse types are in separate file
-            this.pdfParseModule = require('pdf-parse')
-            this.isServerSideInitialized = true
-            results.server = true
-            console.log('PDF parsing initialized successfully via require')
-            return results
-          } catch (requireError) {
-            const errorMessage = requireError instanceof Error ? requireError.message : 'Unknown require error'
-            console.warn('Require failed:', errorMessage)
-          }
-        }
-
-        // Third try: Use createRequire
-        try {
-          const { createRequire } = await import('module')
-          const require = createRequire(import.meta.url)
-          // @ts-ignore - pdf-parse types are in separate file
-          this.pdfParseModule = require('pdf-parse')
-          this.isServerSideInitialized = true
-          results.server = true
-          console.log('PDF parsing initialized successfully via createRequire')
-          return results
-        } catch (createRequireError) {
-          const errorMessage = createRequireError instanceof Error ? createRequireError.message : 'Unknown createRequire error'
-          console.warn('createRequire failed:', errorMessage)
-        }
-
-        // Fourth try: Use eval to bypass module resolution issues
-        try {
-          const evalRequire = eval('require')
-          this.pdfParseModule = evalRequire('pdf-parse')
-          this.isServerSideInitialized = true
-          results.server = true
-          console.log('PDF parsing initialized successfully via eval require')
-          return results
-        } catch (evalError) {
-          const errorMessage = evalError instanceof Error ? evalError.message : 'Unknown eval error'
-          console.warn('Eval require failed:', errorMessage)
-        }
-
-        console.error('All PDF parsing initialization methods failed')
-        
+        // Use createRequire - this is the method that works in production
+        const { createRequire } = await import('module')
+        const require = createRequire(import.meta.url)
+        // @ts-ignore - pdf-parse types are in separate file
+        this.pdfParseModule = require('pdf-parse')
+        this.isServerSideInitialized = true
+        results.server = true
+        console.log('PDF parsing initialized successfully via createRequire')
+        return results
       } catch (error) {
-        console.error('PDF parsing initialization error:', error)
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        console.error('PDF parsing initialization failed:', errorMessage)
       }
     }
 
