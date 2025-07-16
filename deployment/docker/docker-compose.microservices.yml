@@ -13,7 +13,7 @@ services:
       - SAMPLE_SERVICE_URL=http://sample-management:3002
       - AI_SERVICE_URL=http://ai-processing:3003
       - AUTH_SERVICE_URL=http://authentication:3004
-      - FILE_SERVICE_URL=http://file-storage:3005
+      - FILE_SERVICE_URL=http://file-storage:3004
       - AUDIT_SERVICE_URL=http://audit:3006
     depends_on:
       - sample-management
@@ -94,21 +94,30 @@ services:
   file-storage:
     build:
       context: ../..
-      dockerfile: deployment/docker/Dockerfile.file-service
+      dockerfile: services/file-storage/Dockerfile
     ports:
-      - "3005:3005"
+      - "3005:3004"
     environment:
       - NODE_ENV=development
-      - PORT=3005
-      - STORAGE_PATH=/app/storage
-      - MAX_FILE_SIZE=100MB
+      - FILE_STORAGE_PORT=3004
+      - FILE_STORAGE_DB_HOST=file-storage-db
+      - FILE_STORAGE_DB_PORT=5432
+      - FILE_STORAGE_DB_NAME=file_storage
+      - FILE_STORAGE_DB_USER=postgres
+      - FILE_STORAGE_DB_PASSWORD=password
+      - FILE_STORAGE_PATH=/app/storage/files
+      - FILE_STORAGE_MAX_SIZE=104857600
+      - FILE_STORAGE_ALLOWED_TYPES=pdf,jpg,jpeg,png,gif,txt,csv,xlsx,docx
+      - FILE_STORAGE_CORS_ORIGIN=http://localhost:3001
       - SERVICE_NAME=file-storage
       - SERVICE_VERSION=1.0.0
+    depends_on:
+      - file-storage-db
     networks:
       - nanopore-network
     restart: unless-stopped
     volumes:
-      - file-storage:/app/storage
+      - file-storage-data:/app/storage
 
   # Audit Service
   audit:
@@ -157,6 +166,22 @@ services:
       - "5433:5432"
     volumes:
       - auth-db-data:/var/lib/postgresql/data
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+
+  # File Storage Database
+  file-storage-db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=file_storage
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    ports:
+      - "5435:5432"
+    volumes:
+      - file-storage-db-data:/var/lib/postgresql/data
+      - ../../services/file-storage/src/database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
     networks:
       - nanopore-network
     restart: unless-stopped
@@ -245,7 +270,8 @@ services:
 volumes:
   sample-data:
   ai-data:
-  file-storage:
+  file-storage-data:
+  file-storage-db-data:
   sample-db-data:
   auth-db-data:
   audit-db-data:
