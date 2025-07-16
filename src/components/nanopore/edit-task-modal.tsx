@@ -17,6 +17,17 @@ import {
 } from '../ui/dialog'
 import { Input } from '../ui/input'
 
+// Helper function to safely format dates
+const formatDate = (date: Date | string | null | undefined): string => {
+  if (!date) return 'Not available'
+  try {
+    const dateObj = typeof date === 'string' ? new Date(date) : date
+    return dateObj.toLocaleDateString()
+  } catch (error) {
+    return 'Invalid date'
+  }
+}
+
 type NanoporeSample = {
   id: string
   sampleName: string
@@ -370,7 +381,7 @@ export function EditTaskModal({
                 <div>
                   <p className="text-sm font-medium">Created</p>
                   <p className="text-sm text-muted-foreground">
-                    {sample.createdAt.toLocaleDateString()}
+                    {formatDate(sample.createdAt)}
                   </p>
                 </div>
               </div>
@@ -379,7 +390,7 @@ export function EditTaskModal({
                 <div>
                   <p className="text-sm font-medium">Last Updated</p>
                   <p className="text-sm text-muted-foreground">
-                    {sample.updatedAt.toLocaleDateString()}
+                    {formatDate(sample.updatedAt)}
                   </p>
                 </div>
               </div>
