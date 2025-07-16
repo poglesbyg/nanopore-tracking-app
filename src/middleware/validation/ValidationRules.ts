@@ -77,8 +77,16 @@ export const baseValidations = {
   
   // Numeric validations
   positiveNumber: z.number().positive(messages.positive).optional(),
-  concentration: z.number().min(0.001, 'Concentration must be at least 0.001 ng/μL').max(10000, 'Concentration cannot exceed 10,000 ng/μL').optional(),
-  volume: z.number().min(0.1, 'Volume must be at least 0.1 μL').max(1000, 'Volume cannot exceed 1,000 μL').optional(),
+  concentration: z.union([
+    z.number().min(0.001, 'Concentration must be at least 0.001 ng/μL').max(10000, 'Concentration cannot exceed 10,000 ng/μL'),
+    z.null(),
+    z.undefined()
+  ]).optional(),
+  volume: z.union([
+    z.number().min(0.1, 'Volume must be at least 0.1 μL').max(1000, 'Volume cannot exceed 1,000 μL'),
+    z.null(),
+    z.undefined()
+  ]).optional(),
   totalAmount: z.number().min(0.001, 'Total amount must be at least 0.001 ng').max(100000, 'Total amount cannot exceed 100,000 ng').optional(),
   flowCellCount: z.number().int().min(1, 'Flow cell count must be at least 1').max(10, 'Flow cell count cannot exceed 10').default(1),
   

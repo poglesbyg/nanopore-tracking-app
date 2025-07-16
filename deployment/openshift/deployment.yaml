@@ -86,7 +86,7 @@ spec:
         - name: LOG_DIR
           value: "/app/data/logs"
         - name: NODE_OPTIONS
-          value: "--expose-gc --max-old-space-size=320"
+          value: "--expose-gc --max-old-space-size=256"
         volumeMounts:
         - name: uploads-storage
           mountPath: /app/uploads
@@ -95,13 +95,13 @@ spec:
         - name: app-data-storage
           mountPath: /app/data
         securityContext:
-          runAsUser: 1001
+          runAsUser: 1003220000
         resources:
           requests:
-            memory: "192Mi"
+            memory: "160Mi"
             cpu: "100m"
           limits:
-            memory: "384Mi"
+            memory: "320Mi"
             cpu: "300m"
         livenessProbe:
           httpGet:

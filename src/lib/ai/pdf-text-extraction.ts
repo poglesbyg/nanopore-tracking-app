@@ -71,7 +71,7 @@ class PdfTextExtractionService {
   }
 
   /**
-   * Initialize PDF parsing modules - simplified to only use pdf-parse
+   * Initialize PDF parsing modules - using a more robust import approach
    */
   private async initializePdfParsers(): Promise<{ server: boolean }> {
     const results = { server: false }
@@ -79,13 +79,66 @@ class PdfTextExtractionService {
     // Only try server-side initialization with pdf-parse
     if (this.isServerSide && !this.isServerSideInitialized) {
       try {
-        // @ts-ignore - pdf-parse doesn't have types
-        const pdfModule = await import('pdf-parse')
-        this.pdfParseModule = pdfModule.default || pdfModule
-        this.isServerSideInitialized = true
-        results.server = true
+        // First try: Use dynamic import with proper error handling
+        try {
+          const pdfModule = await import('pdf-parse')
+          this.pdfParseModule = pdfModule.default || pdfModule
+          this.isServerSideInitialized = true
+          results.server = true
+          console.log('PDF parsing initialized successfully via dynamic import')
+          return results
+        } catch (importError) {
+          const errorMessage = importError instanceof Error ? importError.message : 'Unknown import error'
+          console.warn('Dynamic import failed:', errorMessage)
+        }
+
+        // Second try: Use require if available
+        if (typeof require !== 'undefined') {
+          try {
+            // @ts-ignore - pdf-parse types are in separate file
+            this.pdfParseModule = require('pdf-parse')
+            this.isServerSideInitialized = true
+            results.server = true
+            console.log('PDF parsing initialized successfully via require')
+            return results
+          } catch (requireError) {
+            const errorMessage = requireError instanceof Error ? requireError.message : 'Unknown require error'
+            console.warn('Require failed:', errorMessage)
+          }
+        }
+
+        // Third try: Use createRequire
+        try {
+          const { createRequire } = await import('module')
+          const require = createRequire(import.meta.url)
+          // @ts-ignore - pdf-parse types are in separate file
+          this.pdfParseModule = require('pdf-parse')
+          this.isServerSideInitialized = true
+          results.server = true
+          console.log('PDF parsing initialized successfully via createRequire')
+          return results
+        } catch (createRequireError) {
+          const errorMessage = createRequireError instanceof Error ? createRequireError.message : 'Unknown createRequire error'
+          console.warn('createRequire failed:', errorMessage)
+        }
+
+        // Fourth try: Use eval to bypass module resolution issues
+        try {
+          const evalRequire = eval('require')
+          this.pdfParseModule = evalRequire('pdf-parse')
+          this.isServerSideInitialized = true
+          results.server = true
+          console.log('PDF parsing initialized successfully via eval require')
+          return results
+        } catch (evalError) {
+          const errorMessage = evalError instanceof Error ? evalError.message : 'Unknown eval error'
+          console.warn('Eval require failed:', errorMessage)
+        }
+
+        console.error('All PDF parsing initialization methods failed')
+        
       } catch (error) {
-        console.warn('Server-side PDF parsing not available:', error)
+        console.error('PDF parsing initialization error:', error)
       }
     }
 
@@ -119,7 +172,6 @@ class PdfTextExtractionService {
       tracker.start()
       tracker.updateStep(ProcessingStep.INITIALIZING, 0, 'Initializing PDF parser...')
       
-      // Initialize PDF parsers
       const { server } = await this.initializePdfParsers()
       
       if (!server) {
@@ -180,11 +232,11 @@ class PdfTextExtractionService {
         const extractedFields = pdfPatternMatcher.extractAllFields(result.text)
         
         tracker.updateStep(ProcessingStep.PATTERN_MATCHING, 100, 'Pattern matching completed')
-        
+       
         // Build metadata from pdf-parse result
         const metadata = this.buildMetadata(result.info || {})
         
-        // Convert pattern matching results to our format
+        // Convert pattern matching results to our format with proper typing
         const sampleName = extractedFields.sampleName?.[0]?.value
         const submitterName = extractedFields.submitterName?.[0]?.value
         const submitterEmail = extractedFields.submitterEmail?.[0]?.value
@@ -203,23 +255,28 @@ class PdfTextExtractionService {
                                .filter(Boolean).length
         const confidence = extractedCount / totalFields
         
+        // Build extractedFields object conditionally
+        const extractedFieldsData: ExtractedPdfData['extractedFields'] = {
+          confidence
+        }
+        
+        // Only add fields if they have values
+        if (sampleName) extractedFieldsData.sampleName = sampleName
+        if (submitterName) extractedFieldsData.submitterName = submitterName
+        if (submitterEmail) extractedFieldsData.submitterEmail = submitterEmail
+        if (labName) extractedFieldsData.labName = labName
+        if (projectName) extractedFieldsData.projectName = projectName
+        if (sequencingType) extractedFieldsData.sequencingType = sequencingType
+        if (sampleType) extractedFieldsData.sampleType = sampleType
+        if (libraryType) extractedFieldsData.libraryType = libraryType
+        if (flowCellType) extractedFieldsData.flowCellType = flowCellType
+        if (priority) extractedFieldsData.priority = priority
+        
         const extractedData: ExtractedPdfData = {
           rawText: result.text,
           pageCount: result.numpages || 1,
           metadata,
-          extractedFields: {
-            sampleName,
-            submitterName,
-            submitterEmail,
-            labName,
-            projectName,
-            sequencingType,
-            sampleType,
-            libraryType,
-            flowCellType,
-            priority,
-            confidence
-          }
+          extractedFields: extractedFieldsData
         }
 
         tracker.complete('PDF processing completed successfully')
@@ -240,6 +297,13 @@ class PdfTextExtractionService {
         )
       }
     })
+  }
+
+  /**
+   * Extract structured data from raw text (helper method)
+   */
+  extractStructuredData(rawText: string): any {
+    return pdfPatternMatcher.extractAllFields(rawText)
   }
 }
 
