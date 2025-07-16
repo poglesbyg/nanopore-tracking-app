@@ -5,7 +5,7 @@ metadata:
   labels:
     app: nanopore-tracking-app
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: nanopore-tracking-app
@@ -138,7 +138,7 @@ metadata:
     app: nanopore-tracking-app
 spec:
   accessModes:
-    - ReadWriteOnce
+    - ReadWriteMany
   resources:
     requests:
       storage: 2Gi
@@ -152,7 +152,7 @@ metadata:
     app: nanopore-tracking-app
 spec:
   accessModes:
-    - ReadWriteOnce
+    - ReadWriteMany
   resources:
     requests:
       storage: 1Gi
