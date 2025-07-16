@@ -14,6 +14,23 @@ spec:
       labels:
         app: nanopore-tracking-app
     spec:
+      initContainers:
+      - name: setup-storage
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          mkdir -p /app/data/cache /app/data/logs
+          ls -la /app/data
+          ls -la /app/uploads
+        volumeMounts:
+        - name: uploads-storage
+          mountPath: /app/uploads
+        - name: app-data-storage
+          mountPath: /app/data
+        securityContext:
+          runAsUser: 1003220000
       containers:
       - name: nanopore-tracking-app
         image: image-registry.openshift-image-registry.svc:5000/dept-barc/nanopore-tracking-app:latest
@@ -62,15 +79,29 @@ spec:
           value: "info"
         - name: UPLOAD_DIR
           value: "/app/uploads"
+        - name: APP_DATA_DIR
+          value: "/app/data"
+        - name: CACHE_DIR
+          value: "/app/data/cache"
+        - name: LOG_DIR
+          value: "/app/data/logs"
+        - name: NODE_OPTIONS
+          value: "--expose-gc --max-old-space-size=320"
         volumeMounts:
-        - name: uploads
+        - name: uploads-storage
           mountPath: /app/uploads
+        - name: temp-storage
+          mountPath: /tmp
+        - name: app-data-storage
+          mountPath: /app/data
+        securityContext:
+          runAsUser: 1001
         resources:
           requests:
-            memory: "128Mi"
+            memory: "192Mi"
             cpu: "100m"
           limits:
-            memory: "256Mi"
+            memory: "384Mi"
             cpu: "300m"
         livenessProbe:
           httpGet:
@@ -89,8 +120,43 @@ spec:
           failureThreshold: 5
           successThreshold: 1
       volumes:
-      - name: uploads
-        emptyDir: {}
+      - name: uploads-storage
+        persistentVolumeClaim:
+          claimName: nanopore-uploads-pvc
+      - name: temp-storage
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: app-data-storage
+        persistentVolumeClaim:
+          claimName: nanopore-app-data-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nanopore-uploads-pvc
+  labels:
+    app: nanopore-tracking-app
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+  storageClassName: snap
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nanopore-app-data-pvc
+  labels:
+    app: nanopore-tracking-app
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: snap
 ---
 apiVersion: v1
 kind: Service

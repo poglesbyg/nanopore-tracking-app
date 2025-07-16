@@ -109,11 +109,11 @@ function checkMemoryHealth(): ComponentHealth {
   let status: HealthStatus = 'healthy'
   let message = `Memory usage: ${heapUsedMB}MB/${heapTotalMB}MB (${heapUsagePercent}%)`
   
-  // Check for critical memory usage
-  if (heapUsagePercent > 90 || rssMB > 300) {
+  // Check for critical memory usage - adjusted thresholds for production
+  if (heapUsagePercent > 95 || rssMB > 350) {
     status = 'unhealthy'
     message = `Critical memory usage: ${heapUsagePercent}% heap, ${rssMB}MB RSS`
-  } else if (heapUsagePercent > 80 || rssMB > 250) {
+  } else if (heapUsagePercent > 85 || rssMB > 300) {
     status = 'degraded'
     message = `High memory usage: ${heapUsagePercent}% heap, ${rssMB}MB RSS`
   }
