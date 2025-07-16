@@ -201,13 +201,32 @@ export default function NanoporeDashboard() {
 
   const handleSampleSubmit = async (sampleData: any) => {
     try {
+      console.log('Dashboard handleSampleSubmit called with:', sampleData)
       await createSampleMutation.mutateAsync(sampleData)
       refetch()
       toast.success('Sample created successfully!')
       setShowCreateModal(false)
     } catch (error) {
       console.error('Failed to create sample:', error)
-      toast.error('Failed to create sample')
+      
+      // Extract detailed error information
+      let errorMessage = 'Failed to create sample'
+      if (error && typeof error === 'object' && 'message' in error) {
+        errorMessage = error.message as string
+      }
+      
+      // Show specific validation errors if available
+      if (error && typeof error === 'object' && 'data' in error && error.data) {
+        const errorData = error.data as any
+        if (errorData.zodError && errorData.zodError.issues) {
+          const validationErrors = errorData.zodError.issues.map((issue: any) => 
+            `${issue.path.join('.')}: ${issue.message}`
+          ).join(', ')
+          errorMessage = `Validation errors: ${validationErrors}`
+        }
+      }
+      
+      toast.error(errorMessage)
     }
   }
 

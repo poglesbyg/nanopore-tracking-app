@@ -120,8 +120,21 @@ export default function CreateSampleModal({ isOpen, onClose, onSubmit }: CreateS
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
+    // Debug logging
+    console.log('Form submission attempted with data:', formData)
+    
     if (!validateForm()) {
       toast.error('Please fix the form errors before submitting')
+      return
+    }
+    
+    // Additional validation to ensure required fields are not empty
+    const requiredFields = ['sampleName', 'submitterName', 'submitterEmail', 'sampleType', 'chartField']
+    const emptyFields = requiredFields.filter(field => !formData[field as keyof FormData] || !formData[field as keyof FormData].toString().trim())
+    
+    if (emptyFields.length > 0) {
+      toast.error(`Please fill in all required fields: ${emptyFields.join(', ')}`)
+      console.error('Empty required fields:', emptyFields)
       return
     }
     
@@ -130,19 +143,21 @@ export default function CreateSampleModal({ isOpen, onClose, onSubmit }: CreateS
     try {
       // Convert form data to API format
       const sampleData = {
-        sampleName: formData.sampleName,
-        projectId: formData.projectId || undefined,
-        submitterName: formData.submitterName,
-        submitterEmail: formData.submitterEmail,
-        labName: formData.labName || undefined,
+        sampleName: formData.sampleName.trim(),
+        projectId: formData.projectId.trim() || undefined,
+        submitterName: formData.submitterName.trim(),
+        submitterEmail: formData.submitterEmail.trim(),
+        labName: formData.labName.trim() || undefined,
         sampleType: formData.sampleType,
         concentration: formData.concentration && formData.concentration.trim() ? Number(formData.concentration) : null,
         volume: formData.volume && formData.volume.trim() ? Number(formData.volume) : null,
         flowCellType: formData.flowCellType || undefined,
         priority: formData.priority,
         chartField: formData.chartField,
-        specialInstructions: formData.specialInstructions || undefined
+        specialInstructions: formData.specialInstructions.trim() || undefined
       }
+      
+      console.log('Submitting sample data:', sampleData)
       
       await onSubmit(sampleData)
       toast.success('Sample created successfully!')
@@ -165,6 +180,7 @@ export default function CreateSampleModal({ isOpen, onClose, onSubmit }: CreateS
       })
       
     } catch (error) {
+      console.error('Form submission error:', error)
       toast.error('Failed to create sample. Please try again.')
     } finally {
       setIsSubmitting(false)

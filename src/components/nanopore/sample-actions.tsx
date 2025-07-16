@@ -35,7 +35,7 @@ interface SampleActionsProps {
   onEditSample: (sample: any) => void
   onAssignSample: (sample: any) => void
   onDeleteSample: (sample: any) => void
-  onStatusUpdate: (sample: any, newStatus: string) => void
+  onStatusUpdate: (sample: any, newStatus: 'submitted' | 'prep' | 'sequencing' | 'analysis' | 'completed' | 'archived') => void
   onWorkflowAction: (sample: any, action: string, data?: any) => void
   actionLoading?: string | null
   isAdmin?: boolean
@@ -141,13 +141,14 @@ export const SampleActions: React.FC<SampleActionsProps> = ({
     }
     
     const nextStatus = statusProgression[sample.status as keyof typeof statusProgression]
+    // Status progression actions
     if (nextStatus) {
       actions.push({
         id: 'next_status',
         label: `→ ${nextStatus}`,
         icon: ChevronRight,
         color: 'text-blue-600',
-        action: () => onStatusUpdate(sample, nextStatus)
+        action: () => onStatusUpdate(sample, nextStatus as 'submitted' | 'prep' | 'sequencing' | 'analysis' | 'completed' | 'archived')
       })
     }
     
