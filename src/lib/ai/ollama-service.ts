@@ -51,6 +51,11 @@ class OllamaService {
   }
 
   async isAvailable(): Promise<boolean> {
+    // First check if AI features are enabled
+    if (!aiConfig.enabled) {
+      return false
+    }
+
     try {
       const response = await fetch(`${this.baseUrl}/api/tags`, {
         method: 'GET',
