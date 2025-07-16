@@ -123,13 +123,23 @@ services:
   audit:
     build:
       context: ../..
-      dockerfile: deployment/docker/Dockerfile.audit-service
+      dockerfile: services/audit/Dockerfile
     ports:
       - "3006:3006"
     environment:
       - NODE_ENV=development
-      - PORT=3006
-      - DATABASE_URL=postgresql://postgres:password@audit-db:5432/audit_db
+      - AUDIT_SERVICE_PORT=3006
+      - AUDIT_DB_HOST=audit-db
+      - AUDIT_DB_PORT=5432
+      - AUDIT_DB_NAME=audit_db
+      - AUDIT_DB_USER=postgres
+      - AUDIT_DB_PASSWORD=password
+      - AUDIT_RETENTION_DAYS=90
+      - AUDIT_MAX_EVENTS_PER_REQUEST=1000
+      - AUDIT_ENABLE_REALTIME_ALERTS=true
+      - AUDIT_ENABLE_SCHEDULED_REPORTS=true
+      - AUDIT_ENABLE_DATA_RETENTION=true
+      - CORS_ORIGIN=http://localhost:3001
       - LOG_LEVEL=info
       - SERVICE_NAME=audit
       - SERVICE_VERSION=1.0.0
@@ -138,6 +148,8 @@ services:
     networks:
       - nanopore-network
     restart: unless-stopped
+    volumes:
+      - audit-logs:/app/logs
 
   # Sample Management Database
   sample-db:
@@ -197,6 +209,7 @@ services:
       - "5434:5432"
     volumes:
       - audit-db-data:/var/lib/postgresql/data
+      - ../../services/audit/src/database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
     networks:
       - nanopore-network
     restart: unless-stopped
@@ -275,6 +288,7 @@ volumes:
   sample-db-data:
   auth-db-data:
   audit-db-data:
+  audit-logs:
   ollama-data:
   vector-db-data:
   redis-data:
