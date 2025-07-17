@@ -1,0 +1,4 @@
+sample_name,project_id,submitter_name,submitter_email,lab_name,sample_type,sample_buffer,concentration,volume,total_amount,flow_cell_type,flow_cell_count,priority,assigned_to,library_prep_by,chart_field
+SAMPLE001,HTSF-001,John Doe,john.doe@university.edu,Genomics Lab,DNA,Tris-EDTA,50.5,20.0,1010.0,R9.4.1,1,normal,Dr. Smith,Stephanie,HTSF-001
+RNA_SAMPLE_002,NANO-002,Jane Wilson,jane.wilson@lab.org,RNA Sequencing Lab,RNA,RNase-free water,25.0,50.0,1250.0,R10.4.1,1,high,Grey,Jenny,NANO-002
+PLASMID_003,SEQ-003,Dr. Brown,brown@research.edu,Plasmid Lab,DNA,TE Buffer,100.0,10.0,1000.0,R9.4.1,2,urgent,Dr. Johnson,Stephanie,SEQ-003 

@@ -19,6 +19,7 @@ import { MigrationPanel } from './migration-panel'
 import { SampleActions } from './sample-actions'
 import type { UserSession } from '../../lib/auth/AdminAuth'
 import PDFUpload from './pdf-upload'
+import CSVUpload from './csv-upload'
 import { useAuth } from '../auth/auth-wrapper'
 import { trpc } from '@/client/trpc'
 import type { NanoporeSample } from '@/lib/api-client'
@@ -142,6 +143,7 @@ export default function NanoporeDashboard() {
   const [selectedSamples, setSelectedSamples] = useState<Set<string>>(new Set())
   const [showBulkAssignModal, setShowBulkAssignModal] = useState(false)
   const [showPdfUploadModal, setShowPdfUploadModal] = useState(false)
+  const [showCsvUploadModal, setShowCsvUploadModal] = useState(false)
 
   // tRPC hooks with optimistic updates
   const utils = trpc.useUtils()
@@ -521,6 +523,10 @@ export default function NanoporeDashboard() {
 
   const handleUploadPDF = () => {
     setShowPdfUploadModal(true)
+  }
+
+  const handleUploadCSV = () => {
+    setShowCsvUploadModal(true)
   }
 
   const handleExport = () => {
@@ -927,6 +933,10 @@ export default function NanoporeDashboard() {
               <Button variant="outline" onClick={handleUploadPDF}>
                 <Upload className="h-4 w-4 mr-2" />
                 Upload PDF
+              </Button>
+              <Button variant="outline" onClick={handleUploadCSV}>
+                <Upload className="h-4 w-4 mr-2" />
+                Upload CSV
               </Button>
               <Button onClick={handleCreateSample}>
                 <Plus className="h-4 w-4 mr-2" />
@@ -1377,6 +1387,35 @@ export default function NanoporeDashboard() {
               }}
               onFileUploaded={(file) => {
                 console.log('PDF uploaded:', file)
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* CSV Upload Modal */}
+      {showCsvUploadModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Upload CSV Spreadsheet</h2>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowCsvUploadModal(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <CSVUpload
+              onSamplesCreated={(samples, file) => {
+                console.log('Samples created from CSV:', samples, file)
+                // Refresh the samples list
+                refetch()
+                setShowCsvUploadModal(false)
+              }}
+              onFileUploaded={(file) => {
+                console.log('CSV uploaded:', file)
               }}
             />
           </div>
