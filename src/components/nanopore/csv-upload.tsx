@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { trpc } from '@/client/trpc'
+import { submissionServiceClient, type ProcessingResult } from '@/lib/submission-client'
 
 interface CSVUploadProps {
   onSamplesCreated?: (samples: any[], file: File) => void
@@ -53,14 +54,28 @@ export default function CSVUpload({
   const [isProcessing, setIsProcessing] = useState(false)
   const [viewingFile, setViewingFile] = useState<UploadedFile | null>(null)
   const [isClient, setIsClient] = useState(false)
+  const [submissionServiceAvailable, setSubmissionServiceAvailable] = useState(false)
 
   // tRPC mutations
   const createSampleMutation = trpc.nanopore.create.useMutation()
   const createDefaultStepsMutation = trpc.nanopore.createDefaultProcessingSteps.useMutation()
 
-  // Ensure client-side rendering
+  // Ensure client-side rendering and check submission service
   useEffect(() => {
     setIsClient(true)
+    
+    // Check if submission service is available
+    const checkSubmissionService = async () => {
+      try {
+        const available = await submissionServiceClient.isAvailable()
+        setSubmissionServiceAvailable(available)
+      } catch (error) {
+        console.warn('Submission service not available:', error)
+        setSubmissionServiceAvailable(false)
+      }
+    }
+    
+    checkSubmissionService()
   }, [])
 
   const parseCSV = useCallback((csvText: string): any[] => {
@@ -184,8 +199,58 @@ export default function CSVUpload({
           // Call the file uploaded callback
           onFileUploaded?.(uploadedFile.file)
 
-          // Read and parse CSV
           const startTime = Date.now()
+          
+          // Use submission service if available, otherwise fall back to client-side processing
+          if (submissionServiceAvailable) {
+            try {
+              // Use Python submission service for better memory management
+              const result: ProcessingResult = await submissionServiceClient.processCSV(uploadedFile.file)
+              const processingTime = Date.now() - startTime
+              
+              if (result.success) {
+                setUploadedFiles((prev) =>
+                  prev.map((f) =>
+                    f.id === uploadedFile.id
+                      ? {
+                          ...f,
+                          status: 'completed' as const,
+                          parsedData: [], // Service handles sample creation
+                          processingTime,
+                        }
+                      : f,
+                  ),
+                )
+                
+                toast.success(result.message)
+                
+                // Refresh samples list
+                utils.nanopore.getAllSamples.invalidate()
+              } else {
+                setUploadedFiles((prev) =>
+                  prev.map((f) =>
+                    f.id === uploadedFile.id
+                      ? {
+                          ...f,
+                          status: 'error',
+                          error: result.message,
+                          processingTime,
+                        }
+                      : f,
+                  ),
+                )
+                
+                if (result.errors.length > 0) {
+                  toast.error(`Processing completed with ${result.errors.length} errors`)
+                }
+              }
+            } catch (serviceError) {
+              console.warn('Submission service failed, falling back to client-side processing:', serviceError)
+              // Fall back to client-side processing
+            }
+          }
+          
+          // Client-side processing (fallback or when service unavailable)
           const csvText = await uploadedFile.file.text()
           const parsedData = parseCSV(csvText)
           const processingTime = Date.now() - startTime

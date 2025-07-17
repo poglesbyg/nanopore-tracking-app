@@ -1,0 +1,36 @@
+{
+  "name": "submission-service",
+  "version": "1.0.0",
+  "description": "Python-based submission service for PDF and CSV processing",
+  "main": "app.py",
+  "scripts": {
+    "start": "python app.py",
+    "dev": "python -m uvicorn app:app --reload --host 0.0.0.0 --port 8000",
+    "test": "python -m pytest tests/",
+    "lint": "flake8 .",
+    "format": "black ."
+  },
+  "dependencies": {
+    "fastapi": "^0.104.1",
+    "uvicorn": "^0.24.0",
+    "pandas": "^2.1.3",
+    "pdfplumber": "^0.10.3",
+    "pydantic": "^2.5.0",
+    "psycopg2-binary": "^2.9.9",
+    "redis": "^5.0.1",
+    "celery": "^5.3.4",
+    "python-multipart": "^0.0.6",
+    "aiofiles": "^23.2.1",
+    "httpx": "^0.25.2",
+    "python-dotenv": "^1.0.0"
+  },
+  "devDependencies": {
+    "pytest": "^7.4.3",
+    "pytest-asyncio": "^0.21.1",
+    "black": "^23.11.0",
+    "flake8": "^6.1.0"
+  },
+  "keywords": ["nanopore", "submission", "pdf", "csv", "microservice"],
+  "author": "Nanopore Tracking Team",
+  "license": "MIT"
+} 
