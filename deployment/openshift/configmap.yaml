@@ -6,5 +6,6 @@ metadata:
     app: nanopore-tracking-app
 data:
   ollama-host: "http://ollama-service:11434"
+  submission-service-url: "http://submission-service:8000"
   app-name: "Nanopore Tracking App"
   log-level: "info"

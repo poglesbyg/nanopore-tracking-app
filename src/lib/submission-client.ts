@@ -27,9 +27,18 @@ export interface HealthCheck {
 
 export class SubmissionServiceClient {
   private baseUrl: string
+  private useGateway: boolean
 
-  constructor(baseUrl: string = process.env.SUBMISSION_SERVICE_URL || 'http://localhost:8000') {
-    this.baseUrl = baseUrl
+  constructor(baseUrl?: string, useGateway: boolean = true) {
+    // Use API Gateway routes by default
+    this.useGateway = useGateway
+    if (useGateway) {
+      // Use relative URLs to go through the API Gateway
+      this.baseUrl = '/api/submission'
+    } else {
+      // Direct connection to submission service (for development/testing)
+      this.baseUrl = baseUrl || process.env.SUBMISSION_SERVICE_URL || 'http://localhost:8001'
+    }
   }
 
   /**
@@ -39,9 +48,18 @@ export class SubmissionServiceClient {
     const formData = new FormData()
     formData.append('file', file)
 
-    const response = await fetch(`${this.baseUrl}/process-csv`, {
+    const url = this.useGateway 
+      ? `${this.baseUrl}/process-csv`
+      : `${this.baseUrl}/process-csv`
+
+    const response = await fetch(url, {
       method: 'POST',
       body: formData,
+      headers: {
+        // Include auth headers if available
+        'Authorization': localStorage.getItem('auth_token') || '',
+        'X-User-Id': localStorage.getItem('user_id') || '',
+      }
     })
 
     if (!response.ok) {
@@ -58,9 +76,18 @@ export class SubmissionServiceClient {
     const formData = new FormData()
     formData.append('file', file)
 
-    const response = await fetch(`${this.baseUrl}/process-pdf`, {
+    const url = this.useGateway 
+      ? `${this.baseUrl}/process-pdf`
+      : `${this.baseUrl}/process-pdf`
+
+    const response = await fetch(url, {
       method: 'POST',
       body: formData,
+      headers: {
+        // Include auth headers if available
+        'Authorization': localStorage.getItem('auth_token') || '',
+        'X-User-Id': localStorage.getItem('user_id') || '',
+      }
     })
 
     if (!response.ok) {
@@ -74,7 +101,12 @@ export class SubmissionServiceClient {
    * Get service health status
    */
   async getHealth(): Promise<HealthCheck> {
-    const response = await fetch(`${this.baseUrl}/health`)
+    // Health check always goes direct to service
+    const url = this.useGateway 
+      ? `${this.baseUrl}/health`
+      : `${this.baseUrl}/health`
+      
+    const response = await fetch(url)
 
     if (!response.ok) {
       throw new Error(`Health check failed: ${response.statusText}`)
@@ -87,7 +119,12 @@ export class SubmissionServiceClient {
    * Get memory usage statistics
    */
   async getMemoryUsage(): Promise<HealthCheck['memory_usage']> {
-    const response = await fetch(`${this.baseUrl}/memory-usage`)
+    // Memory usage check always goes direct to service
+    const url = this.useGateway 
+      ? `${this.baseUrl}/memory-usage`
+      : `${this.baseUrl}/memory-usage`
+      
+    const response = await fetch(url)
 
     if (!response.ok) {
       throw new Error(`Memory usage check failed: ${response.statusText}`)
@@ -111,7 +148,8 @@ export class SubmissionServiceClient {
 }
 
 // Export singleton instance
-export const submissionServiceClient = new SubmissionServiceClient()
+// This will use the API Gateway routes by default
+export const submissionServiceClient = new SubmissionServiceClient(undefined, true)
 
 // Export convenience functions
 export const processCSV = (file: File) => submissionServiceClient.processCSV(file)

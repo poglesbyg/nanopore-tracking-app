@@ -53,6 +53,11 @@ spec:
             configMapKeyRef:
               name: nanopore-config
               key: ollama-host
+        - name: SUBMISSION_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: nanopore-config
+              key: submission-service-url
         - name: BASE_URL
           value: "https://nanopore-tracking-route-dept-barc.apps.cloudapps.unc.edu"
         - name: JWT_SECRET

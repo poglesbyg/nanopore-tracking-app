@@ -1,5 +1,5 @@
-# Use Python 3.11 slim image for smaller size and better memory management
-FROM python:3.11-slim
+# Use Python 3.12 slim image for smaller size and better memory management
+FROM python:3.12-slim
 
 # Set environment variables for Python optimization
 ENV PYTHONUNBUFFERED=1
@@ -9,18 +9,24 @@ ENV PYTHONOPTIMIZE=1
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies and UV
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
-    && rm -rf /var/lib/apt/lists/*
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Add UV to PATH
+ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies using UV
+RUN uv venv && \
+    . .venv/bin/activate && \
+    uv pip install -r requirements.txt
 
 # Copy application code
 COPY . .
@@ -37,5 +43,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import requests; requests.get('http://localhost:8000/health')" || exit 1
 
-# Run the application
-CMD ["python", "app.py"] 
+# Activate virtual environment and run the application
+CMD ["/bin/bash", "-c", "source .venv/bin/activate && python app.py"] 
