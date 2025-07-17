@@ -286,7 +286,8 @@ export default function NanoporeDashboard() {
       
       console.log('Sample update result:', result)
       
-      // Force refetch to get updated data
+      // Invalidate and refetch the samples query
+      await queryClient.invalidateQueries({ queryKey: ['nanopore', 'getAll'] })
       await refetch()
       
       console.log('Data refetched after sample update')
@@ -412,7 +413,8 @@ export default function NanoporeDashboard() {
       
       console.log('Assignment result:', result)
       
-      // Force refetch to get updated data
+      // Invalidate and refetch the samples query
+      await queryClient.invalidateQueries({ queryKey: ['nanopore', 'getAll'] })
       await refetch()
       
       console.log('Data refetched after assignment')
@@ -439,7 +441,8 @@ export default function NanoporeDashboard() {
       
       console.log('Status update result:', result)
       
-      // Force refetch to get updated data
+      // Invalidate and refetch the samples query
+      await queryClient.invalidateQueries({ queryKey: ['nanopore', 'getAll'] })
       await refetch()
       
       console.log('Data refetched after status update')
