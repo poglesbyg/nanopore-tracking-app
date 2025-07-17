@@ -669,15 +669,29 @@ spec:
     - protocol: TCP
       port: 9090
   egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+  # Allow HTTPS/HTTP for external services
   - to: []
     ports:
     - protocol: TCP
-      port: 5432  # PostgreSQL
+      port: 443
     - protocol: TCP
-      port: 11434  # Ollama
+      port: 80
+  # Allow access to PostgreSQL database
+  - to:
+    - podSelector:
+        matchLabels:
+          app: sequencing-consultant
+          component: database
+    ports:
     - protocol: TCP
-      port: 443   # HTTPS
+      port: 5432
+  # Allow access to Ollama service
+  - to: []
+    ports:
     - protocol: TCP
-      port: 80    # HTTP
-    - protocol: UDP
-      port: 53    # DNS 
+      port: 11434 

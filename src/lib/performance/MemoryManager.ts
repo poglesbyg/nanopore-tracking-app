@@ -50,14 +50,14 @@ export interface MemoryConfig {
  * Default memory configuration optimized for production
  */
 const DEFAULT_MEMORY_CONFIG: MemoryConfig = {
-  maxHeapPercent: 75, // Reduced from 85 to 75
-  maxRSSMB: 180, // Reduced from 200 to 180
-  gcThreshold: 70, // Reduced from 80 to 70
-  monitoringInterval: 5000, // Reduced from 10000 to 5000 for more frequent monitoring
-  leakDetectionInterval: 30000, // Reduced from 60000 to 30000
+  maxHeapPercent: parseInt(process.env.MEMORY_THRESHOLD_PERCENT || '80'), // Configurable via env
+  maxRSSMB: 400, // Increased from 180 to 400 for higher memory limits
+  gcThreshold: 75, // Increased from 70 to 75
+  monitoringInterval: parseInt(process.env.MEMORY_MONITORING_INTERVAL || '30000'), // Configurable via env
+  leakDetectionInterval: 60000, // Increased from 30000 to 60000 for less frequent checks
   enableAutoGC: true,
   enableMemoryProfiling: false, // Disabled in production for memory savings
-  cleanupInterval: 15000, // Reduced from 30000 to 15000 for more frequent cleanup
+  cleanupInterval: 30000, // Increased from 15000 to 30000 for less frequent cleanup
 }
 
 /**
