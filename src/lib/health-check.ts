@@ -137,8 +137,8 @@ export class HealthChecker {
     const start = Date.now()
     
     try {
-      const fs = await import('fs/promises')
-      const path = await import('path')
+      const fs = await import(/* @vite-ignore */ 'fs/promises')
+      const path = await import(/* @vite-ignore */ 'path')
       
       // Check if upload directory exists and is writable
       const uploadDir = config.storage.uploadDir
@@ -196,7 +196,7 @@ export class HealthChecker {
 
     try {
       // Basic SMTP configuration check
-      const nodemailer = await import('nodemailer')
+      const nodemailer = await import(/* @vite-ignore */ 'nodemailer')
       
       const transporter = nodemailer.default.createTransport({
         host: config.email.smtp.host,
@@ -240,8 +240,8 @@ export class HealthChecker {
     const start = Date.now()
     
     try {
-      const os = await import('os')
-      const process = await import('process')
+      const os = await import(/* @vite-ignore */ 'os')
+      const process = await import(/* @vite-ignore */ 'process')
       
       const totalMemory = os.totalmem()
       const freeMemory = os.freemem()

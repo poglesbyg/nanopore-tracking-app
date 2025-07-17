@@ -164,7 +164,7 @@ export const GET: APIRoute = async ({ request, url }) => {
 
 async function collectSystemMetrics() {
   const uptime = process.uptime()
-  const loadAverage = process.platform === 'linux' ? (await import('os')).loadavg() : [0, 0, 0]
+  const loadAverage = process.platform === 'linux' ? (await import(/* @vite-ignore */ 'os')).loadavg() : [0, 0, 0]
   
   // CPU usage calculation (simplified)
   const cpuUsage = process.cpuUsage()

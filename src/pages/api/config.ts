@@ -70,7 +70,7 @@ export async function GET(context: APIContext): Promise<Response> {
             },
             cpu: {
               usage: ((cpuUsage.user + cpuUsage.system) / 1000000) / uptime * 100,
-              loadAverage: process.platform === 'linux' ? (await import('os')).loadavg() : [0, 0, 0]
+              loadAverage: process.platform === 'linux' ? (await import(/* @vite-ignore */ 'os')).loadavg() : [0, 0, 0]
             },
             diskSpace: {
               used: 0, // Simplified - would need fs.stat in real implementation

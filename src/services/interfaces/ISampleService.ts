@@ -75,6 +75,28 @@ export interface SearchCriteria {
   }
 }
 
+export interface ProcessingStep {
+  id: string
+  sample_id: string
+  step_name: string
+  step_status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'skipped'
+  assigned_to?: string | null
+  started_at?: Date | null
+  completed_at?: Date | null
+  estimated_duration_hours?: number | null
+  notes?: string | null
+  results_data?: any
+  created_at: Date
+  updated_at: Date
+}
+
+export interface ProcessingStepUpdate {
+  assignedTo?: string
+  notes?: string
+  estimatedDurationHours?: number
+  resultsData?: any
+}
+
 export interface ISampleService {
   createSample(data: CreateSampleData): Promise<Sample>
   updateSample(id: string, data: UpdateSampleData): Promise<Sample>
@@ -86,4 +108,11 @@ export interface ISampleService {
   updateSampleStatus(id: string, status: 'submitted' | 'prep' | 'sequencing' | 'analysis' | 'completed' | 'archived'): Promise<Sample>
   getSamplesByStatus(status: string): Promise<Sample[]>
   getSamplesByUser(userId: string): Promise<Sample[]>
+  
+  // Processing step methods
+  getProcessingSteps(sampleId: string): Promise<ProcessingStep[]>
+  updateProcessingStep(stepId: string, updates: ProcessingStepUpdate): Promise<ProcessingStep>
+  startProcessingStep(stepId: string, assignedTo?: string): Promise<ProcessingStep>
+  completeProcessingStep(stepId: string, notes?: string, resultsData?: any): Promise<ProcessingStep>
+  createDefaultProcessingSteps(sampleId: string): Promise<ProcessingStep[]>
 } 

@@ -226,7 +226,235 @@ export class SampleService implements ISampleService {
   }
 
   async getSamplesByUser(userId: string): Promise<Sample[]> {
-    return await this.sampleRepository.findByUser(userId)
+    const timer = this.logger.startTimer('getSamplesByUser')
+    
+    try {
+      const samples = await this.sampleRepository.findByUser(userId)
+      
+      this.logger.info('Retrieved samples by user', {
+        action: 'get_samples_by_user',
+        metadata: {
+          userId,
+          count: samples.length
+        }
+      })
+      
+      return samples
+    } catch (error) {
+      this.logger.error('Failed to get samples by user', {
+        action: 'get_samples_by_user_error',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        metadata: { userId }
+      })
+      throw error
+    } finally {
+      timer.done()
+    }
+  }
+
+  // Processing step methods
+  async getProcessingSteps(sampleId: string): Promise<any[]> {
+    const timer = this.logger.startTimer('getProcessingSteps')
+    
+    try {
+      const steps = await this.sampleRepository.getProcessingSteps(sampleId)
+      
+      this.logger.info('Retrieved processing steps', {
+        action: 'get_processing_steps',
+        metadata: {
+          sampleId,
+          count: steps.length
+        }
+      })
+      
+      return steps
+    } catch (error) {
+      this.logger.error('Failed to get processing steps', {
+        action: 'get_processing_steps_error',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        metadata: { sampleId }
+      })
+      throw error
+    } finally {
+      timer.done()
+    }
+  }
+
+  async updateProcessingStep(stepId: string, updates: any): Promise<any> {
+    const timer = this.logger.startTimer('updateProcessingStep')
+    
+    try {
+      const step = await this.sampleRepository.updateProcessingStep(stepId, updates)
+      
+      this.logger.info('Updated processing step', {
+        action: 'update_processing_step',
+        metadata: {
+          stepId,
+          updates
+        }
+      })
+      
+      return step
+    } catch (error) {
+      this.logger.error('Failed to update processing step', {
+        action: 'update_processing_step_error',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        metadata: { stepId, updates }
+      })
+      throw error
+    } finally {
+      timer.done()
+    }
+  }
+
+  async startProcessingStep(stepId: string, assignedTo?: string): Promise<any> {
+    const timer = this.logger.startTimer('startProcessingStep')
+    
+    try {
+      const updates = {
+        step_status: 'in_progress',
+        started_at: new Date(),
+        assigned_to: assignedTo || null
+      }
+      
+      const step = await this.sampleRepository.updateProcessingStep(stepId, updates)
+      
+      this.logger.info('Started processing step', {
+        action: 'start_processing_step',
+        metadata: {
+          stepId,
+          assignedTo
+        }
+      })
+      
+      return step
+    } catch (error) {
+      this.logger.error('Failed to start processing step', {
+        action: 'start_processing_step_error',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        metadata: { stepId, assignedTo }
+      })
+      throw error
+    } finally {
+      timer.done()
+    }
+  }
+
+  async completeProcessingStep(stepId: string, notes?: string, resultsData?: any): Promise<any> {
+    const timer = this.logger.startTimer('completeProcessingStep')
+    
+    try {
+      const updates = {
+        step_status: 'completed',
+        completed_at: new Date(),
+        notes: notes || null,
+        results_data: resultsData || null
+      }
+      
+      const step = await this.sampleRepository.updateProcessingStep(stepId, updates)
+      
+      this.logger.info('Completed processing step', {
+        action: 'complete_processing_step',
+        metadata: {
+          stepId,
+          notes: notes ? 'present' : 'none',
+          resultsData: resultsData ? 'present' : 'none'
+        }
+      })
+      
+      return step
+    } catch (error) {
+      this.logger.error('Failed to complete processing step', {
+        action: 'complete_processing_step_error',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        metadata: { stepId, notes, resultsData }
+      })
+      throw error
+    } finally {
+      timer.done()
+    }
+  }
+
+  async createDefaultProcessingSteps(sampleId: string): Promise<any[]> {
+    const timer = this.logger.startTimer('createDefaultProcessingSteps')
+    
+    try {
+      const defaultSteps = [
+        {
+          sample_id: sampleId,
+          step_name: 'Sample QC',
+          step_status: 'pending',
+          estimated_duration_hours: 1
+        },
+        {
+          sample_id: sampleId,
+          step_name: 'Library Preparation',
+          step_status: 'pending',
+          estimated_duration_hours: 4
+        },
+        {
+          sample_id: sampleId,
+          step_name: 'Library QC',
+          step_status: 'pending',
+          estimated_duration_hours: 1
+        },
+        {
+          sample_id: sampleId,
+          step_name: 'Sequencing Setup',
+          step_status: 'pending',
+          estimated_duration_hours: 1
+        },
+        {
+          sample_id: sampleId,
+          step_name: 'Sequencing Run',
+          step_status: 'pending',
+          estimated_duration_hours: 48
+        },
+        {
+          sample_id: sampleId,
+          step_name: 'Basecalling',
+          step_status: 'pending',
+          estimated_duration_hours: 2
+        },
+        {
+          sample_id: sampleId,
+          step_name: 'Quality Assessment',
+          step_status: 'pending',
+          estimated_duration_hours: 1
+        },
+        {
+          sample_id: sampleId,
+          step_name: 'Data Delivery',
+          step_status: 'pending',
+          estimated_duration_hours: 1
+        }
+      ]
+
+      const steps = []
+      for (const stepData of defaultSteps) {
+        const step = await this.sampleRepository.createProcessingStep(sampleId, stepData)
+        steps.push(step)
+      }
+      
+      this.logger.info('Created default processing steps', {
+        action: 'create_default_processing_steps',
+        metadata: {
+          sampleId,
+          count: steps.length
+        }
+      })
+      
+      return steps
+    } catch (error) {
+      this.logger.error('Failed to create default processing steps', {
+        action: 'create_default_processing_steps_error',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        metadata: { sampleId }
+      })
+      throw error
+    } finally {
+      timer.done()
+    }
   }
 
   private validateCreateData(data: CreateSampleData): void {

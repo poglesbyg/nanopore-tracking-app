@@ -1,4 +1,4 @@
-import type { Sample, CreateSampleData, UpdateSampleData, SearchCriteria } from './ISampleService'
+import type { Sample, CreateSampleData, UpdateSampleData, SearchCriteria, ProcessingStep } from './ISampleService'
 
 export interface ISampleRepository {
   create(data: CreateSampleData): Promise<Sample>
@@ -15,4 +15,9 @@ export interface ISampleRepository {
   count(): Promise<number>
   countByStatus(status: string): Promise<number>
   countByPriority(priority: string): Promise<number>
+  
+  // Processing step methods
+  getProcessingSteps(sampleId: string): Promise<ProcessingStep[]>
+  createProcessingStep(sampleId: string, stepData: any): Promise<ProcessingStep>
+  updateProcessingStep(stepId: string, updates: any): Promise<ProcessingStep>
 } 

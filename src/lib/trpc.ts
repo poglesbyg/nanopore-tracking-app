@@ -2,14 +2,15 @@ import { initTRPC } from '@trpc/server'
 
 // Create tRPC context
 export const createTRPCContext = async () => {
-  // Only import database on server side
-  if (typeof window === 'undefined') {
-    const { db } = await import('./database')
-    return { db }
-  }
+  // Lazy load database to avoid circular dependencies
+  const { db } = await import(/* @vite-ignore */ './database')
   
-  // This should never be called on client side for API routes
-  throw new Error('Database context cannot be created on client side')
+  return {
+    db,
+    userId: null, // For future authentication
+    userRole: null,
+    isAuthenticated: false,
+  }
 }
 
 type Context = Awaited<ReturnType<typeof createTRPCContext>>
@@ -19,13 +20,27 @@ const t = initTRPC.context<Context>().create()
 export const router = t.router
 export const publicProcedure = t.procedure
 
-// Create app router without importing nanopore router directly
-// This prevents database code from being bundled for the client
+// Create router with proper typing
+const createRouter = () => {
+  return t.router({
+    // Health check endpoint
+    health: publicProcedure.query(() => {
+      return { status: 'ok', timestamp: new Date().toISOString() }
+    }),
+  })
+}
+
+// Lazy load and merge routers
 export const createAppRouter = async () => {
-  // Dynamically import the nanopore router only on the server
-  const { nanoporeRouter } = await import('./api/nanopore')
+  const { nanoporeRouter } = await import(/* @vite-ignore */ './api/nanopore')
   
-  return router({
+  return t.router({
+    // Health check endpoint
+    health: publicProcedure.query(() => {
+      return { status: 'ok', timestamp: new Date().toISOString() }
+    }),
+    
+    // Nanopore module
     nanopore: nanoporeRouter,
   })
 }

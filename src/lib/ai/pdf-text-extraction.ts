@@ -95,7 +95,7 @@ class PdfTextExtractionService {
 
       // Method 2: Try dynamic import (ES modules)
       try {
-        const pdfParseModule = await import('pdf-parse')
+        const pdfParseModule = await import(/* @vite-ignore */ 'pdf-parse')
         // Handle default export
         this.pdfParseModule = pdfParseModule.default || pdfParseModule
         this.isServerSideInitialized = true
@@ -108,7 +108,7 @@ class PdfTextExtractionService {
 
       // Method 3: Try createRequire (compatibility fallback)
       try {
-        const { createRequire } = await import('module')
+        const { createRequire } = await import(/* @vite-ignore */ 'module')
         const require = createRequire(import.meta.url)
         this.pdfParseModule = require('pdf-parse')
         this.isServerSideInitialized = true
@@ -123,7 +123,7 @@ class PdfTextExtractionService {
       try {
         // Try importing from the exact path
         // @ts-ignore - pdf-parse lib path may not have types
-        const pdfParseModule = await import('pdf-parse/lib/pdf-parse')
+        const pdfParseModule = await import(/* @vite-ignore */ 'pdf-parse/lib/pdf-parse')
         this.pdfParseModule = pdfParseModule.default || pdfParseModule
         this.isServerSideInitialized = true
         results.server = true
@@ -135,8 +135,8 @@ class PdfTextExtractionService {
 
       // Method 5: Last resort - try to load from node_modules directly
       try {
-        const path = await import('path')
-        const fs = await import('fs')
+        const path = await import(/* @vite-ignore */ 'path')
+        const fs = await import(/* @vite-ignore */ 'fs')
         const nodeModulesPath = path.resolve(process.cwd(), 'node_modules', 'pdf-parse')
         if (fs.existsSync(nodeModulesPath)) {
           const pdfParseModule = await import(/* @vite-ignore */ nodeModulesPath)
@@ -155,8 +155,8 @@ class PdfTextExtractionService {
       
       // Log debugging information
       try {
-        const fs = await import('fs')
-        const path = await import('path')
+        const fs = await import(/* @vite-ignore */ 'fs')
+        const path = await import(/* @vite-ignore */ 'path')
         const nodeModulesPath = path.resolve(process.cwd(), 'node_modules')
         console.log('Current working directory:', process.cwd())
         console.log('Node modules exists:', fs.existsSync(nodeModulesPath))

@@ -144,4 +144,79 @@ export const nanoporeRouter = router({
         handleTRPCProcedureError(error as Error, extractRequestContext(ctx))
       }
     }),
+
+  // Get processing steps for a sample
+  getProcessingSteps: publicProcedure
+    .input(z.string().uuid())
+    .query(async ({ input, ctx }) => {
+      try {
+        const sampleService = getSampleService()
+        return await sampleService.getProcessingSteps(input)
+      } catch (error) {
+        handleTRPCProcedureError(error as Error, extractRequestContext(ctx))
+      }
+    }),
+
+  // Update processing step
+  updateProcessingStep: publicProcedure
+    .input(z.object({
+      stepId: z.string().uuid(),
+      updates: z.object({
+        assignedTo: z.string().optional(),
+        notes: z.string().optional(),
+        estimatedDurationHours: z.number().optional(),
+        resultsData: z.any().optional()
+      })
+    }))
+    .mutation(async ({ input, ctx }) => {
+      try {
+        const sampleService = getSampleService()
+        return await sampleService.updateProcessingStep(input.stepId, input.updates)
+      } catch (error) {
+        handleTRPCProcedureError(error as Error, extractRequestContext(ctx))
+      }
+    }),
+
+  // Start processing step
+  startProcessingStep: publicProcedure
+    .input(z.object({
+      stepId: z.string().uuid(),
+      assignedTo: z.string().optional()
+    }))
+    .mutation(async ({ input, ctx }) => {
+      try {
+        const sampleService = getSampleService()
+        return await sampleService.startProcessingStep(input.stepId, input.assignedTo)
+      } catch (error) {
+        handleTRPCProcedureError(error as Error, extractRequestContext(ctx))
+      }
+    }),
+
+  // Complete processing step
+  completeProcessingStep: publicProcedure
+    .input(z.object({
+      stepId: z.string().uuid(),
+      notes: z.string().optional(),
+      resultsData: z.any().optional()
+    }))
+    .mutation(async ({ input, ctx }) => {
+      try {
+        const sampleService = getSampleService()
+        return await sampleService.completeProcessingStep(input.stepId, input.notes, input.resultsData)
+      } catch (error) {
+        handleTRPCProcedureError(error as Error, extractRequestContext(ctx))
+      }
+    }),
+
+  // Create default processing steps for a sample
+  createDefaultProcessingSteps: publicProcedure
+    .input(z.string().uuid())
+    .mutation(async ({ input, ctx }) => {
+      try {
+        const sampleService = getSampleService()
+        return await sampleService.createDefaultProcessingSteps(input)
+      } catch (error) {
+        handleTRPCProcedureError(error as Error, extractRequestContext(ctx))
+      }
+    }),
 })

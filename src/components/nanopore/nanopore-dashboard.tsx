@@ -154,8 +154,11 @@ export default function NanoporeDashboard() {
   
   // Force re-render trigger
   const [forceRender, setForceRender] = useState(0)
+  
+  const createProcessingStepsMutation = trpc.nanopore.createDefaultProcessingSteps.useMutation()
+  
   const createSampleMutation = trpc.nanopore.create.useMutation({
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       if (process.env.NODE_ENV === 'development') {
         console.log('Sample created successfully:', data)
       }
@@ -165,6 +168,17 @@ export default function NanoporeDashboard() {
         if (!old) return [data]
         return [data, ...old]
       })
+      
+      // Create default processing steps for the new sample
+      try {
+        await createProcessingStepsMutation.mutateAsync(data.id)
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Default processing steps created for sample:', data.id)
+        }
+      } catch (error) {
+        console.error('Failed to create default processing steps:', error)
+        // Don't fail the whole operation if processing steps creation fails
+      }
       
       // Force re-render
       setForceRender(prev => prev + 1)

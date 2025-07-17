@@ -22,6 +22,8 @@ import {
   DialogTitle,
   DialogDescription
 } from '../ui/dialog'
+import WorkflowSteps from './workflow-steps'
+import { trpc } from '@/client/trpc'
 
 // Helper function to safely format dates
 const formatDate = (date: Date | string | null | undefined): string => {
@@ -129,17 +131,53 @@ export function ViewTaskModal({
   onClose,
   sample,
 }: ViewTaskModalProps) {
+  // Fetch processing steps for the sample
+  const { data: processingSteps = [], refetch: refetchSteps } = trpc.nanopore.getProcessingSteps.useQuery(
+    sample?.id || '', 
+    { enabled: !!sample?.id }
+  )
+
+  const updateStepMutation = trpc.nanopore.updateProcessingStep.useMutation({
+    onSuccess: () => {
+      refetchSteps()
+    }
+  })
+
+  const startStepMutation = trpc.nanopore.startProcessingStep.useMutation({
+    onSuccess: () => {
+      refetchSteps()
+    }
+  })
+
+  const completeStepMutation = trpc.nanopore.completeProcessingStep.useMutation({
+    onSuccess: () => {
+      refetchSteps()
+    }
+  })
+
+  const handleStepUpdate = async (stepId: string, updates: any) => {
+    await updateStepMutation.mutateAsync({ stepId, updates })
+  }
+
+  const handleStepStart = async (stepId: string, assignedTo?: string) => {
+    await startStepMutation.mutateAsync({ stepId, assignedTo })
+  }
+
+  const handleStepComplete = async (stepId: string, notes?: string, resultsData?: any) => {
+    await completeStepMutation.mutateAsync({ stepId, notes, resultsData })
+  }
+
   if (!sample) {
     return null
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ExternalLink className="h-5 w-5" />
-            Sample Details
+            Sample Details & Workflow
           </DialogTitle>
           <DialogDescription>
             View detailed information and processing status for {sample.sampleName}.
@@ -164,6 +202,18 @@ export function ViewTaskModal({
                 </div>
               </Badge>
             </div>
+          </div>
+
+          {/* Processing Steps */}
+          <div className="border-t pt-4">
+            <WorkflowSteps
+              sampleId={sample.id}
+              steps={processingSteps}
+              onStepUpdate={handleStepUpdate}
+              onStepStart={handleStepStart}
+              onStepComplete={handleStepComplete}
+              readonly={false}
+            />
           </div>
 
           {/* Sample Information */}
