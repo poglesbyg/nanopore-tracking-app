@@ -45,14 +45,14 @@ class DatabaseConnectionPool {
 
   private getPoolConfig(): ConnectionPoolConfig {
     return {
-      minConnections: parseInt(process.env.DB_POOL_MIN || '5'),
-      maxConnections: parseInt(process.env.DB_POOL_MAX || '20'),
-      idleTimeoutMillis: parseInt(process.env.DB_POOL_IDLE_TIMEOUT || '30000'),
-      acquireTimeoutMillis: parseInt(process.env.DB_POOL_ACQUIRE_TIMEOUT || '10000'),
-      connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT || '5000'),
+      minConnections: parseInt(process.env.DB_POOL_MIN || '2'), // Reduced from 5 to 2
+      maxConnections: parseInt(process.env.DB_POOL_MAX || '8'), // Reduced from 20 to 8
+      idleTimeoutMillis: parseInt(process.env.DB_POOL_IDLE_TIMEOUT || '20000'), // Reduced from 30000 to 20000
+      acquireTimeoutMillis: parseInt(process.env.DB_POOL_ACQUIRE_TIMEOUT || '10000'), // Reduced from 60000 to 10000
+      connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT || '5000'), // Reduced from 10000 to 5000
       statementTimeout: parseInt(process.env.DB_STATEMENT_TIMEOUT || '30000'),
-      queryTimeout: parseInt(process.env.DB_QUERY_TIMEOUT || '15000'),
-      allowExitOnIdle: process.env.NODE_ENV === 'production'
+      queryTimeout: parseInt(process.env.DB_QUERY_TIMEOUT || '30000'),
+      allowExitOnIdle: true // Enable exit on idle for better memory management
     }
   }
 

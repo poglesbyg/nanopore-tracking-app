@@ -71,26 +71,110 @@ class PdfTextExtractionService {
   }
 
   /**
-   * Initialize PDF parsing modules - using only the working createRequire approach
+   * Initialize PDF parsing modules - using multiple fallback approaches
    */
   private async initializePdfParsers(): Promise<{ server: boolean }> {
     const results = { server: false }
 
     // Only try server-side initialization with pdf-parse
     if (this.isServerSide && !this.isServerSideInitialized) {
+      console.log('Attempting PDF parsing initialization...')
+      
+      // Method 1: Try direct require first (most reliable in Node.js)
       try {
-        // Use createRequire - this is the method that works in production
+        // Use eval to avoid bundler issues
+        const requireFunc = eval('require')
+        this.pdfParseModule = requireFunc('pdf-parse')
+        this.isServerSideInitialized = true
+        results.server = true
+        console.log('✅ PDF parsing initialized successfully via direct require')
+        return results
+      } catch (requireError) {
+        console.warn('❌ Direct require failed:', requireError instanceof Error ? requireError.message : 'Unknown error')
+      }
+
+      // Method 2: Try dynamic import (ES modules)
+      try {
+        const pdfParseModule = await import('pdf-parse')
+        // Handle default export
+        this.pdfParseModule = pdfParseModule.default || pdfParseModule
+        this.isServerSideInitialized = true
+        results.server = true
+        console.log('✅ PDF parsing initialized successfully via dynamic import')
+        return results
+      } catch (importError) {
+        console.warn('❌ Dynamic import failed:', importError instanceof Error ? importError.message : 'Unknown error')
+      }
+
+      // Method 3: Try createRequire (compatibility fallback)
+      try {
         const { createRequire } = await import('module')
         const require = createRequire(import.meta.url)
-        // @ts-ignore - pdf-parse types are in separate file
         this.pdfParseModule = require('pdf-parse')
         this.isServerSideInitialized = true
         results.server = true
-        console.log('PDF parsing initialized successfully via createRequire')
+        console.log('✅ PDF parsing initialized successfully via createRequire')
         return results
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-        console.error('PDF parsing initialization failed:', errorMessage)
+      } catch (createRequireError) {
+        console.warn('❌ createRequire failed:', createRequireError instanceof Error ? createRequireError.message : 'Unknown error')
+      }
+
+      // Method 4: Try alternative import approaches
+      try {
+        // Try importing from the exact path
+        // @ts-ignore - pdf-parse lib path may not have types
+        const pdfParseModule = await import('pdf-parse/lib/pdf-parse')
+        this.pdfParseModule = pdfParseModule.default || pdfParseModule
+        this.isServerSideInitialized = true
+        results.server = true
+        console.log('✅ PDF parsing initialized successfully via lib path import')
+        return results
+      } catch (libPathError) {
+        console.warn('❌ Lib path import failed:', libPathError instanceof Error ? libPathError.message : 'Unknown error')
+      }
+
+      // Method 5: Last resort - try to load from node_modules directly
+      try {
+        const path = await import('path')
+        const fs = await import('fs')
+        const nodeModulesPath = path.resolve(process.cwd(), 'node_modules', 'pdf-parse')
+        if (fs.existsSync(nodeModulesPath)) {
+          const pdfParseModule = await import(nodeModulesPath)
+          this.pdfParseModule = pdfParseModule.default || pdfParseModule
+          this.isServerSideInitialized = true
+          results.server = true
+          console.log('✅ PDF parsing initialized successfully via node_modules path')
+          return results
+        }
+      } catch (nodeModulesError) {
+        console.warn('❌ Node modules path import failed:', nodeModulesError instanceof Error ? nodeModulesError.message : 'Unknown error')
+      }
+
+      console.error('❌ All PDF parsing initialization methods failed')
+      console.log('Available methods tried: direct require, dynamic import, createRequire, lib path, node_modules path')
+      
+      // Log debugging information
+      try {
+        const fs = await import('fs')
+        const path = await import('path')
+        const nodeModulesPath = path.resolve(process.cwd(), 'node_modules')
+        console.log('Current working directory:', process.cwd())
+        console.log('Node modules exists:', fs.existsSync(nodeModulesPath))
+        if (fs.existsSync(nodeModulesPath)) {
+          const pdfParseExists = fs.existsSync(path.join(nodeModulesPath, 'pdf-parse'))
+          console.log('pdf-parse directory exists:', pdfParseExists)
+          if (pdfParseExists) {
+            const pdfParsePackage = path.join(nodeModulesPath, 'pdf-parse', 'package.json')
+            if (fs.existsSync(pdfParsePackage)) {
+              const packageContent = fs.readFileSync(pdfParsePackage, 'utf8')
+              const packageJson = JSON.parse(packageContent)
+              console.log('pdf-parse version:', packageJson.version)
+              console.log('pdf-parse main:', packageJson.main)
+            }
+          }
+        }
+      } catch (debugError) {
+        console.error('Debug info failed:', debugError instanceof Error ? debugError.message : 'Unknown error')
       }
     }
 

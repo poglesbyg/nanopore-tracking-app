@@ -15,6 +15,17 @@ export interface CacheConfig {
 }
 
 /**
+ * Default cache configuration optimized for memory usage
+ */
+const DEFAULT_CACHE_CONFIG: CacheConfig = {
+  ttl: 300000, // 5 minutes (reduced from default)
+  maxSize: 500, // Reduced from 1000 to 500
+  cleanupInterval: 60000, // 1 minute cleanup
+  enableMetrics: true,
+  namespace: 'nanopore'
+}
+
+/**
  * Cache statistics
  */
 export interface CacheStats {

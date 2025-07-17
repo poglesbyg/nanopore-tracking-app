@@ -47,6 +47,20 @@ export interface MemoryConfig {
 }
 
 /**
+ * Default memory configuration optimized for production
+ */
+const DEFAULT_MEMORY_CONFIG: MemoryConfig = {
+  maxHeapPercent: 75, // Reduced from 85 to 75
+  maxRSSMB: 180, // Reduced from 200 to 180
+  gcThreshold: 70, // Reduced from 80 to 70
+  monitoringInterval: 5000, // Reduced from 10000 to 5000 for more frequent monitoring
+  leakDetectionInterval: 30000, // Reduced from 60000 to 30000
+  enableAutoGC: true,
+  enableMemoryProfiling: false, // Disabled in production for memory savings
+  cleanupInterval: 15000, // Reduced from 30000 to 15000 for more frequent cleanup
+}
+
+/**
  * Resource cleanup tracker
  */
 interface ResourceTracker {
