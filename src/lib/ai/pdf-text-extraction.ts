@@ -139,7 +139,7 @@ class PdfTextExtractionService {
         const fs = await import('fs')
         const nodeModulesPath = path.resolve(process.cwd(), 'node_modules', 'pdf-parse')
         if (fs.existsSync(nodeModulesPath)) {
-          const pdfParseModule = await import(nodeModulesPath)
+          const pdfParseModule = await import(/* @vite-ignore */ nodeModulesPath)
           this.pdfParseModule = pdfParseModule.default || pdfParseModule
           this.isServerSideInitialized = true
           results.server = true

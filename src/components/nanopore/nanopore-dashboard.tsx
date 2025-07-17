@@ -54,6 +54,8 @@ interface DashboardStats {
 }
 
 const StatusBadge = ({ status }: { status: string }) => {
+  console.log('StatusBadge rendering with status:', status)
+  
   const statusConfig = {
     submitted: { color: 'bg-blue-100 text-blue-800', icon: Clock },
     prep: { color: 'bg-yellow-100 text-yellow-800', icon: TestTube },
@@ -142,6 +144,12 @@ export default function NanoporeDashboard() {
   // tRPC hooks with optimistic updates
   const utils = trpc.useUtils()
   const { data: samples = [], isLoading: loading, refetch } = trpc.nanopore.getAll.useQuery()
+  
+  // Debug samples data
+  console.log('Samples data:', samples)
+  
+  // Force re-render trigger
+  const [forceRender, setForceRender] = useState(0)
   const createSampleMutation = trpc.nanopore.create.useMutation({
     onSuccess: () => {
       utils.nanopore.getAll.invalidate()
@@ -182,6 +190,7 @@ export default function NanoporeDashboard() {
             : sample
         )
         console.log('Optimistic update applied, updated samples count:', updated.length)
+        console.log('Updated sample:', updated.find((s: any) => s.id === id))
         return updated
       })
       
@@ -201,6 +210,8 @@ export default function NanoporeDashboard() {
       console.log('Status update settled, invalidating cache')
       // Always refetch after error or success
       utils.nanopore.getAll.invalidate()
+      // Force re-render
+      setForceRender(prev => prev + 1)
     }
   })
 
@@ -975,7 +986,7 @@ export default function NanoporeDashboard() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center space-x-2">
                           <h3 className="text-lg font-medium text-gray-900">{sample.sample_name}</h3>
-                          <StatusBadge status={sample.status} />
+                          <StatusBadge key={`${sample.id}-${sample.status}`} status={sample.status} />
                           <PriorityBadge priority={sample.priority} />
                         </div>
                         

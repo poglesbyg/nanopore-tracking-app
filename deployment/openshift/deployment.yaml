@@ -85,7 +85,7 @@ spec:
           value: "/app/data/cache"
         # Node.js memory optimization
         - name: NODE_OPTIONS
-          value: "--max-old-space-size=256 --optimize-for-size --gc-interval=100"
+          value: "--max-old-space-size=512 --expose-gc"
         - name: UV_THREADPOOL_SIZE
           value: "4"
         # Garbage collection optimization
@@ -98,6 +98,11 @@ spec:
           value: "8"
         - name: DB_POOL_IDLE_TIMEOUT
           value: "20000"
+        # Memory monitoring optimization
+        - name: MEMORY_THRESHOLD_PERCENT
+          value: "80"
+        - name: MEMORY_MONITORING_INTERVAL
+          value: "30000"
         # Memory cleanup settings
         - name: MEMORY_CLEANUP_INTERVAL
           value: "15000"
@@ -116,11 +121,11 @@ spec:
           runAsUser: 1003220000
         resources:
           limits:
-            memory: 384Mi  # Increased from 320Mi to 384Mi
-            cpu: 300m
+            memory: 768Mi  # Increased from 384Mi to 768Mi for better performance
+            cpu: 500m      # Increased from 300m to 500m
           requests:
-            memory: 192Mi  # Increased from 160Mi to 192Mi
-            cpu: 100m
+            memory: 384Mi  # Increased from 192Mi to 384Mi
+            cpu: 150m      # Increased from 100m to 150m
         livenessProbe:
           httpGet:
             path: /health
