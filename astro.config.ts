@@ -9,6 +9,9 @@ export default defineConfig({
   adapter: node({
     mode: 'standalone'
   }),
+  build: {
+    assets: '_astro'
+  },
   vite: {
     define: {
       'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')

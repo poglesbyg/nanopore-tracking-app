@@ -21,7 +21,6 @@ import type { UserSession } from '../../lib/auth/AdminAuth'
 import PDFUpload from './pdf-upload'
 import { useAuth } from '../auth/auth-wrapper'
 import { trpc } from '@/client/trpc'
-import { useQueryClient } from '@tanstack/react-query'
 import type { NanoporeSample } from '@/lib/api-client'
 import { 
   Plus, 
@@ -115,8 +114,10 @@ const StatCard = ({ title, value, icon: Icon, color, change }: {
 )
 
 export default function NanoporeDashboard() {
+  // Authentication check
   const { user, logout } = useAuth()
-  const queryClient = useQueryClient()
+  
+  // State management
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -138,13 +139,34 @@ export default function NanoporeDashboard() {
   const [showBulkAssignModal, setShowBulkAssignModal] = useState(false)
   const [showPdfUploadModal, setShowPdfUploadModal] = useState(false)
 
-  // tRPC hooks
+  // tRPC hooks with optimistic updates
   const { data: samples = [], isLoading: loading, refetch } = trpc.nanopore.getAll.useQuery()
-  const createSampleMutation = trpc.nanopore.create.useMutation()
-  const updateSampleMutation = trpc.nanopore.update.useMutation()
-  const assignSampleMutation = trpc.nanopore.assign.useMutation()
-  const deleteSampleMutation = trpc.nanopore.delete.useMutation()
-  const updateStatusMutation = trpc.nanopore.updateStatus.useMutation()
+  const createSampleMutation = trpc.nanopore.create.useMutation({
+    onSuccess: () => {
+      utils.nanopore.getAll.invalidate()
+    }
+  })
+  const updateSampleMutation = trpc.nanopore.update.useMutation({
+    onSuccess: () => {
+      utils.nanopore.getAll.invalidate()
+    }
+  })
+  const assignSampleMutation = trpc.nanopore.assign.useMutation({
+    onSuccess: () => {
+      utils.nanopore.getAll.invalidate()
+    }
+  })
+  const deleteSampleMutation = trpc.nanopore.delete.useMutation({
+    onSuccess: () => {
+      utils.nanopore.getAll.invalidate()
+    }
+  })
+  const updateStatusMutation = trpc.nanopore.updateStatus.useMutation({
+    onSuccess: () => {
+      utils.nanopore.getAll.invalidate()
+    }
+  })
+  const utils = trpc.useUtils()
 
   // Stats state
   const [stats, setStats] = useState<DashboardStats>({
@@ -286,8 +308,8 @@ export default function NanoporeDashboard() {
       
       console.log('Sample update result:', result)
       
-      // Invalidate and refetch the samples query
-      await queryClient.invalidateQueries({ queryKey: ['nanopore', 'getAll'] })
+      // Use tRPC's invalidation method and manual refetch
+      await utils.nanopore.getAll.invalidate()
       await refetch()
       
       console.log('Data refetched after sample update')
@@ -343,13 +365,29 @@ export default function NanoporeDashboard() {
           toast.success('Results delivered')
           break
         case 'duplicate_sample':
-          // Create a duplicate sample
+          // Create a duplicate sample with all required fields properly mapped
           const duplicateData = {
-            ...sample,
-            sampleName: `${sample.sample_name}_copy`,
-            status: 'submitted' as const,
-            submittedAt: new Date().toISOString()
+            sampleName: `${sample.sample_name || sample.sampleName}_copy`,
+            projectId: sample.project_id || sample.projectId,
+            submitterName: sample.submitter_name || sample.submitterName,
+            submitterEmail: sample.submitter_email || sample.submitterEmail,
+            labName: sample.lab_name || sample.labName,
+            sampleType: sample.sample_type || sample.sampleType,
+            sampleBuffer: sample.sample_buffer || sample.sampleBuffer,
+            concentration: sample.concentration,
+            volume: sample.volume,
+            totalAmount: sample.total_amount || sample.totalAmount,
+            flowCellType: sample.flow_cell_type || sample.flowCellType,
+            flowCellCount: sample.flow_cell_count || sample.flowCellCount || 1,
+            priority: sample.priority || 'normal',
+            chartField: sample.chart_field || sample.chartField,
+            specialInstructions: sample.special_instructions || sample.specialInstructions,
+            status: 'submitted' as const
           }
+          
+          console.log('Duplicating sample with data:', duplicateData)
+          console.log('Original sample:', sample)
+          
           await createSampleMutation.mutateAsync(duplicateData)
           toast.success('Sample duplicated')
           break
@@ -414,7 +452,7 @@ export default function NanoporeDashboard() {
       console.log('Assignment result:', result)
       
       // Invalidate and refetch the samples query
-      await queryClient.invalidateQueries({ queryKey: ['nanopore', 'getAll'] })
+      await utils.nanopore.getAll.invalidate()
       await refetch()
       
       console.log('Data refetched after assignment')
@@ -440,12 +478,7 @@ export default function NanoporeDashboard() {
       })
       
       console.log('Status update result:', result)
-      
-      // Invalidate and refetch the samples query
-      await queryClient.invalidateQueries({ queryKey: ['nanopore', 'getAll'] })
-      await refetch()
-      
-      console.log('Data refetched after status update')
+      console.log('Cache invalidation will be handled by mutation callback')
       
       toast.success(`Sample status updated to ${newStatus}`)
     } catch (error) {
