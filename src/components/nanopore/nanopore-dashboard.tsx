@@ -140,6 +140,7 @@ export default function NanoporeDashboard() {
   const [showPdfUploadModal, setShowPdfUploadModal] = useState(false)
 
   // tRPC hooks with optimistic updates
+  const utils = trpc.useUtils()
   const { data: samples = [], isLoading: loading, refetch } = trpc.nanopore.getAll.useQuery()
   const createSampleMutation = trpc.nanopore.create.useMutation({
     onSuccess: () => {
@@ -162,11 +163,46 @@ export default function NanoporeDashboard() {
     }
   })
   const updateStatusMutation = trpc.nanopore.updateStatus.useMutation({
-    onSuccess: () => {
+    onMutate: async ({ id, status }) => {
+      console.log('onMutate called with:', { id, status })
+      
+      // Cancel any outgoing refetches
+      await utils.nanopore.getAll.cancel()
+      
+      // Snapshot the previous value
+      const previousSamples = utils.nanopore.getAll.getData()
+      console.log('Previous samples count:', previousSamples?.length)
+      
+      // Optimistically update to the new value
+      utils.nanopore.getAll.setData(undefined, (old: any) => {
+        if (!old) return old
+        const updated = old.map((sample: any) => 
+          sample.id === id 
+            ? { ...sample, status: status }
+            : sample
+        )
+        console.log('Optimistic update applied, updated samples count:', updated.length)
+        return updated
+      })
+      
+      console.log('Optimistic update applied for status change')
+      
+      // Return a context object with the snapshotted value
+      return { previousSamples }
+    },
+    onError: (err, variables, context) => {
+      console.log('Status update error:', err)
+      // If the mutation fails, use the context returned from onMutate to roll back
+      if (context?.previousSamples) {
+        utils.nanopore.getAll.setData(undefined, context.previousSamples)
+      }
+    },
+    onSettled: () => {
+      console.log('Status update settled, invalidating cache')
+      // Always refetch after error or success
       utils.nanopore.getAll.invalidate()
     }
   })
-  const utils = trpc.useUtils()
 
   // Stats state
   const [stats, setStats] = useState<DashboardStats>({
@@ -307,12 +343,7 @@ export default function NanoporeDashboard() {
       })
       
       console.log('Sample update result:', result)
-      
-      // Use tRPC's invalidation method and manual refetch
-      await utils.nanopore.getAll.invalidate()
-      await refetch()
-      
-      console.log('Data refetched after sample update')
+      console.log('Cache invalidation will be handled by mutation callback')
       
       toast.success('Sample updated successfully')
       setShowEditModal(false)
