@@ -18,15 +18,12 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
-import {
-  nanoporeFormService,
-  type NanoporeFormData,
-} from '@/lib/ai/nanopore-llm-service'
+import { submissionServiceClient, type ProcessingResult } from '@/lib/submission-client'
 
 import PDFViewer from './pdf-viewer'
 
 interface PDFUploadProps {
-  onDataExtracted?: (data: NanoporeFormData, file: File) => void
+  onDataExtracted?: (data: any, file: File) => void
   onFileUploaded?: (file: File) => void
 }
 
@@ -34,7 +31,7 @@ interface UploadedFile {
   file: File
   id: string
   status: 'processing' | 'completed' | 'error'
-  extractedData?: NanoporeFormData
+  extractedData?: any
   error?: string
   processingTime?: number
 }
@@ -47,10 +44,20 @@ export default function PDFUpload({
   const [isProcessing, setIsProcessing] = useState(false)
   const [viewingFile, setViewingFile] = useState<UploadedFile | null>(null)
   const [isClient, setIsClient] = useState(false)
+  const [submissionServiceAvailable, setSubmissionServiceAvailable] = useState(false)
 
-  // Ensure client-side rendering
+  // Ensure client-side rendering and check submission service
   useEffect(() => {
     setIsClient(true)
+    const checkSubmissionService = async () => {
+      try {
+        const available = await submissionServiceClient.isAvailable()
+        setSubmissionServiceAvailable(available)
+      } catch (error) {
+        setSubmissionServiceAvailable(false)
+      }
+    }
+    checkSubmissionService()
   }, [])
 
   const onDrop = useCallback(
@@ -60,50 +67,52 @@ export default function PDFUpload({
         id: `${Date.now()}-${Math.random()}`,
         status: 'processing' as const,
       }))
-
       setUploadedFiles((prev) => [...prev, ...newFiles])
       setIsProcessing(true)
 
-      // Process each file
       for (const uploadedFile of newFiles) {
         try {
-          // Call the file uploaded callback
           onFileUploaded?.(uploadedFile.file)
-
-          // Extract data using AI
-          const startTime = Date.now()
-          const result = await nanoporeFormService.extractFormData(
-            uploadedFile.file,
-          )
-          const processingTime = Date.now() - startTime
-
-          if (result.success && result.data) {
-            // Update file status
-            setUploadedFiles((prev) =>
-              prev.map((f) =>
-                f.id === uploadedFile.id
-                  ? {
-                      ...f,
-                      status: 'completed' as const,
-                      ...(result.data && { extractedData: result.data }),
-                      processingTime,
-                    }
-                  : f,
-              ),
-            )
-
-            // Call the data extracted callback
-            onDataExtracted?.(result.data, uploadedFile.file)
+          if (submissionServiceAvailable) {
+            // Use Python submission service
+            const startTime = Date.now()
+            const result: ProcessingResult = await submissionServiceClient.processPDF(uploadedFile.file)
+            const processingTime = Date.now() - startTime
+            if (result.success) {
+              setUploadedFiles((prev) =>
+                prev.map((f) =>
+                  f.id === uploadedFile.id
+                    ? {
+                        ...f,
+                        status: 'completed' as const,
+                        processingTime,
+                      }
+                    : f,
+                ),
+              )
+              onDataExtracted?.(result as any, uploadedFile.file)
+            } else {
+              setUploadedFiles((prev) =>
+                prev.map((f) =>
+                  f.id === uploadedFile.id
+                    ? {
+                        ...f,
+                        status: 'error',
+                        error: result.message || 'Failed to process PDF',
+                        processingTime,
+                      }
+                    : f,
+                ),
+              )
+            }
           } else {
-            // Update file with error
             setUploadedFiles((prev) =>
               prev.map((f) =>
                 f.id === uploadedFile.id
                   ? {
                       ...f,
                       status: 'error',
-                      error: result.error || 'Failed to extract data',
-                      processingTime,
+                      error: 'PDF processing service is not available',
                     }
                   : f,
               ),
@@ -116,18 +125,16 @@ export default function PDFUpload({
                 ? {
                     ...f,
                     status: 'error',
-                    error:
-                      error instanceof Error ? error.message : 'Unknown error',
+                    error: error instanceof Error ? error.message : 'Unknown error',
                   }
                 : f,
             ),
           )
         }
       }
-
       setIsProcessing(false)
     },
-    [onDataExtracted, onFileUploaded],
+    [onDataExtracted, onFileUploaded, submissionServiceAvailable],
   )
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -211,13 +218,34 @@ export default function PDFUpload({
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Upload className="h-5 w-5 text-blue-600" />
-              <span>PDF Upload & AI Analysis</span>
+              <span>PDF Upload & Processing</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-center h-32 text-gray-500 dark:text-gray-400">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
               <span className="ml-2">Loading...</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (isProcessing) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Upload className="h-5 w-5 text-blue-600" />
+              <span>PDF Upload & Processing</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col items-center justify-center h-32 text-gray-500 dark:text-gray-400">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+              <span className="mt-2">PDF is being processed by the server...</span>
             </div>
           </CardContent>
         </Card>

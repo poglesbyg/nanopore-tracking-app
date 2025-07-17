@@ -25,7 +25,7 @@ docker build -t "$IMAGE_NAME" .
 echo "🔧 Tagging image for OpenShift registry..."
 
 # Get OpenShift registry URL
-REGISTRY_URL=$(oc get route default-route -n openshift-image-registry -o jsonpath='{.spec.host}' 2>/dev/null || echo "image-registry.openshift-image-registry.svc:5000")
+REGISTRY_URL="default-route-openshift-image-registry.apps.cloudapps.unc.edu"
 
 # Tag image for OpenShift
 docker tag "$IMAGE_NAME" "$REGISTRY_URL/$NAMESPACE/$IMAGE_NAME"

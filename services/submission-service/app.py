@@ -272,29 +272,171 @@ async def process_pdf(
 
 def parse_pdf_text(text: str, page_num: int) -> Optional[Dict[str, Any]]:
     """
-    Parse extracted PDF text to extract sample data
-    This is a simplified parser - you may need to enhance based on your PDF format
+    Parse extracted PDF text to extract sample data from HTSF quote forms
+    Enhanced parser for nanopore sequencing submission forms
+    
+    Handles HTSF quote forms with the following structure:
+    - Quote ID (e.g., HTSF--JL-147)
+    - Sample information section
+    - Flow cell selection
+    - Bioinformatics and data delivery options
     """
     try:
-        # Basic text parsing logic - enhance based on your PDF structure
+        import re
         lines = text.split('\n')
         sample_data = {}
         
-        for line in lines:
-            line = line.strip()
-            if ':' in line:
-                key, value = line.split(':', 1)
-                key = key.strip().lower().replace(' ', '_')
-                value = value.strip()
-                
-                if key in ['sample_name', 'project_id', 'submitter_name', 'submitter_email']:
-                    sample_data[key] = value
+        # Initialize with defaults
+        sample_data['status'] = 'pending'
+        sample_data['priority'] = 'normal'
         
-        # Return None if no valid data found
-        if not sample_data.get('sample_name'):
-            return None
+        # Extract HTSF Quote ID (e.g., HTSF--JL-147)
+        htsf_pattern = r'(HTSF--[A-Z]+-\d+)'
+        for line in lines:
+            match = re.search(htsf_pattern, line)
+            if match:
+                sample_data['chart'] = match.group(1)
+                sample_data['sample_name'] = match.group(1)  # Use as sample name if no other name found
+                break
+        
+        # Parse the form sections
+        current_section = None
+        i = 0
+        while i < len(lines):
+            line = lines[i].strip()
             
-        return sample_data
+            # Identify sections
+            if 'Sample Information' in line:
+                current_section = 'sample_info'
+            elif 'Flow Cell Selection' in line:
+                current_section = 'flow_cell'
+            elif 'Bioinformatics' in line:
+                current_section = 'bioinformatics'
+            elif 'Type of Sample' in line:
+                current_section = 'sample_type'
+            elif 'Source Organism' in line:
+                current_section = 'organism'
+            
+            # Extract data based on current section
+            if current_section == 'sample_info':
+                # Look for sample details in a table format
+                if 'Sample Name' in line and i + 1 < len(lines):
+                    # Check next few lines for sample data
+                    for j in range(1, min(5, len(lines) - i)):
+                        data_line = lines[i + j].strip()
+                        if data_line and not any(header in data_line for header in ['Sample Name', 'Concentration', 'Volume']):
+                            # Parse sample data row
+                            parts = data_line.split()
+                            if parts:
+                                # First part is usually sample name
+                                sample_data['sample_name'] = parts[0]
+                                
+                                # Look for concentration (ng/μL pattern)
+                                for part in parts:
+                                    if 'ng/' in part or part.replace('.', '').isdigit():
+                                        try:
+                                            conc_value = float(re.sub(r'[^\d.]', '', part))
+                                            if conc_value > 0:
+                                                sample_data['concentration'] = conc_value
+                                                break
+                                        except:
+                                            pass
+                                
+                                # Look for volume (μL pattern)
+                                for k, part in enumerate(parts):
+                                    if 'μL' in part or 'ul' in part.lower():
+                                        try:
+                                            vol_value = float(re.sub(r'[^\d.]', '', part))
+                                            if vol_value > 0:
+                                                sample_data['volume'] = vol_value
+                                        except:
+                                            # Try previous part if current has unit only
+                                            if k > 0:
+                                                try:
+                                                    vol_value = float(parts[k-1])
+                                                    if vol_value > 0:
+                                                        sample_data['volume'] = vol_value
+                                                except:
+                                                    pass
+                            break
+            
+            elif current_section == 'flow_cell':
+                # Extract flow cell type (R10.4.1, R9.4.1, etc.)
+                if 'R10' in line or 'R9' in line:
+                    flow_cell_match = re.search(r'(R\d+\.\d+\.\d+)', line)
+                    if flow_cell_match:
+                        sample_data['flow_cell_type'] = flow_cell_match.group(1)
+                # Check for PromethION or MinION
+                elif 'PromethION' in line:
+                    sample_data['flow_cell_type'] = 'PromethION'
+                elif 'MinION' in line:
+                    sample_data['flow_cell_type'] = 'MinION'
+            
+            elif current_section == 'sample_type':
+                # Look for DNA/RNA selection
+                if i + 1 < len(lines):
+                    next_line = lines[i + 1].strip()
+                    if 'DNA' in next_line.upper() and 'RNA' not in next_line.upper():
+                        sample_data['sample_type'] = 'DNA'
+                    elif 'RNA' in next_line.upper():
+                        sample_data['sample_type'] = 'RNA'
+            
+            elif current_section == 'organism':
+                # Extract organism information
+                if ':' in line:
+                    organism_value = line.split(':', 1)[1].strip()
+                    if organism_value and organism_value.lower() not in ['na', 'n/a', 'none']:
+                        sample_data['organism'] = organism_value
+                elif i + 1 < len(lines) and current_section == 'organism':
+                    # Check next line for organism
+                    next_line = lines[i + 1].strip()
+                    if next_line and ':' not in next_line and not any(keyword in next_line for keyword in ['Sample', 'Type', 'Buffer']):
+                        sample_data['organism'] = next_line
+            
+            # Extract submitter information (anywhere in the form)
+            if '@' in line:
+                # Email pattern
+                email_match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', line)
+                if email_match:
+                    sample_data['submitter_email'] = email_match.group(0)
+                    # Try to extract name before email
+                    before_email = line[:line.find(email_match.group(0))].strip()
+                    if before_email:
+                        # Remove common prefixes
+                        name = before_email.replace('Contact:', '').replace('Email:', '').strip()
+                        if name and len(name) > 2:
+                            sample_data['submitter_name'] = name
+            
+            # Extract dates
+            date_match = re.search(r'(\d{1,2}/\d{1,2}/\d{2,4})', line)
+            if date_match and 'created_at' not in sample_data:
+                sample_data['created_at'] = date_match.group(1)
+            
+            # Extract cost/quote information
+            if '$' in line:
+                cost_match = re.search(r'\$\s*([\d,]+\.?\d*)', line)
+                if cost_match:
+                    sample_data['estimated_cost'] = cost_match.group(1).replace(',', '')
+            
+            i += 1
+        
+        # Validate required fields
+        if 'sample_name' in sample_data or 'chart' in sample_data:
+            # Set defaults for missing fields
+            if 'sample_type' not in sample_data:
+                sample_data['sample_type'] = 'DNA'  # Default to DNA
+            if 'concentration' not in sample_data:
+                sample_data['concentration'] = 0.0
+            if 'volume' not in sample_data:
+                sample_data['volume'] = 0.0
+            
+            # Add metadata
+            sample_data['pdf_page'] = page_num
+            sample_data['extraction_method'] = 'pdf_htsf_quote'
+            
+            return sample_data
+        
+        return None
         
     except Exception as e:
         logger.error(f"Error parsing PDF text on page {page_num}: {str(e)}")

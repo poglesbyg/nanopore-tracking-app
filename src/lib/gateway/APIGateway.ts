@@ -95,6 +95,19 @@ export class APIGateway {
       }
     })
 
+    // Submission Service
+    this.services.set('submission', {
+      name: 'submission',
+      baseUrl: this.config.get('SUBMISSION_SERVICE_URL', 'http://localhost:8001'),
+      healthCheckUrl: '/health',
+      timeout: 120000, // 2 minutes for large file processing
+      retries: 2,
+      circuitBreaker: {
+        failureThreshold: 3,
+        recoveryTimeout: 60000
+      }
+    })
+
     // File Storage Service
     this.services.set('file-storage', {
       name: 'file-storage',
