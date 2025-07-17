@@ -9,24 +9,21 @@ ENV PYTHONOPTIMIZE=1
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies and UV
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Add UV to PATH
-ENV PATH="/root/.cargo/bin:${PATH}"
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies using UV
-RUN uv venv && \
+# Install Python dependencies using pip (more reliable in Docker)
+RUN python -m venv .venv && \
     . .venv/bin/activate && \
-    uv pip install -r requirements.txt
+    pip install --upgrade pip && \
+    pip install -r requirements.txt
 
 # Copy application code
 COPY . .
