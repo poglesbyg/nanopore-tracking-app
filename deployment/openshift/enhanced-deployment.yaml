@@ -125,8 +125,7 @@ spec:
         prometheus.io/scrape: "true"
         prometheus.io/port: "8080"
         prometheus.io/path: "/api/metrics"
-        # Security annotations
-        container.apparmor.security.beta.kubernetes.io/nanopore-tracking-app: runtime/default
+        # Security annotations (AppArmor disabled for compatibility)
         seccomp.security.alpha.kubernetes.io/pod: runtime/default
     spec:
       serviceAccountName: nanopore-tracking-sa
