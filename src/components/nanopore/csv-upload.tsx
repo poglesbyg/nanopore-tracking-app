@@ -56,7 +56,8 @@ export default function CSVUpload({
   const [isClient, setIsClient] = useState(false)
   const [submissionServiceAvailable, setSubmissionServiceAvailable] = useState(false)
 
-  // tRPC mutations
+  // tRPC mutations and utils
+  const utils = trpc.useUtils()
   const createSampleMutation = trpc.nanopore.create.useMutation()
   const createDefaultStepsMutation = trpc.nanopore.createDefaultProcessingSteps.useMutation()
 
@@ -225,7 +226,7 @@ export default function CSVUpload({
                 toast.success(result.message)
                 
                 // Refresh samples list
-                utils.nanopore.getAllSamples.invalidate()
+                utils.nanopore.getAll.invalidate()
               } else {
                 setUploadedFiles((prev) =>
                   prev.map((f) =>
