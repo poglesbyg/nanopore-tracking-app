@@ -83,6 +83,7 @@ export default function CreateSampleModal({ isOpen, onClose, onSubmit }: CreateS
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {}
     
+    // Required field validation
     if (!formData.sampleName.trim()) {
       errors.sampleName = 'Sample name is required'
     }
@@ -97,20 +98,27 @@ export default function CreateSampleModal({ isOpen, onClose, onSubmit }: CreateS
       errors.submitterEmail = 'Invalid email format'
     }
     
-    if (!formData.sampleType) {
+    if (!formData.sampleType || formData.sampleType.trim() === '') {
       errors.sampleType = 'Sample type is required'
     }
     
-    if (!formData.chartField) {
+    if (!formData.chartField || formData.chartField.trim() === '') {
       errors.chartField = 'Chart field is required'
     }
     
-    if (formData.concentration && isNaN(Number(formData.concentration))) {
-      errors.concentration = 'Concentration must be a number'
+    // Numeric field validation
+    if (formData.concentration && formData.concentration.trim() !== '') {
+      const concentration = Number(formData.concentration)
+      if (isNaN(concentration) || concentration <= 0) {
+        errors.concentration = 'Concentration must be a positive number'
+      }
     }
     
-    if (formData.volume && isNaN(Number(formData.volume))) {
-      errors.volume = 'Volume must be a number'
+    if (formData.volume && formData.volume.trim() !== '') {
+      const volume = Number(formData.volume)
+      if (isNaN(volume) || volume <= 0) {
+        errors.volume = 'Volume must be a positive number'
+      }
     }
     
     setValidationErrors(errors)
@@ -122,6 +130,7 @@ export default function CreateSampleModal({ isOpen, onClose, onSubmit }: CreateS
     
     // Debug logging
     console.log('Form submission attempted with data:', formData)
+    console.log('Form validation state:', validationErrors)
     
     if (!validateForm()) {
       toast.error('Please fix the form errors before submitting')
@@ -130,31 +139,57 @@ export default function CreateSampleModal({ isOpen, onClose, onSubmit }: CreateS
     
     // Additional validation to ensure required fields are not empty
     const requiredFields = ['sampleName', 'submitterName', 'submitterEmail', 'sampleType', 'chartField']
-    const emptyFields = requiredFields.filter(field => !formData[field as keyof FormData] || !formData[field as keyof FormData].toString().trim())
+    const emptyFields = requiredFields.filter(field => {
+      const value = formData[field as keyof FormData]
+      return !value || !value.toString().trim()
+    })
     
     if (emptyFields.length > 0) {
       toast.error(`Please fill in all required fields: ${emptyFields.join(', ')}`)
       console.error('Empty required fields:', emptyFields)
+      console.error('Form data values:', requiredFields.map(field => ({ 
+        field, 
+        value: formData[field as keyof FormData], 
+        type: typeof formData[field as keyof FormData] 
+      })))
       return
     }
     
     setIsSubmitting(true)
     
     try {
-      // Convert form data to API format
+      // Convert form data to API format with explicit validation
       const sampleData = {
         sampleName: formData.sampleName.trim(),
         projectId: formData.projectId.trim() || undefined,
         submitterName: formData.submitterName.trim(),
         submitterEmail: formData.submitterEmail.trim(),
         labName: formData.labName.trim() || undefined,
-        sampleType: formData.sampleType,
-        concentration: formData.concentration && formData.concentration.trim() ? Number(formData.concentration) : null,
-        volume: formData.volume && formData.volume.trim() ? Number(formData.volume) : null,
+        sampleType: formData.sampleType, // Ensure this is not empty
+        sampleBuffer: undefined, // Add if needed
+        concentration: formData.concentration && formData.concentration.trim() ? Number(formData.concentration) : undefined,
+        volume: formData.volume && formData.volume.trim() ? Number(formData.volume) : undefined,
+        totalAmount: undefined, // Will be calculated on backend if concentration and volume provided
         flowCellType: formData.flowCellType || undefined,
+        flowCellCount: 1, // Default value
         priority: formData.priority,
-        chartField: formData.chartField,
-        specialInstructions: formData.specialInstructions.trim() || undefined
+        assignedTo: undefined, // Optional field
+        libraryPrepBy: undefined, // Optional field
+        chartField: formData.chartField, // Ensure this is not empty
+      }
+      
+      // Final validation before submission
+      if (!sampleData.sampleName || !sampleData.submitterName || !sampleData.submitterEmail || !sampleData.sampleType || !sampleData.chartField) {
+        const missingFields = []
+        if (!sampleData.sampleName) missingFields.push('sampleName')
+        if (!sampleData.submitterName) missingFields.push('submitterName')
+        if (!sampleData.submitterEmail) missingFields.push('submitterEmail')
+        if (!sampleData.sampleType) missingFields.push('sampleType')
+        if (!sampleData.chartField) missingFields.push('chartField')
+        
+        console.error('Missing required fields in sampleData:', missingFields)
+        console.error('Sample data:', sampleData)
+        throw new Error(`Required fields are missing: ${missingFields.join(', ')}`)
       }
       
       console.log('Submitting sample data:', sampleData)
@@ -181,7 +216,18 @@ export default function CreateSampleModal({ isOpen, onClose, onSubmit }: CreateS
       
     } catch (error) {
       console.error('Form submission error:', error)
-      toast.error('Failed to create sample. Please try again.')
+      
+      // More detailed error logging
+      if (error && typeof error === 'object') {
+        console.error('Error details:', {
+          message: (error as any).message,
+          data: (error as any).data,
+          shape: (error as any).shape,
+          stack: (error as any).stack
+        })
+      }
+      
+      toast.error(`Failed to create sample: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setIsSubmitting(false)
     }
@@ -277,6 +323,7 @@ export default function CreateSampleModal({ isOpen, onClose, onSubmit }: CreateS
                 onChange={(e) => setFormData(prev => ({ ...prev, sampleName: e.target.value }))}
                 placeholder="e.g., NANO-001-2024"
                 className={validationErrors.sampleName ? 'border-red-500' : ''}
+                required
               />
               {validationErrors.sampleName && (
                 <p className="text-red-500 text-xs mt-1">{validationErrors.sampleName}</p>
@@ -312,6 +359,7 @@ export default function CreateSampleModal({ isOpen, onClose, onSubmit }: CreateS
                   onChange={(e) => setFormData(prev => ({ ...prev, submitterName: e.target.value }))}
                   placeholder="Dr. Jane Smith"
                   className={validationErrors.submitterName ? 'border-red-500' : ''}
+                  required
                 />
                 {validationErrors.submitterName && (
                   <p className="text-red-500 text-xs mt-1">{validationErrors.submitterName}</p>
@@ -328,6 +376,7 @@ export default function CreateSampleModal({ isOpen, onClose, onSubmit }: CreateS
                   onChange={(e) => setFormData(prev => ({ ...prev, submitterEmail: e.target.value }))}
                   placeholder="jane.smith@university.edu"
                   className={validationErrors.submitterEmail ? 'border-red-500' : ''}
+                  required
                 />
                 {validationErrors.submitterEmail && (
                   <p className="text-red-500 text-xs mt-1">{validationErrors.submitterEmail}</p>
@@ -365,10 +414,11 @@ export default function CreateSampleModal({ isOpen, onClose, onSubmit }: CreateS
                   className={`w-full px-3 py-2 border rounded-md bg-white text-sm ${
                     validationErrors.sampleType ? 'border-red-500' : 'border-gray-300'
                   }`}
+                  required
                 >
-                  <option value="">Select sample type</option>
+                  <option value="">Select sample type *</option>
                   {SAMPLE_TYPES.map(type => (
-                    <option key={type.value} value={type.value}>{type.label}</option>
+                    <option key={`${type.value}-${type.label}`} value={type.value}>{type.label}</option>
                   ))}
                 </select>
                 {validationErrors.sampleType && (
@@ -463,8 +513,9 @@ export default function CreateSampleModal({ isOpen, onClose, onSubmit }: CreateS
                 className={`w-full px-3 py-2 border rounded-md bg-white text-sm ${
                   validationErrors.chartField ? 'border-red-500' : 'border-gray-300'
                 }`}
+                required
               >
-                <option value="">Select chart field</option>
+                <option value="">Select chart field *</option>
                 {CHART_FIELDS.map(field => (
                   <option key={field} value={field}>{field}</option>
                 ))}

@@ -21,6 +21,7 @@ import type { UserSession } from '../../lib/auth/AdminAuth'
 import PDFUpload from './pdf-upload'
 import { useAuth } from '../auth/auth-wrapper'
 import { trpc } from '@/client/trpc'
+import { useQueryClient } from '@tanstack/react-query'
 import type { NanoporeSample } from '@/lib/api-client'
 import { 
   Plus, 
@@ -115,6 +116,7 @@ const StatCard = ({ title, value, icon: Icon, color, change }: {
 
 export default function NanoporeDashboard() {
   const { user, logout } = useAuth()
+  const queryClient = useQueryClient()
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -273,13 +275,22 @@ export default function NanoporeDashboard() {
   }
 
   const handleSampleUpdate = async (sampleId: string, updateData: any) => {
+    console.log('Sample update initiated:', { sampleId, updateData })
+    
     setActionLoading(sampleId)
     try {
-      await updateSampleMutation.mutateAsync({
+      const result = await updateSampleMutation.mutateAsync({
         id: sampleId,
         data: updateData,
       })
-      refetch()
+      
+      console.log('Sample update result:', result)
+      
+      // Force refetch to get updated data
+      await refetch()
+      
+      console.log('Data refetched after sample update')
+      
       toast.success('Sample updated successfully')
       setShowEditModal(false)
     } catch (error) {
@@ -383,14 +394,29 @@ export default function NanoporeDashboard() {
   const handleSampleAssign = async (assignedTo: string, libraryPrepBy?: string) => {
     if (!selectedSample) return
     
+    console.log('Sample assignment initiated:', { 
+      sampleId: selectedSample.id, 
+      assignedTo, 
+      libraryPrepBy,
+      currentAssignedTo: selectedSample.assigned_to,
+      currentLibraryPrepBy: selectedSample.library_prep_by
+    })
+    
     setActionLoading(selectedSample.id)
     try {
-      await assignSampleMutation.mutateAsync({
+      const result = await assignSampleMutation.mutateAsync({
         id: selectedSample.id,
         assignedTo,
         libraryPrepBy,
       })
-      refetch()
+      
+      console.log('Assignment result:', result)
+      
+      // Force refetch to get updated data
+      await refetch()
+      
+      console.log('Data refetched after assignment')
+      
       toast.success('Sample assigned successfully')
       setShowAssignModal(false)
     } catch (error) {
@@ -402,13 +428,22 @@ export default function NanoporeDashboard() {
   }
 
   const handleStatusUpdate = async (sample: any, newStatus: 'submitted' | 'prep' | 'sequencing' | 'analysis' | 'completed' | 'archived') => {
+    console.log('Status update initiated:', { sampleId: sample.id, currentStatus: sample.status, newStatus })
+    
     setActionLoading(sample.id)
     try {
-      await updateStatusMutation.mutateAsync({
+      const result = await updateStatusMutation.mutateAsync({
         id: sample.id,
         status: newStatus,
       })
-      refetch()
+      
+      console.log('Status update result:', result)
+      
+      // Force refetch to get updated data
+      await refetch()
+      
+      console.log('Data refetched after status update')
+      
       toast.success(`Sample status updated to ${newStatus}`)
     } catch (error) {
       console.error('Failed to update status:', error)
@@ -913,6 +948,12 @@ export default function NanoporeDashboard() {
                       {sample.assigned_to && (
                         <div className="text-sm text-gray-500">
                           Assigned to: <span className="font-medium">{sample.assigned_to}</span>
+                        </div>
+                      )}
+                      
+                      {sample.library_prep_by && (
+                        <div className="text-sm text-gray-500">
+                          Library prep: <span className="font-medium">{sample.library_prep_by}</span>
                         </div>
                       )}
                       
