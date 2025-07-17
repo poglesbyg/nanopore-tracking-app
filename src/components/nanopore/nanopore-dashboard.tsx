@@ -54,7 +54,9 @@ interface DashboardStats {
 }
 
 const StatusBadge = ({ status }: { status: string }) => {
-  console.log('StatusBadge rendering with status:', status)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('StatusBadge rendering with status:', status)
+  }
   
   const statusConfig = {
     submitted: { color: 'bg-blue-100 text-blue-800', icon: Clock },
@@ -145,73 +147,275 @@ export default function NanoporeDashboard() {
   const utils = trpc.useUtils()
   const { data: samples = [], isLoading: loading, refetch } = trpc.nanopore.getAll.useQuery()
   
-  // Debug samples data
-  console.log('Samples data:', samples)
+  // Debug samples data (only in development)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Samples data:', samples)
+  }
   
   // Force re-render trigger
   const [forceRender, setForceRender] = useState(0)
   const createSampleMutation = trpc.nanopore.create.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Sample created successfully:', data)
+      }
+      
+      // Add the new sample to the cache
+      utils.nanopore.getAll.setData(undefined, (old: any) => {
+        if (!old) return [data]
+        return [data, ...old]
+      })
+      
+      // Force re-render
+      setForceRender(prev => prev + 1)
+    },
+    onError: (error) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Sample creation error:', error)
+      }
+      // Invalidate cache on error to ensure fresh data
       utils.nanopore.getAll.invalidate()
     }
   })
+  
   const updateSampleMutation = trpc.nanopore.update.useMutation({
-    onSuccess: () => {
-      utils.nanopore.getAll.invalidate()
-    }
-  })
-  const assignSampleMutation = trpc.nanopore.assign.useMutation({
-    onSuccess: () => {
-      utils.nanopore.getAll.invalidate()
-    }
-  })
-  const deleteSampleMutation = trpc.nanopore.delete.useMutation({
-    onSuccess: () => {
-      utils.nanopore.getAll.invalidate()
-    }
-  })
-  const updateStatusMutation = trpc.nanopore.updateStatus.useMutation({
-    onMutate: async ({ id, status }) => {
-      console.log('onMutate called with:', { id, status })
+    onMutate: async ({ id, data }) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Sample update onMutate:', { id, data })
+      }
       
       // Cancel any outgoing refetches
       await utils.nanopore.getAll.cancel()
       
       // Snapshot the previous value
       const previousSamples = utils.nanopore.getAll.getData()
-      console.log('Previous samples count:', previousSamples?.length)
+      
+      // Optimistically update
+      utils.nanopore.getAll.setData(undefined, (old: any) => {
+        if (!old) return old
+        return old.map((sample: any) => 
+          sample.id === id 
+            ? { ...sample, ...data, updated_at: new Date().toISOString() }
+            : sample
+        )
+      })
+      
+      return { previousSamples }
+    },
+    onSuccess: (data, variables) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Sample update successful:', { data, variables })
+      }
+      
+      // Update cache with server response
+      utils.nanopore.getAll.setData(undefined, (old: any) => {
+        if (!old) return old
+        return old.map((sample: any) => 
+          sample.id === variables.id 
+            ? { ...sample, ...data }
+            : sample
+        )
+      })
+      
+      setForceRender(prev => prev + 1)
+    },
+    onError: (err, variables, context) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Sample update error:', err)
+      }
+      
+      // Roll back optimistic update
+      if (context?.previousSamples) {
+        utils.nanopore.getAll.setData(undefined, context.previousSamples)
+      }
+      
+      setForceRender(prev => prev + 1)
+    }
+  })
+  
+  const assignSampleMutation = trpc.nanopore.assign.useMutation({
+    onMutate: async ({ id, assignedTo, libraryPrepBy }) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Assignment onMutate:', { id, assignedTo, libraryPrepBy })
+      }
+      
+      await utils.nanopore.getAll.cancel()
+      const previousSamples = utils.nanopore.getAll.getData()
+      
+      // Optimistically update assignment
+      utils.nanopore.getAll.setData(undefined, (old: any) => {
+        if (!old) return old
+        return old.map((sample: any) => 
+          sample.id === id 
+            ? { 
+                ...sample, 
+                assigned_to: assignedTo, 
+                library_prep_by: libraryPrepBy,
+                updated_at: new Date().toISOString()
+              }
+            : sample
+        )
+      })
+      
+      return { previousSamples }
+    },
+    onSuccess: (data, variables) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Assignment successful:', { data, variables })
+      }
+      
+      // Update cache with server response
+      utils.nanopore.getAll.setData(undefined, (old: any) => {
+        if (!old) return old
+        return old.map((sample: any) => 
+          sample.id === variables.id 
+            ? { ...sample, ...data }
+            : sample
+        )
+      })
+      
+      setForceRender(prev => prev + 1)
+    },
+    onError: (err, variables, context) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Assignment error:', err)
+      }
+      
+      if (context?.previousSamples) {
+        utils.nanopore.getAll.setData(undefined, context.previousSamples)
+      }
+      
+      setForceRender(prev => prev + 1)
+    }
+  })
+  
+  const deleteSampleMutation = trpc.nanopore.delete.useMutation({
+    onMutate: async (id) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Delete onMutate:', { id })
+      }
+      
+      await utils.nanopore.getAll.cancel()
+      const previousSamples = utils.nanopore.getAll.getData()
+      
+      // Optimistically remove from cache
+      utils.nanopore.getAll.setData(undefined, (old: any) => {
+        if (!old) return old
+        return old.filter((sample: any) => sample.id !== id)
+      })
+      
+      return { previousSamples }
+    },
+    onSuccess: (data, variables) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Delete successful:', { variables })
+      }
+      
+      // Ensure sample is removed from cache
+      utils.nanopore.getAll.setData(undefined, (old: any) => {
+        if (!old) return old
+        return old.filter((sample: any) => sample.id !== variables)
+      })
+      
+      setForceRender(prev => prev + 1)
+    },
+    onError: (err, variables, context) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Delete error:', err)
+      }
+      
+      if (context?.previousSamples) {
+        utils.nanopore.getAll.setData(undefined, context.previousSamples)
+      }
+      
+      setForceRender(prev => prev + 1)
+    }
+  })
+  
+  const updateStatusMutation = trpc.nanopore.updateStatus.useMutation({
+    onMutate: async ({ id, status }) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('onMutate called with:', { id, status })
+      }
+      
+      // Cancel any outgoing refetches
+      await utils.nanopore.getAll.cancel()
+      
+      // Snapshot the previous value
+      const previousSamples = utils.nanopore.getAll.getData()
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Previous samples count:', previousSamples?.length)
+      }
       
       // Optimistically update to the new value
       utils.nanopore.getAll.setData(undefined, (old: any) => {
         if (!old) return old
         const updated = old.map((sample: any) => 
           sample.id === id 
-            ? { ...sample, status: status }
+            ? { ...sample, status: status, updated_at: new Date().toISOString() }
             : sample
         )
-        console.log('Optimistic update applied, updated samples count:', updated.length)
-        console.log('Updated sample:', updated.find((s: any) => s.id === id))
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Optimistic update applied, updated samples count:', updated.length)
+          console.log('Updated sample:', updated.find((s: any) => s.id === id))
+        }
         return updated
       })
       
-      console.log('Optimistic update applied for status change')
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Optimistic update applied for status change')
+      }
       
       // Return a context object with the snapshotted value
       return { previousSamples }
     },
+    onSuccess: (data, variables) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Status update successful:', { data, variables })
+      }
+      
+      // Update the cache with the actual server response
+      utils.nanopore.getAll.setData(undefined, (old: any) => {
+        if (!old) return old
+        return old.map((sample: any) => 
+          sample.id === variables.id 
+            ? { ...sample, ...data, status: variables.status }
+            : sample
+        )
+      })
+      
+      // Force re-render to ensure UI consistency
+      setForceRender(prev => prev + 1)
+    },
     onError: (err, variables, context) => {
-      console.log('Status update error:', err)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Status update error:', err)
+      }
+      
       // If the mutation fails, use the context returned from onMutate to roll back
       if (context?.previousSamples) {
         utils.nanopore.getAll.setData(undefined, context.previousSamples)
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Rolled back optimistic update due to error')
+        }
       }
-    },
-    onSettled: () => {
-      console.log('Status update settled, invalidating cache')
-      // Always refetch after error or success
-      utils.nanopore.getAll.invalidate()
-      // Force re-render
+      
+      // Force re-render to ensure UI consistency
       setForceRender(prev => prev + 1)
+    },
+    onSettled: (data, error, variables) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Status update settled:', { success: !error, variables })
+      }
+      
+      // Only invalidate cache if there was an error (to ensure fresh data)
+      // Success case is handled in onSuccess with direct cache update
+      if (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Invalidating cache due to error')
+        }
+        utils.nanopore.getAll.invalidate()
+      }
     }
   })
 
@@ -512,6 +716,14 @@ export default function NanoporeDashboard() {
   const handleStatusUpdate = async (sample: any, newStatus: 'submitted' | 'prep' | 'sequencing' | 'analysis' | 'completed' | 'archived') => {
     console.log('Status update initiated:', { sampleId: sample.id, currentStatus: sample.status, newStatus })
     
+    // Add debug logging to track the status change
+    if (process.env.NODE_ENV === 'development') {
+      console.log('=== STATUS UPDATE DEBUG ===')
+      console.log('Sample before update:', sample)
+      console.log('New status:', newStatus)
+      console.log('Current cache data:', utils.nanopore.getAll.getData())
+    }
+    
     setActionLoading(sample.id)
     try {
       const result = await updateStatusMutation.mutateAsync({
@@ -521,6 +733,12 @@ export default function NanoporeDashboard() {
       
       console.log('Status update result:', result)
       console.log('Cache invalidation will be handled by mutation callback')
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('=== STATUS UPDATE SUCCESS ===')
+        console.log('Server response:', result)
+        console.log('Cache after update:', utils.nanopore.getAll.getData())
+      }
       
       toast.success(`Sample status updated to ${newStatus}`)
     } catch (error) {

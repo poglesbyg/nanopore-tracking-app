@@ -10,10 +10,13 @@ export function TRPCProvider({ children }: { children: ReactNode }) {
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 0, // Always refetch data
-        gcTime: 1000 * 60 * 5, // Keep in cache for 5 minutes (formerly cacheTime)
-        refetchOnWindowFocus: true,
+        staleTime: 1000 * 10, // 10 seconds - reduce from 30 seconds for more responsive updates
+        gcTime: 1000 * 60 * 2, // Keep in cache for 2 minutes (reduced from 5 minutes)
+        refetchOnWindowFocus: false, // Disable to reduce memory pressure
         refetchOnReconnect: true,
+        retry: 2, // Reduce retry attempts
+        refetchInterval: false, // Disable automatic refetching
+        refetchIntervalInBackground: false, // Disable background refetching
       },
     },
   }))
