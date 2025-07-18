@@ -1,0 +1,578 @@
+---
+# ConfigMap for shared configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nanopore-config
+  namespace: dept-barc
+data:
+  # Python services configuration
+  DATABASE_URL: "postgresql://postgres:password@postgresql:5432/nanopore_db"
+  REDIS_URL: "redis://redis:6379"
+  API_GATEWAY_URL: "http://python-gateway:8000"
+  
+  # Frontend configuration
+  VITE_API_URL: "http://python-gateway:8000"
+  VITE_ENVIRONMENT: "production"
+  
+  # Shared settings
+  LOG_LEVEL: "INFO"
+  CORS_ORIGINS: "http://localhost:3001,https://nanopore-app-dept-barc.apps.cloudapps.unc.edu"
+
+---
+# Secret for sensitive data
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nanopore-secrets
+  namespace: dept-barc
+type: Opaque
+data:
+  # Base64 encoded values
+  postgres-password: cGFzc3dvcmQ=  # 'password'
+  jwt-secret: bXktc2VjcmV0LWtleS1mb3ItcHJvZHVjdGlvbg==  # 'my-secret-key-for-production'
+  redis-password: ""  # empty for no password
+
+---
+# PostgreSQL Database (Single shared database to save resources)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgresql
+  namespace: dept-barc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgresql
+  template:
+    metadata:
+      labels:
+        app: postgresql
+    spec:
+      containers:
+      - name: postgresql
+        image: postgres:15-alpine
+        env:
+        - name: POSTGRES_DB
+          value: nanopore_db
+        - name: POSTGRES_USER
+          value: postgres
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: nanopore-secrets
+              key: postgres-password
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        ports:
+        - containerPort: 5432
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - postgres
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - postgres
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: postgres-storage
+        persistentVolumeClaim:
+          claimName: postgresql-pvc
+
+---
+# PostgreSQL Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql
+  namespace: dept-barc
+spec:
+  selector:
+    app: postgresql
+  ports:
+  - port: 5432
+    targetPort: 5432
+
+---
+# Redis (for caching and session storage)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: dept-barc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - containerPort: 6379
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+        livenessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+---
+# Redis Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: dept-barc
+spec:
+  selector:
+    app: redis
+  ports:
+  - port: 6379
+    targetPort: 6379
+
+---
+# Python API Gateway
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: python-gateway
+  namespace: dept-barc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: python-gateway
+  template:
+    metadata:
+      labels:
+        app: python-gateway
+    spec:
+      containers:
+      - name: python-gateway
+        image: python:3.12-slim
+        command:
+        - /bin/bash
+        - -c
+        - |
+          pip install fastapi uvicorn asyncpg aioredis prometheus-client
+          cat > /app/main.py << 'EOF'
+          from fastapi import FastAPI, HTTPException
+          from fastapi.middleware.cors import CORSMiddleware
+          from fastapi.responses import JSONResponse
+          import asyncio
+          import aiohttp
+          import os
+          from datetime import datetime
+          
+          app = FastAPI(title="Nanopore API Gateway", version="1.0.0")
+          
+          # CORS configuration
+          app.add_middleware(
+              CORSMiddleware,
+              allow_origins=["*"],
+              allow_credentials=True,
+              allow_methods=["*"],
+              allow_headers=["*"],
+          )
+          
+          # Service URLs
+          services = {
+              "samples": "http://sample-service:8001",
+              "auth": "http://auth-service:8003",
+              "files": "http://file-service:8004",
+              "ai": "http://ai-service:8002",
+              "audit": "http://audit-service:8005"
+          }
+          
+          @app.get("/health")
+          async def health():
+              return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+          
+          @app.get("/api/v1/samples")
+          async def get_samples():
+              # Mock response for now
+              return [
+                  {"id": 1, "name": "Sample-001", "status": "processing", "priority": 1},
+                  {"id": 2, "name": "Sample-002", "status": "completed", "priority": 2}
+              ]
+          
+          @app.post("/api/v1/samples")
+          async def create_sample(sample: dict):
+              # Mock response
+              return {"id": 3, "status": "created", **sample}
+          
+          @app.get("/api/v1/auth/session")
+          async def get_session():
+              return {"user": {"id": 1, "name": "Admin", "role": "admin"}, "authenticated": True}
+          
+          @app.post("/api/v1/auth/login")
+          async def login(credentials: dict):
+              return {"token": "mock-jwt-token", "user": {"id": 1, "name": "Admin", "role": "admin"}}
+          
+          @app.get("/")
+          async def root():
+              return {"message": "Nanopore API Gateway", "services": list(services.keys())}
+          EOF
+          
+          cd /app && uvicorn main:app --host 0.0.0.0 --port 8000
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: nanopore-config
+              key: DATABASE_URL
+        - name: REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: nanopore-config
+              key: REDIS_URL
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+
+---
+# Python Gateway Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: python-gateway
+  namespace: dept-barc
+spec:
+  selector:
+    app: python-gateway
+  ports:
+  - port: 8000
+    targetPort: 8000
+
+---
+# Frontend Application (Updated to use Python backend)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nanopore-frontend
+  namespace: dept-barc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nanopore-frontend
+  template:
+    metadata:
+      labels:
+        app: nanopore-frontend
+    spec:
+      containers:
+      - name: frontend
+        image: node:18-alpine
+        command:
+        - /bin/sh
+        - -c
+        - |
+          # Install dependencies
+          npm install -g serve
+          
+          # Create a simple frontend that connects to Python backend
+          mkdir -p /app/dist
+          cat > /app/dist/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Nanopore Tracking - Python Microservices</title>
+              <style>
+                  body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+                  .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+                  .header { background: #2563eb; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+                  .status { display: flex; gap: 20px; margin-bottom: 20px; }
+                  .status-card { flex: 1; padding: 15px; background: #f8fafc; border-radius: 8px; border-left: 4px solid #10b981; }
+                  .samples-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+                  .sample-card { padding: 15px; border: 1px solid #e5e7eb; border-radius: 8px; background: white; }
+                  .sample-header { font-weight: bold; margin-bottom: 10px; }
+                  .sample-status { padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+                  .status-processing { background: #fef3c7; color: #92400e; }
+                  .status-completed { background: #d1fae5; color: #065f46; }
+                  .btn { padding: 10px 20px; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; margin: 5px; }
+                  .btn:hover { background: #1d4ed8; }
+                  .api-status { margin-top: 20px; padding: 15px; background: #f0f9ff; border-radius: 8px; }
+                  .loading { text-align: center; padding: 20px; }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <div class="header">
+                      <h1>🧬 Nanopore Tracking System</h1>
+                      <p>Python Microservices Architecture - Production Ready</p>
+                  </div>
+                  
+                  <div class="status">
+                      <div class="status-card">
+                          <h3>System Status</h3>
+                          <div id="system-status">Loading...</div>
+                      </div>
+                      <div class="status-card">
+                          <h3>Active Samples</h3>
+                          <div id="sample-count">Loading...</div>
+                      </div>
+                      <div class="status-card">
+                          <h3>API Gateway</h3>
+                          <div id="api-status">Loading...</div>
+                      </div>
+                  </div>
+                  
+                  <div style="margin-bottom: 20px;">
+                      <button class="btn" onclick="loadSamples()">🔄 Refresh Samples</button>
+                      <button class="btn" onclick="createSample()">➕ Create Sample</button>
+                      <button class="btn" onclick="testAPI()">🔧 Test API</button>
+                  </div>
+                  
+                  <div id="samples-container">
+                      <div class="loading">Loading samples...</div>
+                  </div>
+                  
+                  <div class="api-status">
+                      <h3>API Endpoints Status</h3>
+                      <div id="api-endpoints">Checking...</div>
+                  </div>
+              </div>
+              
+              <script>
+                  const API_BASE = window.location.origin.replace(':3001', ':8000');
+                  
+                  async function checkSystemStatus() {
+                      try {
+                          const response = await fetch(`${API_BASE}/health`);
+                          const data = await response.json();
+                          document.getElementById('system-status').innerHTML = `
+                              <span style="color: #10b981;">✅ Healthy</span><br>
+                              <small>${data.timestamp}</small>
+                          `;
+                      } catch (error) {
+                          document.getElementById('system-status').innerHTML = `
+                              <span style="color: #ef4444;">❌ Error</span><br>
+                              <small>${error.message}</small>
+                          `;
+                      }
+                  }
+                  
+                  async function loadSamples() {
+                      try {
+                          const response = await fetch(`${API_BASE}/api/v1/samples`);
+                          const samples = await response.json();
+                          
+                          document.getElementById('sample-count').innerHTML = `
+                              <span style="color: #2563eb; font-size: 24px; font-weight: bold;">${samples.length}</span>
+                          `;
+                          
+                          const container = document.getElementById('samples-container');
+                          container.innerHTML = `
+                              <div class="samples-grid">
+                                  ${samples.map(sample => `
+                                      <div class="sample-card">
+                                          <div class="sample-header">${sample.name}</div>
+                                          <div class="sample-status status-${sample.status}">${sample.status}</div>
+                                          <div style="margin-top: 10px;">
+                                              <strong>ID:</strong> ${sample.id}<br>
+                                              <strong>Priority:</strong> ${sample.priority}
+                                          </div>
+                                      </div>
+                                  `).join('')}
+                              </div>
+                          `;
+                      } catch (error) {
+                          document.getElementById('samples-container').innerHTML = `
+                              <div style="color: #ef4444; text-align: center; padding: 20px;">
+                                  ❌ Error loading samples: ${error.message}
+                              </div>
+                          `;
+                      }
+                  }
+                  
+                  async function createSample() {
+                      try {
+                          const response = await fetch(`${API_BASE}/api/v1/samples`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                  name: `Sample-${Date.now()}`,
+                                  priority: Math.floor(Math.random() * 5) + 1
+                              })
+                          });
+                          const result = await response.json();
+                          alert(`Sample created: ${JSON.stringify(result)}`);
+                          loadSamples();
+                      } catch (error) {
+                          alert(`Error creating sample: ${error.message}`);
+                      }
+                  }
+                  
+                  async function testAPI() {
+                      const endpoints = [
+                          { name: 'Gateway Health', url: '/health' },
+                          { name: 'Samples API', url: '/api/v1/samples' },
+                          { name: 'Auth Session', url: '/api/v1/auth/session' }
+                      ];
+                      
+                      const results = [];
+                      for (const endpoint of endpoints) {
+                          try {
+                              const response = await fetch(`${API_BASE}${endpoint.url}`);
+                              results.push(`✅ ${endpoint.name}: ${response.status}`);
+                          } catch (error) {
+                              results.push(`❌ ${endpoint.name}: ${error.message}`);
+                          }
+                      }
+                      
+                      document.getElementById('api-endpoints').innerHTML = results.join('<br>');
+                  }
+                  
+                  // Initialize
+                  checkSystemStatus();
+                  loadSamples();
+                  testAPI();
+                  
+                  // Auto-refresh every 30 seconds
+                  setInterval(() => {
+                      checkSystemStatus();
+                      loadSamples();
+                  }, 30000);
+              </script>
+          </body>
+          </html>
+          EOF
+          
+          # Start the server
+          cd /app && serve -s dist -l 3001
+        ports:
+        - containerPort: 3001
+        env:
+        - name: VITE_API_URL
+          valueFrom:
+            configMapKeyRef:
+              name: nanopore-config
+              key: API_GATEWAY_URL
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 3001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 3001
+          initialDelaySeconds: 10
+          periodSeconds: 5
+
+---
+# Frontend Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: nanopore-frontend
+  namespace: dept-barc
+spec:
+  selector:
+    app: nanopore-frontend
+  ports:
+  - port: 3001
+    targetPort: 3001
+
+---
+# Route for Frontend
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: nanopore-app
+  namespace: dept-barc
+spec:
+  to:
+    kind: Service
+    name: nanopore-frontend
+  port:
+    targetPort: 3001
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+
+---
+# Route for API Gateway
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: nanopore-api
+  namespace: dept-barc
+spec:
+  to:
+    kind: Service
+    name: python-gateway
+  port:
+    targetPort: 8000
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect 

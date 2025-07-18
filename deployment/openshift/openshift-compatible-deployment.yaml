@@ -27,7 +27,7 @@ data:
   jwt-secret: bXktc2VjcmV0LWtleS1mb3ItcHJvZHVjdGlvbg==  # 'my-secret-key-for-production'
 
 ---
-# PostgreSQL Database (Resource optimized)
+# PostgreSQL Database (OpenShift compatible)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -106,7 +106,7 @@ spec:
     targetPort: 5432
 
 ---
-# Redis (Lightweight caching)
+# Redis (OpenShift compatible)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -164,7 +164,7 @@ spec:
     targetPort: 6379
 
 ---
-# Python API Gateway (Resource optimized)
+# Python API Gateway (OpenShift compatible)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -183,13 +183,16 @@ spec:
       containers:
       - name: python-gateway
         image: python:3.12-slim
+        workingDir: /tmp
         command:
         - /bin/bash
         - -c
         - |
-          pip install fastapi uvicorn asyncpg aioredis prometheus-client
-          mkdir -p /app
-          cat > /app/main.py << 'EOF'
+          # Install dependencies in user space
+          pip install --user fastapi uvicorn asyncpg aioredis prometheus-client
+          
+          # Create main.py in /tmp (writable directory)
+          cat > /tmp/main.py << 'EOF'
           from fastapi import FastAPI, HTTPException
           from fastapi.middleware.cors import CORSMiddleware
           from fastapi.responses import JSONResponse
@@ -317,7 +320,9 @@ spec:
               }
           EOF
           
-          cd /app && uvicorn main:app --host 0.0.0.0 --port 8000
+          # Start the server
+          export PATH="/home/$(whoami)/.local/bin:$PATH"
+          cd /tmp && python -m uvicorn main:app --host 0.0.0.0 --port 8000
         ports:
         - containerPort: 8000
         env:
@@ -342,13 +347,13 @@ spec:
           httpGet:
             path: /health
             port: 8000
-          initialDelaySeconds: 30
+          initialDelaySeconds: 60
           periodSeconds: 10
         readinessProbe:
           httpGet:
             path: /health
             port: 8000
-          initialDelaySeconds: 10
+          initialDelaySeconds: 30
           periodSeconds: 5
 
 ---
@@ -366,7 +371,7 @@ spec:
     targetPort: 8000
 
 ---
-# Frontend Application (Resource optimized)
+# Frontend Application (OpenShift compatible)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -385,13 +390,17 @@ spec:
       containers:
       - name: frontend
         image: node:18-alpine
+        workingDir: /tmp
         command:
         - /bin/sh
         - -c
         - |
+          # Install serve globally in user space
           npm install -g serve
-          mkdir -p /app/dist
-          cat > /app/dist/index.html << 'EOF'
+          
+          # Create the HTML file in /tmp
+          mkdir -p /tmp/dist
+          cat > /tmp/dist/index.html << 'EOF'
           <!DOCTYPE html>
           <html lang="en">
           <head>
@@ -439,6 +448,7 @@ spec:
                   .form-group { margin-bottom: 15px; }
                   .form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
                   .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; }
+                  .deployment-info { background: #f0f9ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #3b82f6; }
               </style>
           </head>
           <body>
@@ -446,6 +456,14 @@ spec:
                   <div class="header">
                       <h1>🧬 Nanopore Tracking System</h1>
                       <p>Python Microservices Architecture - Production Ready on OpenShift</p>
+                  </div>
+                  
+                  <div class="deployment-info">
+                      <h3>🚀 Deployment Information</h3>
+                      <p><strong>Environment:</strong> OpenShift Production</p>
+                      <p><strong>Architecture:</strong> Python FastAPI Microservices</p>
+                      <p><strong>Frontend:</strong> https://nanopore-app-dept-barc.apps.cloudapps.unc.edu</p>
+                      <p><strong>API Gateway:</strong> https://nanopore-api-dept-barc.apps.cloudapps.unc.edu</p>
                   </div>
                   
                   <div class="status-grid">
@@ -520,11 +538,8 @@ spec:
               </div>
               
               <script>
-                  // Get the current URL and construct API base URL
-                  const currentUrl = window.location.href;
-                  const API_BASE = currentUrl.includes('nanopore-app') 
-                      ? currentUrl.replace('nanopore-app', 'nanopore-api').replace(/\/$/, '')
-                      : window.location.origin.replace(':3001', ':8000');
+                  // API Base URL for OpenShift
+                  const API_BASE = 'https://nanopore-api-dept-barc.apps.cloudapps.unc.edu';
                   
                   console.log('API Base URL:', API_BASE);
                   
@@ -752,7 +767,8 @@ spec:
           </html>
           EOF
           
-          cd /app && serve -s dist -l 3001
+          # Start the server
+          cd /tmp && serve -s dist -l 3001
         ports:
         - containerPort: 3001
         env:
@@ -772,13 +788,13 @@ spec:
           httpGet:
             path: /
             port: 3001
-          initialDelaySeconds: 30
+          initialDelaySeconds: 60
           periodSeconds: 10
         readinessProbe:
           httpGet:
             path: /
             port: 3001
-          initialDelaySeconds: 10
+          initialDelaySeconds: 30
           periodSeconds: 5
 
 ---
