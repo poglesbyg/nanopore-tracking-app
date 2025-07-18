@@ -128,6 +128,12 @@ spec:
         # Security annotations (AppArmor disabled for compatibility)
         seccomp.security.alpha.kubernetes.io/pod: runtime/default
     spec:
+      dnsPolicy: ClusterFirst
+      dnsConfig:
+        options:
+        - name: ndots
+          value: "2"
+        - name: edns0
       serviceAccountName: nanopore-tracking-sa
       securityContext:
         runAsNonRoot: true
@@ -161,6 +167,14 @@ spec:
             secretKeyRef:
               name: nanopore-secrets
               key: database-url
+        
+        # Submission service configuration
+        - name: SUBMISSION_SERVICE_URL
+          value: "http://submission-service:8000"
+        - name: SUBMISSION_SERVICE_IP
+          value: "172.30.47.35"  # Current service IP as fallback
+        - name: NODE_OPTIONS
+          value: "--dns-result-order=ipv4first"
         
         # Enhanced configuration from ConfigMap
         - name: DB_POOL_MIN

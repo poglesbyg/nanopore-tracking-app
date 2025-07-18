@@ -19,10 +19,8 @@ RUN apt-get update && apt-get install -y \
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies using pip (more reliable in Docker)
-RUN python -m venv .venv && \
-    . .venv/bin/activate && \
-    pip install --upgrade pip && \
+# Install Python dependencies directly (no virtual environment needed in container)
+RUN pip install --upgrade pip && \
     pip install -r requirements.txt
 
 # Copy application code
@@ -40,5 +38,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import requests; requests.get('http://localhost:8000/health')" || exit 1
 
-# Activate virtual environment and run the application
-CMD ["/bin/bash", "-c", "/app/.venv/bin/python -m app.main"] 
+# Run the application
+CMD ["python", "-m", "app.main"]

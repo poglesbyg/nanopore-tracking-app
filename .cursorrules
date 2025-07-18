@@ -130,3 +130,71 @@ src/
 - Optimize database queries with proper indexing
 - Implement caching strategies for static data
 - Monitor bundle size and loading performance
+
+## OpenShift Development Guidelines
+
+### Container Strategy
+- **Base Images**: Use UBI (Universal Base Image) for production deployments
+- **Multi-stage Builds**: Optimize Docker images for size and security
+- **Health Checks**: Implement readiness and liveness probes
+- **Resource Limits**: Define CPU/memory limits for optimal scheduling
+
+### Deployment Patterns
+- **Location**: `deployment/openshift/` directory
+- **Core Templates**:
+  - `deployment.yaml` - Main application deployment
+  - `configmap.yaml` - Environment configuration
+  - `secret.yaml` - Sensitive data management
+  - `routes.yaml` - External access configuration
+- **Scaling**: Use HPA (Horizontal Pod Autoscaler) for automatic scaling
+- **Rolling Updates**: Zero-downtime deployments with readiness checks
+
+### Service Architecture
+- **Microservices**: Each service in separate namespace or project
+- **Service Discovery**: Use OpenShift DNS for service-to-service communication
+- **Load Balancing**: Router-based traffic distribution
+- **API Gateway**: Centralized request routing and rate limiting
+
+### Security & Compliance
+- **Security Context Constraints (SCC)**: Use restricted SCC by default
+- **Service Accounts**: Dedicated service accounts with minimal privileges
+- **Network Policies**: Implement namespace isolation
+- **Image Security**: Scan images for vulnerabilities before deployment
+- **Secrets Management**: Use OpenShift secrets, never hardcode credentials
+
+### Monitoring & Observability
+- **Prometheus Integration**: Custom metrics and alerts
+- **Logging**: Structured logging to stdout/stderr for collection
+- **Tracing**: Distributed tracing for microservices communication
+- **Health Endpoints**: `/health`, `/ready`, `/metrics` endpoints
+
+### Development Workflow
+- **Local Development**: Use `oc port-forward` for service access
+- **Build Configs**: S2I (Source-to-Image) builds for automated deployments
+- **Image Streams**: Version management for container images
+- **Pipelines**: Tekton-based CI/CD integration
+
+### Configuration Management
+- **ConfigMaps**: Non-sensitive configuration data
+- **Secrets**: Sensitive data (database passwords, API keys)
+- **Environment Variables**: Runtime configuration injection
+- **Volume Mounts**: File-based configuration when needed
+
+### Resource Management
+- **Quotas**: Project-level resource quotas
+- **Limit Ranges**: Default resource limits for containers
+- **Storage**: Persistent volumes for stateful services
+- **CPU/Memory**: Right-sizing based on actual usage
+
+### Networking
+- **Routes**: External HTTP/HTTPS access with SSL termination
+- **Services**: Internal service discovery and load balancing
+- **Ingress**: Alternative to Routes for advanced routing rules
+- **Network Policies**: Pod-to-pod communication restrictions
+
+### Best Practices
+- **12-Factor App**: Follow cloud-native application principles
+- **Stateless Design**: Store state in external databases or caches
+- **Graceful Shutdown**: Handle SIGTERM signals properly
+- **Configuration Externalization**: Separate config from code
+- **Health Checks**: Implement proper health check endpoints
