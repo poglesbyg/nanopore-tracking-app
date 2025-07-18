@@ -353,45 +353,39 @@ ${sampleCount > 0 ? `\nSample Details:\n${sampleTable.slice(0, 10).map((s: any, 
         submitterName: requesterName,
         submitterEmail: requesterEmail,
         labName: labName,
-        sampleType: mappedSampleType,
-        flowCellType: mappedFlowCellType,
-        chartField: chartField,
         priority: 'high' as const, // Set to high since this is a formal quote
         status: 'submitted' as const,
         concentration: sampleCount > 0 && sampleTable[0] ? (sampleTable[0].concentration || sampleTable[0].qubit_conc || null) : null,
         volume: sampleCount > 0 && sampleTable[0] ? (sampleTable[0].volume || null) : null,
-        specialInstructions: specialInstructions !== 'None' ? specialInstructions : '',
-        notes: `Extracted from: ${file.name}
-
-=== PROJECT DETAILS ===
-Service Requested: ${serviceRequested}
-Source Organism: ${organism}
-Sample Buffer: ${buffer}
-Genome Size: ${genomeSize}
-Coverage: ${coverage}
-Basecalling: ${basecalling}
-File Format: ${fileFormat}
-Cost: ${cost}
-
-=== CONTACT INFORMATION ===
+        notes: `QUOTE: ${quoteId}
+SAMPLE TYPE: ${mappedSampleType}
+FLOW CELL: ${mappedFlowCellType}
+CHART FIELD: ${chartField}
+SERVICE: ${serviceRequested}
+ORGANISM: ${organism}
+BUFFER: ${buffer}
+GENOME SIZE: ${genomeSize}
+COVERAGE: ${coverage}
+BASECALLING: ${basecalling}
+FILE FORMAT: ${fileFormat}
+COST: ${cost}
 PI: ${piName}
-Department: ${department}
-Institution: ${institution}
-Phone: ${phone}
+DEPARTMENT: ${department}
+INSTITUTION: ${institution}
+PHONE: ${phone}
+PROJECT: ${projectDescription}
+DATA DELIVERY: ${dataDelivery}
+BILLING: ${billingAccount}
+SPECIAL INSTRUCTIONS: ${specialInstructions}
+EXPECTED YIELD: ${expectedYield}
+LIBRARY PREP: ${libraryPrep}
+MULTIPLEXING: ${multiplexing}
+SAMPLE COUNT: ${sampleCount}${sampleCount > 0 ? `
 
-=== LOGISTICS ===
-Project Description: ${projectDescription}
-Data Delivery: ${dataDelivery}
-Billing Account: ${billingAccount}
-Expected Yield: ${expectedYield}
-Library Prep: ${libraryPrep}
-Multiplexing: ${multiplexing}
-
-=== SAMPLE INFORMATION ===
-Sample Count: ${sampleCount}
-${sampleCount > 0 ? `Sample Details:\n${sampleTable.slice(0, 10).map((s: any, i: number) => 
+SAMPLE DETAILS:
+${sampleTable.slice(0, 10).map((s: any, i: number) => 
   `${i + 1}. ${s.sample_name || s.name || `Sample ${i + 1}`}: ${s.volume || 'N/A'}µL, ${s.concentration || s.qubit_conc || 'N/A'}ng/µL${s.nanodrop_conc ? `, NanoDrop: ${s.nanodrop_conc}ng/µL` : ''}`
-).join('\n')}${sampleCount > 10 ? `\n... and ${sampleCount - 10} more samples` : ''}` : 'No sample table found'}`,
+).join('\n')}${sampleCount > 10 ? `\n... and ${sampleCount - 10} more samples` : ''}` : ''}`,
       }
       
       console.log('Creating sample with comprehensive data:', sampleData)
@@ -523,11 +517,11 @@ ${sampleCount > 0 ? `Sample Details:\n${sampleTable.slice(0, 10).map((s: any, i:
           </div>
 
           {/* Samples Table */}
-          <Card>
+          <Card className="relative">
             <CardHeader>
               <CardTitle>Samples ({filteredSamples.length})</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="overflow-visible">
               <div className="space-y-4">
                 {filteredSamples.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
@@ -535,7 +529,7 @@ ${sampleCount > 0 ? `Sample Details:\n${sampleTable.slice(0, 10).map((s: any, i:
                   </div>
                 ) : (
                   filteredSamples.map((sample) => (
-                    <div key={sample.id} className="border rounded-lg p-4 space-y-2">
+                    <div key={sample.id} className="border rounded-lg p-4 space-y-2 relative overflow-visible">
                       <div className="flex justify-between items-start">
                         <div>
                           <h3 className="font-medium">{sample.sampleName}</h3>
@@ -555,7 +549,7 @@ ${sampleCount > 0 ? `Sample Details:\n${sampleTable.slice(0, 10).map((s: any, i:
                         <div className="text-xs text-muted-foreground">
                           Created: {new Date(sample.createdAt).toLocaleDateString()}
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 items-center">
                           <Button
                             size="sm"
                             variant="outline"
@@ -565,11 +559,15 @@ ${sampleCount > 0 ? `Sample Details:\n${sampleTable.slice(0, 10).map((s: any, i:
                           </Button>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button size="sm" variant="ghost" className="p-1">
+                              <Button size="sm" variant="ghost" className="p-1 h-8 w-8">
                                 <ChevronDown className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuContent 
+                              align="end" 
+                              className="w-48 z-[100]"
+                              sideOffset={5}
+                            >
                               <DropdownMenuItem onClick={() => handleEditSample(sample)}>
                                 <Edit className="h-4 w-4 mr-2" />
                                 Edit
