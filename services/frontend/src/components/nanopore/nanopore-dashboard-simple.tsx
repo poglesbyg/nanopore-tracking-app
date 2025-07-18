@@ -272,6 +272,20 @@ export default function NanoporeDashboard() {
       const basecalling = extractedData.basecalling || extractedData.basecalling_method || 'Unknown'
       const fileFormat = extractedData.file_format || 'Unknown'
       
+      // Extract additional comprehensive fields
+      const piName = extractedData.pi_name || extractedData.pi || 'Unknown'
+      const department = extractedData.department || 'Unknown'
+      const institution = extractedData.institution || 'Unknown'
+      const projectDescription = extractedData.project_description || 'Unknown'
+      const dataDelivery = extractedData.data_delivery || 'Unknown'
+      const billingAccount = extractedData.billing_account || 'Unknown'
+      const specialInstructions = extractedData.special_instructions || 'None'
+      const expectedYield = extractedData.expected_yield || 'Unknown'
+      const libraryPrep = extractedData.library_prep || 'Unknown'
+      const multiplexing = extractedData.multiplexing || 'Unknown'
+      const phone = extractedData.phone || 'Unknown'
+      const serviceRequested = extractedData.service_requested || 'Unknown'
+      
       // Extract sample table information if available
       const sampleTable = extractedData.sample_table || extractedData.samples || []
       const sampleCount = Array.isArray(sampleTable) ? sampleTable.length : 0
@@ -279,33 +293,105 @@ export default function NanoporeDashboard() {
       // Create comprehensive notes with all extracted information
       const detailedNotes = `
 Extracted from: ${file.name}
+
+=== QUOTE INFORMATION ===
 Quote ID: ${quoteId}
+Requester: ${requesterName}
+Email: ${requesterEmail}
+Phone: ${phone}
 Lab: ${labName}
-Organism: ${organism}
-Buffer: ${buffer}
+PI: ${piName}
+Department: ${department}
+Institution: ${institution}
+
+=== PROJECT DETAILS ===
+Project Description: ${projectDescription}
+Service Requested: ${serviceRequested}
 Sample Type: ${sampleType}
+Source Organism: ${organism}
+Sample Buffer: ${buffer}
+
+=== SEQUENCING SPECIFICATIONS ===
 Flow Cell: ${flowCellType}
 Genome Size: ${genomeSize}
 Coverage: ${coverage}
-Cost: ${cost}
+Library Prep: ${libraryPrep}
+Multiplexing: ${multiplexing}
 Basecalling: ${basecalling}
 File Format: ${fileFormat}
+Expected Yield: ${expectedYield}
+
+=== LOGISTICS ===
+Cost: ${cost}
+Billing Account: ${billingAccount}
+Data Delivery: ${dataDelivery}
+Special Instructions: ${specialInstructions}
+
+=== SAMPLE INFORMATION ===
 Sample Count: ${sampleCount}
-${sampleCount > 0 ? `\nSample Details:\n${sampleTable.slice(0, 5).map((s: any, i: number) => 
-  `${i + 1}. ${s.sample_name || s.name || `Sample ${i + 1}`}: ${s.volume || 'N/A'}µL, ${s.concentration || s.qubit_conc || 'N/A'}ng/µL`
-).join('\n')}${sampleCount > 5 ? `\n... and ${sampleCount - 5} more samples` : ''}` : ''}
+${sampleCount > 0 ? `\nSample Details:\n${sampleTable.slice(0, 10).map((s: any, i: number) => 
+  `${i + 1}. ${s.sample_name || s.name || `Sample ${i + 1}`}: ${s.volume || 'N/A'}µL, ${s.concentration || s.qubit_conc || 'N/A'}ng/µL${s.nanodrop_conc ? `, NanoDrop: ${s.nanodrop_conc}ng/µL` : ''}`
+).join('\n')}${sampleCount > 10 ? `\n... and ${sampleCount - 10} more samples` : ''}` : 'No sample table found'}
       `.trim()
+      
+      // Map sample type to standard values
+      const mappedSampleType = sampleType.toLowerCase().includes('dna') ? 'DNA' : 
+                              sampleType.toLowerCase().includes('rna') ? 'RNA' : 
+                              sampleType.toLowerCase().includes('amplicon') ? 'DNA' : 
+                              sampleType.toLowerCase().includes('plasmid') ? 'DNA' : 'Other'
+      
+      // Map flow cell type to standard values
+      const mappedFlowCellType = flowCellType.includes('R9.4.1') ? 'R9.4.1' :
+                                flowCellType.includes('R10.4.1') ? 'R10.4.1' :
+                                flowCellType.includes('R10.5.1') ? 'R10.5.1' : 'Other'
+      
+      // Generate chart field from quote ID if available
+      const chartField = quoteId.includes('HTSF') ? quoteId.split('--')[0] : 'HTSF-001'
       
       const sampleData = {
         sampleName: quoteId || file.name.replace('.pdf', ''),
         submitterName: requesterName,
         submitterEmail: requesterEmail,
         labName: labName,
-        priority: 'medium' as const,
+        sampleType: mappedSampleType,
+        flowCellType: mappedFlowCellType,
+        chartField: chartField,
+        priority: 'high' as const, // Set to high since this is a formal quote
         status: 'submitted' as const,
         concentration: sampleCount > 0 && sampleTable[0] ? (sampleTable[0].concentration || sampleTable[0].qubit_conc || null) : null,
         volume: sampleCount > 0 && sampleTable[0] ? (sampleTable[0].volume || null) : null,
-        notes: detailedNotes,
+        specialInstructions: specialInstructions !== 'None' ? specialInstructions : '',
+        notes: `Extracted from: ${file.name}
+
+=== PROJECT DETAILS ===
+Service Requested: ${serviceRequested}
+Source Organism: ${organism}
+Sample Buffer: ${buffer}
+Genome Size: ${genomeSize}
+Coverage: ${coverage}
+Basecalling: ${basecalling}
+File Format: ${fileFormat}
+Cost: ${cost}
+
+=== CONTACT INFORMATION ===
+PI: ${piName}
+Department: ${department}
+Institution: ${institution}
+Phone: ${phone}
+
+=== LOGISTICS ===
+Project Description: ${projectDescription}
+Data Delivery: ${dataDelivery}
+Billing Account: ${billingAccount}
+Expected Yield: ${expectedYield}
+Library Prep: ${libraryPrep}
+Multiplexing: ${multiplexing}
+
+=== SAMPLE INFORMATION ===
+Sample Count: ${sampleCount}
+${sampleCount > 0 ? `Sample Details:\n${sampleTable.slice(0, 10).map((s: any, i: number) => 
+  `${i + 1}. ${s.sample_name || s.name || `Sample ${i + 1}`}: ${s.volume || 'N/A'}µL, ${s.concentration || s.qubit_conc || 'N/A'}ng/µL${s.nanodrop_conc ? `, NanoDrop: ${s.nanodrop_conc}ng/µL` : ''}`
+).join('\n')}${sampleCount > 10 ? `\n... and ${sampleCount - 10} more samples` : ''}` : 'No sample table found'}`,
       }
       
       console.log('Creating sample with comprehensive data:', sampleData)
@@ -483,7 +569,7 @@ ${sampleCount > 0 ? `\nSample Details:\n${sampleTable.slice(0, 5).map((s: any, i
                                 <ChevronDown className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent>
+                            <DropdownMenuContent align="end" className="w-48">
                               <DropdownMenuItem onClick={() => handleEditSample(sample)}>
                                 <Edit className="h-4 w-4 mr-2" />
                                 Edit

@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nanopore-frontend
+  namespace: dept-barc
+  labels:
+    app: nanopore-frontend
+    service: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nanopore-frontend
+  template:
+    metadata:
+      labels:
+        app: nanopore-frontend
+        service: frontend
+    spec:
+      containers:
+      - name: nanopore-frontend
+        image: image-registry.openshift-image-registry.svc:5000/dept-barc/nanopore-frontend:latest
+        ports:
+        - containerPort: 3000
+          protocol: TCP
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "3000"
+        - name: HOST
+          value: "0.0.0.0"
+        - name: SAMPLE_MANAGEMENT_URL
+          value: "http://sample-management:3002"
+        - name: SUBMISSION_SERVICE_URL
+          value: "https://submission-service-dept-barc.apps.cloudapps.unc.edu"
+        - name: AUTH_SERVICE_URL
+          value: "http://authentication:3003"
+        - name: FILE_STORAGE_URL
+          value: "http://file-storage:3004"
+        - name: AUDIT_SERVICE_URL
+          value: "http://audit:3005"
+        - name: AI_PROCESSING_URL
+          value: "http://ai-processing:3006"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 10
+          failureThreshold: 3
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        securityContext:
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          capabilities:
+            drop:
+            - ALL 

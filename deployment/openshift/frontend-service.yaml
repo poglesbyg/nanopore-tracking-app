@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nanopore-frontend
+  namespace: dept-barc
+  labels:
+    app: nanopore-frontend
+    service: frontend
+spec:
+  ports:
+  - name: http
+    port: 3000
+    targetPort: 3000
+    protocol: TCP
+  selector:
+    app: nanopore-frontend
+  type: ClusterIP 

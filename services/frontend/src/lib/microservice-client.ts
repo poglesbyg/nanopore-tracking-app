@@ -48,21 +48,28 @@ class MicroserviceClient {
 
   constructor() {
     // Get service URLs from environment variables or use defaults
-    // Use external HTTPS routes for production to avoid mixed content errors
-    const isProduction = typeof window !== 'undefined' && window.location.protocol === 'https:'
+    // Detect if we're running in local development vs production
+    const isLocalDev = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+    const isProduction = typeof window !== 'undefined' && window.location.protocol === 'https:' && !isLocalDev
     
     this.baseUrls = {
       sampleManagement: process.env.SAMPLE_MANAGEMENT_URL || 
-        (isProduction ? 'https://nanopore-api-dept-barc.apps.cloudapps.unc.edu' : 'http://python-gateway:8000'),
-      submission: process.env.SUBMISSION_SERVICE_URL || 'https://submission-service-dept-barc.apps.cloudapps.unc.edu',
+        (isLocalDev ? 'http://localhost:3002' : 
+         isProduction ? 'https://nanopore-api-dept-barc.apps.cloudapps.unc.edu' : 'http://python-gateway:8000'),
+      submission: process.env.SUBMISSION_SERVICE_URL || 
+        (isLocalDev ? 'http://localhost:8000' : 'https://submission-service-dept-barc.apps.cloudapps.unc.edu'),
       auth: process.env.AUTH_SERVICE_URL || 
-        (isProduction ? 'https://nanopore-api-dept-barc.apps.cloudapps.unc.edu' : 'http://python-gateway:8000'),
+        (isLocalDev ? 'http://localhost:3002' :
+         isProduction ? 'https://nanopore-api-dept-barc.apps.cloudapps.unc.edu' : 'http://python-gateway:8000'),
       fileStorage: process.env.FILE_STORAGE_URL || 
-        (isProduction ? 'https://nanopore-api-dept-barc.apps.cloudapps.unc.edu' : 'http://python-gateway:8000'),
+        (isLocalDev ? 'http://localhost:3002' :
+         isProduction ? 'https://nanopore-api-dept-barc.apps.cloudapps.unc.edu' : 'http://python-gateway:8000'),
       audit: process.env.AUDIT_SERVICE_URL || 
-        (isProduction ? 'https://nanopore-api-dept-barc.apps.cloudapps.unc.edu' : 'http://python-gateway:8000'),
+        (isLocalDev ? 'http://localhost:3002' :
+         isProduction ? 'https://nanopore-api-dept-barc.apps.cloudapps.unc.edu' : 'http://python-gateway:8000'),
       aiProcessing: process.env.AI_PROCESSING_URL || 
-        (isProduction ? 'https://ai-service-optimized-route-dept-barc.apps.cloudapps.unc.edu' : 'http://python-gateway:8000'),
+        (isLocalDev ? 'http://localhost:3002' :
+         isProduction ? 'https://ai-service-optimized-route-dept-barc.apps.cloudapps.unc.edu' : 'http://python-gateway:8000'),
     }
   }
 

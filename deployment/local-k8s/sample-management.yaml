@@ -1,0 +1,142 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sample-management
+  namespace: nanopore-local
+  labels:
+    app: sample-management
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sample-management
+  template:
+    metadata:
+      labels:
+        app: sample-management
+    spec:
+      containers:
+      - name: sample-management
+        image: python:3.12-slim
+        command: ["sh", "-c"]
+        args:
+        - |
+          pip install fastapi uvicorn && python -c "
+          from fastapi import FastAPI
+          from fastapi.middleware.cors import CORSMiddleware
+          import uvicorn
+          import json
+          from datetime import datetime
+          
+          app = FastAPI()
+          
+          app.add_middleware(
+              CORSMiddleware,
+              allow_origins=['*'],
+              allow_credentials=True,
+              allow_methods=['*'],
+              allow_headers=['*'],
+          )
+          
+          # Mock sample data
+          samples = [
+              {
+                  'id': 1,
+                  'name': 'Sample-001',
+                  'status': 'processing',
+                  'priority': 1,
+                  'created_at': '2025-01-18T10:00:00Z',
+                  'submitter_name': 'John Doe',
+                  'submitter_email': 'john.doe@example.com',
+                  'project_id': 'Lab A',
+                  'concentration': '10 ng/μL',
+                  'volume': '50 μL',
+                  'notes': 'Mock sample data'
+              },
+              {
+                  'id': 2,
+                  'name': 'Sample-002',
+                  'status': 'completed',
+                  'priority': 2,
+                  'created_at': '2025-01-18T09:30:00Z',
+                  'submitter_name': 'Jane Smith',
+                  'submitter_email': 'jane.smith@example.com',
+                  'project_id': 'Lab B',
+                  'concentration': '15 ng/μL',
+                  'volume': '30 μL',
+                  'notes': 'Mock sample data'
+              }
+          ]
+          
+          @app.get('/health')
+          async def health():
+              return {'status': 'healthy'}
+          
+          @app.get('/api/v1/samples')
+          async def get_samples():
+              return samples
+          
+          @app.post('/api/v1/samples')
+          async def create_sample(sample: dict):
+              new_sample = {
+                  'id': len(samples) + 1,
+                  'name': sample.get('sampleName', 'New Sample'),
+                  'status': sample.get('status', 'submitted'),
+                  'priority': 2,  # Default to medium priority
+                  'created_at': datetime.now().isoformat() + 'Z',
+                  'submitter_name': sample.get('submitterName', 'Unknown'),
+                  'submitter_email': sample.get('submitterEmail', 'unknown@example.com'),
+                  'project_id': sample.get('labName', 'Unknown Lab'),
+                  'concentration': sample.get('concentration', ''),
+                  'volume': sample.get('volume', ''),
+                  'notes': sample.get('notes', '')
+              }
+              samples.append(new_sample)
+              return new_sample
+          
+          @app.put('/api/v1/samples/{sample_id}')
+          async def update_sample(sample_id: int, updates: dict):
+              for i, sample in enumerate(samples):
+                  if sample['id'] == sample_id:
+                      samples[i].update(updates)
+                      return samples[i]
+              return {'error': 'Sample not found'}, 404
+          
+          @app.delete('/api/v1/samples/{sample_id}')
+          async def delete_sample(sample_id: int):
+              for i, sample in enumerate(samples):
+                  if sample['id'] == sample_id:
+                      deleted_sample = samples.pop(i)
+                      return {'message': 'Sample deleted', 'sample': deleted_sample}
+              return {'error': 'Sample not found'}, 404
+          
+          uvicorn.run(app, host='0.0.0.0', port=3002)
+          "
+        ports:
+        - containerPort: 3002
+        env:
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sample-management
+  namespace: nanopore-local
+spec:
+  selector:
+    app: sample-management
+  ports:
+    - name: http
+      port: 3002
+      targetPort: 3002
+  type: ClusterIP 

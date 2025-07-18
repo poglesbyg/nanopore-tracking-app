@@ -33,19 +33,31 @@ class PDFProcessor:
             'organism': re.compile(r'(?:Organism|Species|Source\s*Organism)[:\s]*([^\n]+)', re.IGNORECASE),
             'buffer': re.compile(r'(?:Buffer|Sample\s*Buffer)[:\s]*([^\n]+)', re.IGNORECASE),
             
-            # Nanopore-specific patterns
-            'quote_identifier': re.compile(r'Identifier[:\s]*([^\n]+)', re.IGNORECASE),
-            'lab': re.compile(r'Lab[:\s]*([^\n]+)', re.IGNORECASE),
+            # Enhanced nanopore-specific patterns
+            'quote_identifier': re.compile(r'(?:Quote|Identifier)[:\s]*([^\n]+)', re.IGNORECASE),
+            'lab_name': re.compile(r'Lab[:\s]*([^\n]+)', re.IGNORECASE),
             'phone': re.compile(r'Phone[:\s]*([^\n]+)', re.IGNORECASE),
             'sample_type': re.compile(r'Type\s*of\s*Sample[:\s]*([^\n]+)', re.IGNORECASE),
             'flow_cell': re.compile(r'Flow\s*Cell[:\s]*([^\n]+)', re.IGNORECASE),
-            'genome_size': re.compile(r'Genome\s*Size[:\s]*([^\n]+)', re.IGNORECASE),
-            'coverage': re.compile(r'Coverage[:\s]*([^\n]+)', re.IGNORECASE),
+            'genome_size': re.compile(r'(?:Genome\s*Size|Approx\.\s*Genome\s*Size)[:\s]*([^\n]+)', re.IGNORECASE),
+            'coverage': re.compile(r'(?:Coverage|Approx\.\s*Coverage)[:\s]*([^\n]+)', re.IGNORECASE),
             'cost': re.compile(r'(?:Projected\s*Cost|Cost)[:\s]*\$?([^\n]+)', re.IGNORECASE),
             'basecalling': re.compile(r'basecalled\s*using[:\s]*([^\n]+)', re.IGNORECASE),
             'file_format': re.compile(r'File\s*Format[:\s]*([^\n]+)', re.IGNORECASE),
             'service_requested': re.compile(r'Service\s*Requested[:\s]*([^\n]+)', re.IGNORECASE),
             'sequencing_type': re.compile(r'I\s*will\s*be\s*submitting.*?for[:\s]*([^\n]+)', re.IGNORECASE),
+            
+            # Additional comprehensive patterns
+            'pi_name': re.compile(r'PI[:\s]*([^\n]+)', re.IGNORECASE),
+            'department': re.compile(r'Department[:\s]*([^\n]+)', re.IGNORECASE),
+            'institution': re.compile(r'Institution[:\s]*([^\n]+)', re.IGNORECASE),
+            'project_description': re.compile(r'Project\s*Description[:\s]*([^\n]+)', re.IGNORECASE),
+            'data_delivery': re.compile(r'Data\s*Delivery[:\s]*([^\n]+)', re.IGNORECASE),
+            'billing_account': re.compile(r'Billing\s*Account[:\s]*([^\n]+)', re.IGNORECASE),
+            'special_instructions': re.compile(r'Special\s*Instructions[:\s]*([^\n]+)', re.IGNORECASE),
+            'expected_yield': re.compile(r'Expected\s*Yield[:\s]*([^\n]+)', re.IGNORECASE),
+            'library_prep': re.compile(r'Library\s*Prep[:\s]*([^\n]+)', re.IGNORECASE),
+            'multiplexing': re.compile(r'Multiplexing[:\s]*([^\n]+)', re.IGNORECASE),
         }
     
     async def process_file(self, file_content: bytes, filename: str) -> ProcessingResult:
@@ -193,7 +205,7 @@ class PDFProcessor:
             data['metadata'] = metadata
         
         # Check if we have minimum required fields
-        if any(key in data for key in ['sample_name', 'submitter_name', 'quote_identifier', 'lab']):
+        if any(key in data for key in ['sample_name', 'submitter_name', 'quote_identifier', 'lab_name']):
             # Set defaults for required fields
             data.setdefault('sample_name', data.get('quote_identifier', 'Unknown'))
             data.setdefault('submitter_name', 'Unknown')
@@ -207,32 +219,99 @@ class PDFProcessor:
         """Extract sample table data from text."""
         samples = []
         
-        # Look for sample table patterns
-        table_pattern = re.compile(
-            r'Sample\s*Name\s*Volume.*?(?=\n\n|\Z)', 
-            re.IGNORECASE | re.DOTALL
-        )
+        # Look for various sample table patterns
+        table_patterns = [
+            # Pattern 1: Standard sample table with headers
+            re.compile(
+                r'Sample\s*(?:Name|ID)\s*.*?(?:Volume|Vol).*?(?:Concentration|Conc).*?(?=\n\n|\Z)', 
+                re.IGNORECASE | re.DOTALL
+            ),
+            # Pattern 2: Sample Information table
+            re.compile(
+                r'Sample\s*Information.*?(?=\n\n|\Z)', 
+                re.IGNORECASE | re.DOTALL
+            ),
+            # Pattern 3: Generic table with sample data
+            re.compile(
+                r'(?:Sample|#)\s*(?:Name|ID).*?(?:\d+\.?\d*\s*(?:ng/[μu]l|μl|ul)).*?(?=\n\n|\Z)', 
+                re.IGNORECASE | re.DOTALL
+            )
+        ]
         
-        table_match = table_pattern.search(text)
-        if not table_match:
+        table_text = None
+        for pattern in table_patterns:
+            table_match = pattern.search(text)
+            if table_match:
+                table_text = table_match.group(0)
+                break
+        
+        if not table_text:
             return samples
         
-        table_text = table_match.group(0)
+        # Multiple patterns for sample rows to handle different formats
+        sample_row_patterns = [
+            # Pattern 1: Sample Name/ID, Volume, Concentration (with units)
+            re.compile(
+                r'(\w+[-\w]*)\s+(\d+\.?\d*)\s*(?:μl|ul)\s+(\d+\.?\d*)\s*(?:ng/μl|ng/ul)', 
+                re.IGNORECASE | re.MULTILINE
+            ),
+            # Pattern 2: Numbered samples with measurements
+            re.compile(
+                r'(\d+)\s+([A-Za-z0-9_-]+)\s+(\d+\.?\d*)\s+(\d+\.?\d*)\s+(\d+\.?\d*)', 
+                re.MULTILINE
+            ),
+            # Pattern 3: Simple sample data with name and measurements
+            re.compile(
+                r'([A-Za-z0-9_-]+)\s+(\d+\.?\d*)\s+(\d+\.?\d*)', 
+                re.MULTILINE
+            ),
+            # Pattern 4: Tab-separated or space-separated values
+            re.compile(
+                r'([A-Za-z0-9_-]+)[\s\t]+(\d+\.?\d*)[\s\t]+(\d+\.?\d*)[\s\t]*(\d+\.?\d*)?', 
+                re.MULTILINE
+            )
+        ]
         
-        # Extract individual sample rows
-        sample_row_pattern = re.compile(
-            r'(\d+)\s+(\d+)\s+(\d+)\s+(\d+\.?\d*)\s+(\d+\.?\d*)', 
-            re.MULTILINE
-        )
+        for pattern in sample_row_patterns:
+            matches = pattern.finditer(table_text)
+            for match in matches:
+                groups = match.groups()
+                
+                # Handle different group patterns
+                if len(groups) >= 5:  # Pattern 2: index, name, vol, conc1, conc2
+                    sample = {
+                        'sample_index': groups[0],
+                        'sample_name': groups[1],
+                        'volume': float(groups[2]) if groups[2] else None,
+                        'qubit_conc': float(groups[3]) if groups[3] else None,
+                        'nanodrop_conc': float(groups[4]) if groups[4] else None
+                    }
+                elif len(groups) >= 3:  # Pattern 1 or 3: name, vol, conc
+                    sample = {
+                        'sample_name': groups[0],
+                        'volume': float(groups[1]) if groups[1] else None,
+                        'concentration': float(groups[2]) if groups[2] else None
+                    }
+                    # Add qubit_conc as alias for concentration
+                    if sample['concentration']:
+                        sample['qubit_conc'] = sample['concentration']
+                
+                if len(groups) >= 4 and groups[3]:  # Additional concentration
+                    sample['nanodrop_conc'] = float(groups[3])
+                
+                samples.append(sample)
+            
+            # If we found samples with this pattern, break
+            if samples:
+                break
         
-        for match in sample_row_pattern.finditer(table_text):
-            sample = {
-                'sample_name': match.group(1),
-                'sample_id': match.group(2),
-                'volume': float(match.group(3)),
-                'qubit_conc': float(match.group(4)),
-                'nanodrop_conc': float(match.group(5))
-            }
-            samples.append(sample)
+        # Remove duplicates based on sample_name
+        unique_samples = []
+        seen_names = set()
+        for sample in samples:
+            name = sample.get('sample_name', '')
+            if name and name not in seen_names:
+                seen_names.add(name)
+                unique_samples.append(sample)
         
-        return samples 
+        return unique_samples 
