@@ -3,6 +3,12 @@
 # Service Monitoring Script
 # Monitors DNS resolution, service health, and network connectivity
 
+# Ensure we're using bash 4+ for advanced features
+if [[ ${BASH_VERSION%%.*} -lt 4 ]]; then
+    echo "⚠️  Warning: This script requires bash 4+. Current version: $BASH_VERSION"
+    echo "🔄 Continuing with compatibility mode..."
+fi
+
 set -e
 
 NAMESPACE="dept-barc"
