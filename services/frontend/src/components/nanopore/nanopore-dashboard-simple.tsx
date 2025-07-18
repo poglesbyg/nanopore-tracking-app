@@ -479,7 +479,7 @@ ${sampleCount > 0 ? `\nSample Details:\n${sampleTable.slice(0, 5).map((s: any, i
                           </Button>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button size="sm" variant="ghost">
+                              <Button size="sm" variant="ghost" className="p-1">
                                 <ChevronDown className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
