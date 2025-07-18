@@ -30,17 +30,15 @@ class Settings(BaseSettings):
     
     # API settings
     api_prefix: str = Field(default="/api/v1", env="API_PREFIX")
-    cors_origins: list[str] = Field(
-        default=["http://localhost:3000", "http://localhost:3001"],
+    cors_origins: str = Field(
+        default="http://localhost:3000,http://localhost:3001",
         env="CORS_ORIGINS"
     )
     
     @property
     def cors_origins_list(self) -> list[str]:
         """Parse CORS origins from environment variable or use defaults."""
-        if isinstance(self.cors_origins, str):
-            return [origin.strip() for origin in self.cors_origins.split(",")]
-        return self.cors_origins
+        return [origin.strip() for origin in self.cors_origins.split(",")]
     
     # Logging settings
     log_level: str = Field(default="INFO", env="LOG_LEVEL")
