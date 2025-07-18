@@ -72,6 +72,7 @@ export default function PDFUpload({
 
       for (const uploadedFile of newFiles) {
         try {
+          console.log('Processing file:', uploadedFile.file.name, 'Service available:', submissionServiceAvailable)
           onFileUploaded?.(uploadedFile.file)
           if (submissionServiceAvailable) {
             // Use Python submission service
@@ -86,12 +87,14 @@ export default function PDFUpload({
                         ...f,
                         status: 'completed' as const,
                         processingTime,
+                        extractedData: result.data,
                       }
                     : f,
                 ),
               )
-              onDataExtracted?.(result as any, uploadedFile.file)
+              onDataExtracted?.(result.data, uploadedFile.file)
             } else {
+              console.error('PDF processing failed:', result.message)
               setUploadedFiles((prev) =>
                 prev.map((f) =>
                   f.id === uploadedFile.id
@@ -106,6 +109,7 @@ export default function PDFUpload({
               )
             }
           } else {
+            console.warn('PDF processing service is not available')
             setUploadedFiles((prev) =>
               prev.map((f) =>
                 f.id === uploadedFile.id
@@ -119,6 +123,7 @@ export default function PDFUpload({
             )
           }
         } catch (error) {
+          console.error('PDF processing error:', error)
           setUploadedFiles((prev) =>
             prev.map((f) =>
               f.id === uploadedFile.id

@@ -20,7 +20,8 @@ import {
   Archive,
   Trash2,
   X,
-  Users
+  Users,
+  Edit
 } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
@@ -93,6 +94,8 @@ export default function NanoporeDashboard() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [priorityFilter, setPriorityFilter] = useState<string>('all')
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editingSample, setEditingSample] = useState<NanoporeSample | null>(null)
   const [showExportModal, setShowExportModal] = useState(false)
   const [selectedSample, setSelectedSample] = useState<NanoporeSample | null>(null)
   
@@ -110,16 +113,64 @@ export default function NanoporeDashboard() {
     loadSamples()
   }, [])
 
+  // Add timeout to prevent infinite loading
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (loading) {
+        console.warn('Loading timeout reached, forcing loading to false')
+        setLoading(false)
+      }
+    }, 10000) // 10 second timeout
+
+    return () => clearTimeout(timeout)
+  }, [loading])
+
   const loadSamples = async () => {
     try {
+      console.log('Starting to load samples...')
       setLoading(true)
       const data = await microserviceClient.getSamples()
+      console.log('Samples loaded:', data)
       setSamples(data)
       updateStats(data)
     } catch (error) {
       console.error('Failed to load samples:', error)
       toast.error('Failed to load samples')
+      // Set mock samples on error so the UI still renders
+      const mockSamples: NanoporeSample[] = [
+        {
+          id: '1',
+          sampleName: 'Sample-001',
+          submitterName: 'John Doe',
+          submitterEmail: 'john.doe@example.com',
+          labName: 'Lab A',
+          priority: 'urgent',
+          status: 'sequencing',
+          concentration: '10 ng/μL',
+          volume: '50 μL',
+          notes: 'Mock sample data (API unavailable)',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: '2',
+          sampleName: 'Sample-002',
+          submitterName: 'Jane Smith',
+          submitterEmail: 'jane.smith@example.com',
+          labName: 'Lab B',
+          priority: 'high',
+          status: 'completed',
+          concentration: '15 ng/μL',
+          volume: '30 μL',
+          notes: 'Mock sample data (API unavailable)',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ]
+      setSamples(mockSamples)
+      updateStats(mockSamples)
     } finally {
+      console.log('Setting loading to false')
       setLoading(false)
     }
   }
@@ -136,9 +187,9 @@ export default function NanoporeDashboard() {
   }
 
   const filteredSamples = samples.filter(sample => {
-    const matchesSearch = sample.sampleName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         sample.submitterName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         sample.labName.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesSearch = (sample.sampleName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                         (sample.submitterName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                         (sample.labName?.toLowerCase() || '').includes(searchTerm.toLowerCase())
     
     const matchesStatus = statusFilter === 'all' || sample.status === statusFilter
     const matchesPriority = priorityFilter === 'all' || sample.priority === priorityFilter
@@ -180,21 +231,86 @@ export default function NanoporeDashboard() {
     }
   }
 
+  const handleEditSample = (sample: NanoporeSample) => {
+    setEditingSample(sample)
+    setShowEditModal(true)
+  }
+
+  const handleSaveEditSample = async (sampleData: Omit<NanoporeSample, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (!editingSample) return
+    
+    try {
+      await handleUpdateSample(editingSample.id, sampleData)
+      setShowEditModal(false)
+      setEditingSample(null)
+    } catch (error) {
+      console.error('Failed to save sample changes:', error)
+      toast.error('Failed to save sample changes')
+    }
+  }
+
   const handlePDFDataExtracted = async (data: any, file: File) => {
     try {
+      console.log('PDF data extracted:', data)
+      
+      // Extract the first item from the data array if it's an array
+      const extractedData = Array.isArray(data) ? data[0] : data
+      console.log('Extracted data item:', extractedData)
+      
+      // Extract comprehensive information from the PDF
+      const quoteId = extractedData.quote_identifier || extractedData.identifier || 'Unknown'
+      const requesterName = extractedData.requester || extractedData.submitter_name || extractedData.submitterName || 'Unknown'
+      const requesterEmail = extractedData.email || extractedData.submitter_email || extractedData.submitterEmail || ''
+      const labName = extractedData.lab || extractedData.lab_name || extractedData.labName || 'Unknown Lab'
+      const organism = extractedData.organism || extractedData.source_organism || 'Unknown'
+      const buffer = extractedData.buffer || extractedData.sample_buffer || 'Unknown'
+      const sampleType = extractedData.sample_type || extractedData.type_of_sample || 'Unknown'
+      const flowCellType = extractedData.flow_cell || extractedData.flow_cell_type || 'Unknown'
+      const genomeSize = extractedData.genome_size || extractedData.approx_genome_size || 'Unknown'
+      const coverage = extractedData.coverage || extractedData.approx_coverage || 'Unknown'
+      const cost = extractedData.cost || extractedData.projected_cost || 'Unknown'
+      const basecalling = extractedData.basecalling || extractedData.basecalling_method || 'Unknown'
+      const fileFormat = extractedData.file_format || 'Unknown'
+      
+      // Extract sample table information if available
+      const sampleTable = extractedData.sample_table || extractedData.samples || []
+      const sampleCount = Array.isArray(sampleTable) ? sampleTable.length : 0
+      
+      // Create comprehensive notes with all extracted information
+      const detailedNotes = `
+Extracted from: ${file.name}
+Quote ID: ${quoteId}
+Lab: ${labName}
+Organism: ${organism}
+Buffer: ${buffer}
+Sample Type: ${sampleType}
+Flow Cell: ${flowCellType}
+Genome Size: ${genomeSize}
+Coverage: ${coverage}
+Cost: ${cost}
+Basecalling: ${basecalling}
+File Format: ${fileFormat}
+Sample Count: ${sampleCount}
+${sampleCount > 0 ? `\nSample Details:\n${sampleTable.slice(0, 5).map((s: any, i: number) => 
+  `${i + 1}. ${s.sample_name || s.name || `Sample ${i + 1}`}: ${s.volume || 'N/A'}µL, ${s.concentration || s.qubit_conc || 'N/A'}ng/µL`
+).join('\n')}${sampleCount > 5 ? `\n... and ${sampleCount - 5} more samples` : ''}` : ''}
+      `.trim()
+      
       const sampleData = {
-        sampleName: data.sampleName || file.name.replace('.pdf', ''),
-        submitterName: data.submitterName || '',
-        submitterEmail: data.submitterEmail || '',
-        labName: data.labName || '',
-        priority: data.priority || 'medium' as const,
+        sampleName: quoteId || file.name.replace('.pdf', ''),
+        submitterName: requesterName,
+        submitterEmail: requesterEmail,
+        labName: labName,
+        priority: 'medium' as const,
         status: 'submitted' as const,
-        concentration: data.concentration,
-        volume: data.volume,
-        notes: data.notes || `Extracted from ${file.name}`,
+        concentration: sampleCount > 0 && sampleTable[0] ? (sampleTable[0].concentration || sampleTable[0].qubit_conc || null) : null,
+        volume: sampleCount > 0 && sampleTable[0] ? (sampleTable[0].volume || null) : null,
+        notes: detailedNotes,
       }
       
+      console.log('Creating sample with comprehensive data:', sampleData)
       await handleCreateSample(sampleData)
+      toast.success(`Sample created successfully from PDF data (${sampleCount} samples found)`)
     } catch (error) {
       console.error('Failed to create sample from PDF data:', error)
       toast.error('Failed to create sample from PDF data')
@@ -368,6 +484,10 @@ export default function NanoporeDashboard() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent>
+                              <DropdownMenuItem onClick={() => handleEditSample(sample)}>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleDeleteSample(sample.id)}>
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 Delete
@@ -393,6 +513,294 @@ export default function NanoporeDashboard() {
           />
         </TabsContent>
       </Tabs>
+
+      {/* Sample Detail Modal */}
+      <Dialog open={!!selectedSample} onOpenChange={() => setSelectedSample(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Sample Details</DialogTitle>
+          </DialogHeader>
+          {selectedSample && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium">Sample Name</Label>
+                  <p className="text-sm">{selectedSample.sampleName}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Submitter</Label>
+                  <p className="text-sm">{selectedSample.submitterName}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Lab</Label>
+                  <p className="text-sm">{selectedSample.labName}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Email</Label>
+                  <p className="text-sm">{selectedSample.submitterEmail}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Status</Label>
+                  <StatusBadge status={selectedSample.status} />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Priority</Label>
+                  <PriorityBadge priority={selectedSample.priority} />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Concentration</Label>
+                  <p className="text-sm">{selectedSample.concentration || 'N/A'}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Volume</Label>
+                  <p className="text-sm">{selectedSample.volume || 'N/A'}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Created</Label>
+                  <p className="text-sm">{new Date(selectedSample.createdAt).toLocaleString()}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Updated</Label>
+                  <p className="text-sm">{new Date(selectedSample.updatedAt).toLocaleString()}</p>
+                </div>
+              </div>
+              {selectedSample.notes && (
+                <div>
+                  <Label className="text-sm font-medium">Notes</Label>
+                  <p className="text-sm mt-1 p-2 bg-muted rounded">{selectedSample.notes}</p>
+                </div>
+              )}
+              <div className="flex justify-end gap-2 pt-4">
+                <Button variant="outline" onClick={() => setSelectedSample(null)}>
+                  Close
+                </Button>
+                <Button onClick={() => {
+                  if (selectedSample) {
+                    handleEditSample(selectedSample)
+                    setSelectedSample(null)
+                  }
+                }}>
+                  Edit Sample
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Sample Modal */}
+      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Create New Sample</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={(e) => {
+            e.preventDefault()
+            const formData = new FormData(e.currentTarget)
+            const sampleData = {
+              sampleName: formData.get('sampleName') as string,
+              submitterName: formData.get('submitterName') as string,
+              submitterEmail: formData.get('submitterEmail') as string,
+              labName: formData.get('labName') as string,
+              priority: formData.get('priority') as 'low' | 'medium' | 'high' | 'urgent',
+              status: 'submitted' as const,
+              concentration: formData.get('concentration') as string,
+              volume: formData.get('volume') as string,
+              notes: formData.get('notes') as string,
+            }
+            handleCreateSample(sampleData)
+          }}>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="sampleName">Sample Name *</Label>
+                  <Input id="sampleName" name="sampleName" required />
+                </div>
+                <div>
+                  <Label htmlFor="submitterName">Submitter Name *</Label>
+                  <Input id="submitterName" name="submitterName" required />
+                </div>
+                <div>
+                  <Label htmlFor="submitterEmail">Submitter Email *</Label>
+                  <Input id="submitterEmail" name="submitterEmail" type="email" required />
+                </div>
+                <div>
+                  <Label htmlFor="labName">Lab Name *</Label>
+                  <Input id="labName" name="labName" required />
+                </div>
+                <div>
+                  <Label htmlFor="priority">Priority</Label>
+                  <Select name="priority" defaultValue="medium">
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="urgent">Urgent</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="concentration">Concentration</Label>
+                  <Input id="concentration" name="concentration" placeholder="e.g., 10 ng/μL" />
+                </div>
+                <div>
+                  <Label htmlFor="volume">Volume</Label>
+                  <Input id="volume" name="volume" placeholder="e.g., 50 μL" />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="notes">Notes</Label>
+                <Input id="notes" name="notes" placeholder="Additional notes..." />
+              </div>
+              <div className="flex justify-end gap-2 pt-4">
+                <Button type="button" variant="outline" onClick={() => setShowCreateModal(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit">
+                  Create Sample
+                </Button>
+              </div>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Sample Modal */}
+      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Sample</DialogTitle>
+          </DialogHeader>
+          {editingSample && (
+            <form onSubmit={(e) => {
+              e.preventDefault()
+              const formData = new FormData(e.currentTarget)
+              const sampleData = {
+                sampleName: formData.get('sampleName') as string,
+                submitterName: formData.get('submitterName') as string,
+                submitterEmail: formData.get('submitterEmail') as string,
+                labName: formData.get('labName') as string,
+                priority: formData.get('priority') as 'low' | 'medium' | 'high' | 'urgent',
+                status: formData.get('status') as 'submitted' | 'prep' | 'sequencing' | 'analysis' | 'completed' | 'failed',
+                concentration: formData.get('concentration') as string,
+                volume: formData.get('volume') as string,
+                notes: formData.get('notes') as string,
+              }
+              handleSaveEditSample(sampleData)
+            }}>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="edit-sampleName">Sample Name *</Label>
+                    <Input 
+                      id="edit-sampleName" 
+                      name="sampleName" 
+                      defaultValue={editingSample.sampleName}
+                      required 
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-submitterName">Submitter Name *</Label>
+                    <Input 
+                      id="edit-submitterName" 
+                      name="submitterName" 
+                      defaultValue={editingSample.submitterName}
+                      required 
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-submitterEmail">Submitter Email *</Label>
+                    <Input 
+                      id="edit-submitterEmail" 
+                      name="submitterEmail" 
+                      type="email" 
+                      defaultValue={editingSample.submitterEmail}
+                      required 
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-labName">Lab Name *</Label>
+                    <Input 
+                      id="edit-labName" 
+                      name="labName" 
+                      defaultValue={editingSample.labName}
+                      required 
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-priority">Priority</Label>
+                    <Select name="priority" defaultValue={editingSample.priority}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">Low</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="urgent">Urgent</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-status">Status</Label>
+                    <Select name="status" defaultValue={editingSample.status}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="submitted">Submitted</SelectItem>
+                        <SelectItem value="prep">Prep</SelectItem>
+                        <SelectItem value="sequencing">Sequencing</SelectItem>
+                        <SelectItem value="analysis">Analysis</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                        <SelectItem value="failed">Failed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-concentration">Concentration</Label>
+                    <Input 
+                      id="edit-concentration" 
+                      name="concentration" 
+                      defaultValue={editingSample.concentration || ''}
+                      placeholder="e.g., 10 ng/μL" 
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-volume">Volume</Label>
+                    <Input 
+                      id="edit-volume" 
+                      name="volume" 
+                      defaultValue={editingSample.volume || ''}
+                      placeholder="e.g., 50 μL" 
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="edit-notes">Notes</Label>
+                  <Input 
+                    id="edit-notes" 
+                    name="notes" 
+                    defaultValue={editingSample.notes || ''}
+                    placeholder="Additional notes..." 
+                  />
+                </div>
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button type="button" variant="outline" onClick={() => setShowEditModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit">
+                    Save Changes
+                  </Button>
+                </div>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Export Modal */}
       <ExportModal

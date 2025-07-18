@@ -24,13 +24,28 @@ class PDFProcessor:
     def _compile_patterns(self) -> Dict[str, re.Pattern]:
         """Compile regex patterns for field extraction."""
         return {
+            # Basic sample information
             'sample_name': re.compile(r'Sample\s*(?:Name|ID)[:\s]*([^\n]+)', re.IGNORECASE),
-            'submitter_name': re.compile(r'(?:Submitter|Contact)\s*Name[:\s]*([^\n]+)', re.IGNORECASE),
+            'submitter_name': re.compile(r'(?:Submitter|Contact|Requester)[:\s]*([^\n]+)', re.IGNORECASE),
             'submitter_email': re.compile(r'(?:Email|E-mail)[:\s]*([^\s@]+@[^\s@]+\.[^\s@]+)', re.IGNORECASE),
             'concentration': re.compile(r'Concentration[:\s]*(\d+\.?\d*)\s*(ng/[μu]l|ng/ul)', re.IGNORECASE),
             'volume': re.compile(r'Volume[:\s]*(\d+\.?\d*)\s*([μu]l|ul)', re.IGNORECASE),
-            'organism': re.compile(r'(?:Organism|Species)[:\s]*([^\n]+)', re.IGNORECASE),
-            'buffer': re.compile(r'Buffer[:\s]*([^\n]+)', re.IGNORECASE),
+            'organism': re.compile(r'(?:Organism|Species|Source\s*Organism)[:\s]*([^\n]+)', re.IGNORECASE),
+            'buffer': re.compile(r'(?:Buffer|Sample\s*Buffer)[:\s]*([^\n]+)', re.IGNORECASE),
+            
+            # Nanopore-specific patterns
+            'quote_identifier': re.compile(r'Identifier[:\s]*([^\n]+)', re.IGNORECASE),
+            'lab': re.compile(r'Lab[:\s]*([^\n]+)', re.IGNORECASE),
+            'phone': re.compile(r'Phone[:\s]*([^\n]+)', re.IGNORECASE),
+            'sample_type': re.compile(r'Type\s*of\s*Sample[:\s]*([^\n]+)', re.IGNORECASE),
+            'flow_cell': re.compile(r'Flow\s*Cell[:\s]*([^\n]+)', re.IGNORECASE),
+            'genome_size': re.compile(r'Genome\s*Size[:\s]*([^\n]+)', re.IGNORECASE),
+            'coverage': re.compile(r'Coverage[:\s]*([^\n]+)', re.IGNORECASE),
+            'cost': re.compile(r'(?:Projected\s*Cost|Cost)[:\s]*\$?([^\n]+)', re.IGNORECASE),
+            'basecalling': re.compile(r'basecalled\s*using[:\s]*([^\n]+)', re.IGNORECASE),
+            'file_format': re.compile(r'File\s*Format[:\s]*([^\n]+)', re.IGNORECASE),
+            'service_requested': re.compile(r'Service\s*Requested[:\s]*([^\n]+)', re.IGNORECASE),
+            'sequencing_type': re.compile(r'I\s*will\s*be\s*submitting.*?for[:\s]*([^\n]+)', re.IGNORECASE),
         }
     
     async def process_file(self, file_content: bytes, filename: str) -> ProcessingResult:
@@ -131,6 +146,7 @@ class PDFProcessor:
         """Extract sample data from text using patterns."""
         data = {}
         
+        # Extract basic patterns
         for field, pattern in self.patterns.items():
             match = pattern.search(text)
             if match:
@@ -145,13 +161,78 @@ class PDFProcessor:
                 else:
                     data[field] = value
         
+        # Extract sample table data
+        sample_table = self._extract_sample_table(text)
+        if sample_table:
+            data['sample_table'] = sample_table
+        
+        # Extract additional metadata
+        metadata = {}
+        
+        # Extract PI information
+        pi_match = re.search(r'PIs[:\s]*([^\n]+)', text, re.IGNORECASE)
+        if pi_match:
+            metadata['pi'] = pi_match.group(1).strip()
+        
+        # Extract billing information
+        billing_match = re.search(r'Billing\s*address[:\s]*([^\n]+)', text, re.IGNORECASE)
+        if billing_match:
+            metadata['billing_address'] = billing_match.group(1).strip()
+        
+        # Extract comments
+        comments_match = re.search(r'Additional\s*Comments[:\s]*([^\n]+)', text, re.IGNORECASE)
+        if comments_match:
+            metadata['comments'] = comments_match.group(1).strip()
+        
+        # Extract data delivery information
+        delivery_match = re.search(r'Data\s*Delivery.*?email[:\s]*([^\n]+)', text, re.IGNORECASE | re.DOTALL)
+        if delivery_match:
+            metadata['data_delivery_email'] = delivery_match.group(1).strip()
+        
+        if metadata:
+            data['metadata'] = metadata
+        
         # Check if we have minimum required fields
-        if 'sample_name' in data or 'submitter_name' in data:
+        if any(key in data for key in ['sample_name', 'submitter_name', 'quote_identifier', 'lab']):
             # Set defaults for required fields
-            data.setdefault('sample_name', 'Unknown')
+            data.setdefault('sample_name', data.get('quote_identifier', 'Unknown'))
             data.setdefault('submitter_name', 'Unknown')
             data.setdefault('submitter_email', 'unknown@example.com')
             
             return SampleData(**data)
         
-        return None 
+        return None
+    
+    def _extract_sample_table(self, text: str) -> List[Dict[str, Any]]:
+        """Extract sample table data from text."""
+        samples = []
+        
+        # Look for sample table patterns
+        table_pattern = re.compile(
+            r'Sample\s*Name\s*Volume.*?(?=\n\n|\Z)', 
+            re.IGNORECASE | re.DOTALL
+        )
+        
+        table_match = table_pattern.search(text)
+        if not table_match:
+            return samples
+        
+        table_text = table_match.group(0)
+        
+        # Extract individual sample rows
+        sample_row_pattern = re.compile(
+            r'(\d+)\s+(\d+)\s+(\d+)\s+(\d+\.?\d*)\s+(\d+\.?\d*)', 
+            re.MULTILINE
+        )
+        
+        for match in sample_row_pattern.finditer(table_text):
+            sample = {
+                'sample_name': match.group(1),
+                'sample_id': match.group(2),
+                'volume': float(match.group(3)),
+                'qubit_conc': float(match.group(4)),
+                'nanodrop_conc': float(match.group(5))
+            }
+            samples.append(sample)
+        
+        return samples 

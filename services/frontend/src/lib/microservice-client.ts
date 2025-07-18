@@ -48,18 +48,28 @@ class MicroserviceClient {
 
   constructor() {
     // Get service URLs from environment variables or use defaults
+    // Use external HTTPS routes for production to avoid mixed content errors
+    const isProduction = typeof window !== 'undefined' && window.location.protocol === 'https:'
+    
     this.baseUrls = {
-      sampleManagement: process.env.SAMPLE_MANAGEMENT_URL || 'http://sample-management:3002',
+      sampleManagement: process.env.SAMPLE_MANAGEMENT_URL || 
+        (isProduction ? 'https://nanopore-api-dept-barc.apps.cloudapps.unc.edu' : 'http://python-gateway:8000'),
       submission: process.env.SUBMISSION_SERVICE_URL || 'https://submission-service-dept-barc.apps.cloudapps.unc.edu',
-      auth: process.env.AUTH_SERVICE_URL || 'http://authentication:3003',
-      fileStorage: process.env.FILE_STORAGE_URL || 'http://file-storage:3004',
-      audit: process.env.AUDIT_SERVICE_URL || 'http://audit:3005',
-      aiProcessing: process.env.AI_PROCESSING_URL || 'http://ai-processing:3006',
+      auth: process.env.AUTH_SERVICE_URL || 
+        (isProduction ? 'https://nanopore-api-dept-barc.apps.cloudapps.unc.edu' : 'http://python-gateway:8000'),
+      fileStorage: process.env.FILE_STORAGE_URL || 
+        (isProduction ? 'https://nanopore-api-dept-barc.apps.cloudapps.unc.edu' : 'http://python-gateway:8000'),
+      audit: process.env.AUDIT_SERVICE_URL || 
+        (isProduction ? 'https://nanopore-api-dept-barc.apps.cloudapps.unc.edu' : 'http://python-gateway:8000'),
+      aiProcessing: process.env.AI_PROCESSING_URL || 
+        (isProduction ? 'https://ai-service-optimized-route-dept-barc.apps.cloudapps.unc.edu' : 'http://python-gateway:8000'),
     }
   }
 
   private async request<T>(service: string, endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseUrls[service]}${endpoint}`
+    
+    console.log(`Making request to: ${url}`)
     
     const response = await fetch(url, {
       ...options,
@@ -70,6 +80,7 @@ class MicroserviceClient {
     })
 
     if (!response.ok) {
+      console.error(`Request failed: ${response.status} ${response.statusText}`)
       throw new Error(`Request failed: ${response.status} ${response.statusText}`)
     }
 
@@ -78,35 +89,72 @@ class MicroserviceClient {
 
   // Sample Management Service
   async getSamples(): Promise<NanoporeSample[]> {
-    return this.request<NanoporeSample[]>('sampleManagement', '/api/samples')
+    try {
+      const response = await this.request<any[]>('sampleManagement', '/api/v1/samples')
+      
+      // Transform API response to match NanoporeSample interface
+      return response.map(sample => {
+        // Convert numeric priority to string priority
+        let priority: 'low' | 'medium' | 'high' | 'urgent' = 'medium'
+        if (typeof sample.priority === 'number') {
+          if (sample.priority === 1) priority = 'urgent'
+          else if (sample.priority === 2) priority = 'high'
+          else if (sample.priority === 3) priority = 'medium'
+          else priority = 'low'
+        } else if (typeof sample.priority === 'string') {
+          priority = sample.priority as 'low' | 'medium' | 'high' | 'urgent'
+        }
+
+        return {
+          id: sample.id?.toString() || '',
+          sampleName: sample.name || sample.sampleName || '',
+          submitterName: sample.submitter_name || sample.submitterName || '',
+          submitterEmail: sample.submitter_email || sample.submitterEmail || '',
+          labName: sample.project_id || sample.labName || '',
+          priority,
+          status: sample.status || 'submitted',
+          concentration: sample.concentration,
+          volume: sample.volume,
+          notes: sample.notes,
+          createdAt: sample.created_at ? new Date(sample.created_at) : new Date(),
+          updatedAt: sample.updated_at ? new Date(sample.updated_at) : new Date(),
+          assignedUser: sample.assigned_user || sample.assignedUser,
+          workflowHistory: sample.workflow_history || sample.workflowHistory,
+          chart: sample.chart
+        }
+      })
+    } catch (error) {
+      console.error('Error fetching samples:', error)
+      throw error
+    }
   }
 
   async getSample(id: string): Promise<NanoporeSample> {
-    return this.request<NanoporeSample>('sampleManagement', `/api/samples/${id}`)
+    return this.request<NanoporeSample>('sampleManagement', `/api/v1/samples/${id}`)
   }
 
   async createSample(sample: Omit<NanoporeSample, 'id' | 'createdAt' | 'updatedAt'>): Promise<NanoporeSample> {
-    return this.request<NanoporeSample>('sampleManagement', '/api/samples', {
+    return this.request<NanoporeSample>('sampleManagement', '/api/v1/samples', {
       method: 'POST',
       body: JSON.stringify(sample),
     })
   }
 
   async updateSample(id: string, updates: Partial<NanoporeSample>): Promise<NanoporeSample> {
-    return this.request<NanoporeSample>('sampleManagement', `/api/samples/${id}`, {
+    return this.request<NanoporeSample>('sampleManagement', `/api/v1/samples/${id}`, {
       method: 'PUT',
       body: JSON.stringify(updates),
     })
   }
 
   async deleteSample(id: string): Promise<void> {
-    await this.request<void>('sampleManagement', `/api/samples/${id}`, {
+    await this.request<void>('sampleManagement', `/api/v1/samples/${id}`, {
       method: 'DELETE',
     })
   }
 
   async exportSamples(params: ExportParams): Promise<ExportResult> {
-    return this.request<ExportResult>('sampleManagement', '/api/samples/export', {
+    return this.request<ExportResult>('sampleManagement', '/api/v1/samples/export', {
       method: 'POST',
       body: JSON.stringify(params),
     })
@@ -114,19 +162,42 @@ class MicroserviceClient {
 
   // Submission Service
   async processPDF(file: File): Promise<ProcessingResult> {
-    const formData = new FormData()
-    formData.append('file', file)
+    try {
+      console.log('Starting PDF processing for file:', file.name)
+      const formData = new FormData()
+      formData.append('file', file)
 
-    const response = await fetch(`${this.baseUrls.submission}/api/v1/process-pdf`, {
-      method: 'POST',
-      body: formData,
-    })
+      const url = `${this.baseUrls.submission}/api/v1/process-pdf`
+      console.log('Making PDF processing request to:', url)
 
-    if (!response.ok) {
-      throw new Error(`PDF processing failed: ${response.status} ${response.statusText}`)
+      const response = await fetch(url, {
+        method: 'POST',
+        body: formData,
+      })
+
+      console.log('PDF processing response status:', response.status)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('PDF processing error response:', errorText)
+        throw new Error(`PDF processing failed: ${response.status} ${response.statusText}`)
+      }
+
+      const result = await response.json()
+      console.log('PDF processing result:', result)
+      
+      // Transform the response to match the expected ProcessingResult interface
+      const transformedResult: ProcessingResult = {
+        success: result.status === 'completed',
+        message: result.message,
+        data: result.data
+      }
+      
+      return transformedResult
+    } catch (error) {
+      console.error('PDF processing error:', error)
+      throw error
     }
-
-    return response.json()
   }
 
   async isSubmissionServiceAvailable(): Promise<boolean> {
@@ -140,20 +211,20 @@ class MicroserviceClient {
 
   // Authentication Service
   async login(credentials: { username: string; password: string }): Promise<{ token: string; user: any }> {
-    return this.request<{ token: string; user: any }>('auth', '/api/auth/login', {
+    return this.request<{ token: string; user: any }>('auth', '/api/v1/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
     })
   }
 
   async logout(): Promise<void> {
-    await this.request<void>('auth', '/api/auth/logout', {
+    await this.request<void>('auth', '/api/v1/auth/logout', {
       method: 'POST',
     })
   }
 
   async getCurrentUser(): Promise<any> {
-    return this.request<any>('auth', '/api/auth/me')
+    return this.request<any>('auth', '/api/v1/auth/session')
   }
 
   // File Storage Service
