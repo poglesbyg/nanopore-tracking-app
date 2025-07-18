@@ -1,6 +1,6 @@
 """Application configuration using Pydantic settings."""
 import os
-from typing import Optional
+from typing import Optional, List
 from pydantic_settings import BaseSettings
 from pydantic import Field, AnyUrl
 
@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     
     # File processing settings
     max_file_size: int = Field(default=100 * 1024 * 1024, env="MAX_FILE_SIZE")  # 100MB
-    allowed_file_types: list[str] = Field(
+    allowed_file_types: List[str] = Field(
         default=["application/pdf", "text/csv"],
         env="ALLOWED_FILE_TYPES"
     )
