@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
       - name: nanopore-frontend
-        image: nanopore-frontend:latest
+        image: image-registry.openshift-image-registry.svc:5000/dept-barc/nanopore-frontend:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 3000
@@ -91,7 +91,7 @@ metadata:
     app: nanopore-frontend
     service: frontend
 spec:
-  host: nanopore-frontend-final-dept-barc.apps.cloudapps.unc.edu
+  host: nanopore-frontend-microservice-dept-barc.apps.cloudapps.unc.edu
   to:
     kind: Service
     name: nanopore-frontend

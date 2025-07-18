@@ -1,0 +1,143 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${SERVICE_NAME}
+  labels:
+    app: ${SERVICE_NAME}
+    service: ${SERVICE_TYPE}
+    version: ${VERSION}
+spec:
+  replicas: ${REPLICAS}
+  selector:
+    matchLabels:
+      app: ${SERVICE_NAME}
+  template:
+    metadata:
+      labels:
+        app: ${SERVICE_NAME}
+        service: ${SERVICE_TYPE}
+        version: ${VERSION}
+    spec:
+      containers:
+      - name: ${SERVICE_NAME}
+        image: ${IMAGE}
+        ports:
+        - containerPort: ${PORT}
+          name: http
+          protocol: TCP
+        env:
+        # Standard CORS Configuration (from ConfigMap)
+        - name: CORS_ORIGINS
+          valueFrom:
+            configMapKeyRef:
+              name: cors-config
+              key: CORS_ORIGINS
+        - name: CORS_METHODS
+          valueFrom:
+            configMapKeyRef:
+              name: cors-config
+              key: CORS_METHODS
+        - name: CORS_HEADERS
+          valueFrom:
+            configMapKeyRef:
+              name: cors-config
+              key: CORS_HEADERS
+        - name: CORS_CREDENTIALS
+          valueFrom:
+            configMapKeyRef:
+              name: cors-config
+              key: CORS_CREDENTIALS
+        - name: CORS_MAX_AGE
+          valueFrom:
+            configMapKeyRef:
+              name: cors-config
+              key: CORS_MAX_AGE
+        # Service-specific environment variables
+        - name: PORT
+          value: "${PORT}"
+        - name: HOST
+          value: "0.0.0.0"
+        - name: ENVIRONMENT
+          value: "${ENVIRONMENT}"
+        # Additional environment variables can be added here
+        ${ADDITIONAL_ENV_VARS}
+        resources:
+          requests:
+            memory: "${MEMORY_REQUEST}"
+            cpu: "${CPU_REQUEST}"
+          limits:
+            memory: "${MEMORY_LIMIT}"
+            cpu: "${CPU_LIMIT}"
+        livenessProbe:
+          httpGet:
+            path: ${HEALTH_PATH}
+            port: ${PORT}
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: ${HEALTH_PATH}
+            port: ${PORT}
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        imagePullPolicy: Always
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${SERVICE_NAME}
+  labels:
+    app: ${SERVICE_NAME}
+    service: ${SERVICE_TYPE}
+spec:
+  selector:
+    app: ${SERVICE_NAME}
+  ports:
+  - port: ${PORT}
+    targetPort: ${PORT}
+    protocol: TCP
+    name: http
+  type: ClusterIP
+
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: ${SERVICE_NAME}
+  labels:
+    app: ${SERVICE_NAME}
+    service: ${SERVICE_TYPE}
+spec:
+  to:
+    kind: Service
+    name: ${SERVICE_NAME}
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+
+---
+# Default values for template substitution:
+# SERVICE_NAME: Name of the service (e.g., "sample-management")
+# SERVICE_TYPE: Type of service (e.g., "api", "processing", "storage")
+# VERSION: Version tag (e.g., "v1.0.0")
+# REPLICAS: Number of replicas (e.g., "1")
+# IMAGE: Container image (e.g., "registry/namespace/service:tag")
+# PORT: Service port (e.g., "8000")
+# ENVIRONMENT: Environment name (e.g., "production", "development")
+# MEMORY_REQUEST: Memory request (e.g., "256Mi")
+# MEMORY_LIMIT: Memory limit (e.g., "512Mi")
+# CPU_REQUEST: CPU request (e.g., "100m")
+# CPU_LIMIT: CPU limit (e.g., "500m")
+# HEALTH_PATH: Health check path (e.g., "/health", "/api/v1/health")
+# ADDITIONAL_ENV_VARS: Additional environment variables in YAML format 

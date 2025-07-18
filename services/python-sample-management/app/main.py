@@ -318,13 +318,27 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# CORS Configuration
+def get_cors_origins():
+    origins = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:3001")
+    return [origin.strip() for origin in origins.split(",")]
+
+def get_cors_methods():
+    methods = os.getenv("CORS_METHODS", "GET,POST,PUT,DELETE,OPTIONS,PATCH")
+    return [method.strip() for method in methods.split(",")]
+
+def get_cors_headers():
+    headers = os.getenv("CORS_HEADERS", "Content-Type,Authorization,X-Requested-With,Accept,Origin")
+    return [header.strip() for header in headers.split(",")]
+
 # Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=get_cors_origins(),
+    allow_credentials=os.getenv("CORS_CREDENTIALS", "true").lower() == "true",
+    allow_methods=get_cors_methods(),
+    allow_headers=get_cors_headers(),
+    max_age=int(os.getenv("CORS_MAX_AGE", "86400")),
 )
 
 # User dependency (from gateway headers)

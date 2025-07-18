@@ -19,8 +19,8 @@ class Settings(BaseSettings):
     
     # File processing settings
     max_file_size: int = Field(default=100 * 1024 * 1024, env="MAX_FILE_SIZE")  # 100MB
-    allowed_file_types: List[str] = Field(
-        default=["application/pdf", "text/csv"],
+    allowed_file_types: str = Field(
+        default="application/pdf,text/csv",
         env="ALLOWED_FILE_TYPES"
     )
     
@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     def cors_origins_list(self) -> list[str]:
         """Parse CORS origins from environment variable or use defaults."""
         return [origin.strip() for origin in self.cors_origins.split(",")]
+    
+    @property
+    def allowed_file_types_list(self) -> list[str]:
+        """Parse allowed file types from environment variable or use defaults."""
+        return [file_type.strip() for file_type in self.allowed_file_types.split(",")]
     
     # Logging settings
     log_level: str = Field(default="INFO", env="LOG_LEVEL")
