@@ -41,4 +41,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import requests; requests.get('http://localhost:8000/health')" || exit 1
 
 # Activate virtual environment and run the application
-CMD ["/bin/bash", "-c", "source .venv/bin/activate && python app.py"] 
+CMD ["/bin/bash", "-c", "/app/.venv/bin/python -m app.main"] 
