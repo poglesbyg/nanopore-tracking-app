@@ -6,7 +6,7 @@ Core sample operations, status management, and workflow tracking
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, selectinload
 from sqlalchemy import String, DateTime, Integer, Float, Boolean, Text, select, update, delete
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List, Dict, Any
@@ -17,6 +17,14 @@ import logging
 import asyncio
 from contextlib import asynccontextmanager
 import uvicorn
+
+# Import the new models
+from models import (
+    Base, NanoporeSubmission, NanoporeSample, NanoporeProcessingStep,
+    NanoporeSampleDetail, NanoporeAttachment,
+    SubmissionStatus, SampleStatus, QCStatus, Priority, SampleType,
+    SequencingPlatform, DataDeliveryMethod
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

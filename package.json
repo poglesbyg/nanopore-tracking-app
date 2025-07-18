@@ -46,6 +46,7 @@
     "@trpc/react-query": "^11.1.2",
     "@trpc/server": "^11.1.2",
     "@types/nodemailer": "^6.4.17",
+    "@types/uuid": "^10.0.0",
     "better-auth": "^1.2.8",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -67,6 +68,7 @@
     "superjson": "^2.2.2",
     "tailwind-merge": "^3.2.0",
     "type-fest": "^4.41.0",
+    "uuid": "^11.1.0",
     "zod": "^3.24.3"
   },
   "devDependencies": {
