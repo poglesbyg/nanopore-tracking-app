@@ -157,10 +157,10 @@ log_with_timestamp "🚀 Starting monitoring loop..."
 start_time=$(date +%s)
 end_time=$((start_time + DURATION))
 
-# Service definitions
-declare -A SERVICES=(
-    ["submission-service"]="172.30.47.35:8000:/api/v1/health"
-    ["ai-service-optimized"]="unknown:8001:/health"
+# Service definitions (compatible with older bash versions)
+SERVICES=(
+    "submission-service|172.30.47.35:8000|/api/v1/health"
+    "ai-service-optimized|unknown:8001|/health"
 )
 
 iteration=0
@@ -174,8 +174,9 @@ while [[ $(date +%s) -lt $end_time ]]; do
     check_pod_status "ai-service-optimized"
     
     # Test DNS resolution and connectivity for each service
-    for service_name in "${!SERVICES[@]}"; do
-        IFS=':' read -r service_ip service_port service_path <<< "${SERVICES[$service_name]}"
+    for service_entry in "${SERVICES[@]}"; do
+        IFS='|' read -r service_name service_endpoint service_path <<< "$service_entry"
+        IFS=':' read -r service_ip service_port <<< "$service_endpoint"
         
         log_with_timestamp "🔍 Testing $service_name..."
         

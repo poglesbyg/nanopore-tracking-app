@@ -1,11 +1,6 @@
 -- Authentication Database Schema
 -- Python microservices migration
-
--- Create database if not exists
-CREATE DATABASE IF NOT EXISTS auth_db;
-
--- Use the database
-\c auth_db;
+-- Note: Database is created by Docker Compose environment variables
 
 -- Create users table
 CREATE TABLE IF NOT EXISTS users (

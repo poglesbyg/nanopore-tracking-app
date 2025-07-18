@@ -184,7 +184,7 @@ services:
       - ENVIRONMENT=production
       - PORT=8006
       - LOG_LEVEL=info
-      - CORS_ORIGINS=http://localhost:8000,http://localhost:3007
+      - CORS_ORIGINS=http://localhost:8000,http://localhost:3001,http://localhost:3007
       - MAX_UPLOAD_SIZE=100MB
       - CHUNK_SIZE=100
       - MEMORY_LIMIT=100MB
