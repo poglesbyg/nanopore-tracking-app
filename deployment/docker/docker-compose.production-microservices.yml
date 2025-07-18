@@ -1,0 +1,427 @@
+version: '3.8'
+
+services:
+  # API Gateway - Central entry point
+  api-gateway:
+    build:
+      context: ../../services/api-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - LOG_LEVEL=info
+      - CORS_ORIGIN=http://localhost:3007
+      - JWT_SECRET=${JWT_SECRET:-your-jwt-secret-key}
+      - SAMPLE_SERVICE_URL=http://sample-management:3002
+      - AI_SERVICE_URL=http://ai-processing:3003
+      - AUTH_SERVICE_URL=http://authentication:3004
+      - FILE_SERVICE_URL=http://file-storage:3005
+      - AUDIT_SERVICE_URL=http://audit:3006
+      - SUBMISSION_SERVICE_URL=http://submission-service:8000
+    depends_on:
+      - sample-management
+      - ai-processing
+      - authentication
+      - file-storage
+      - audit
+      - submission-service
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Sample Management Service - Core sample operations
+  sample-management:
+    build:
+      context: ../../services/sample-management
+      dockerfile: Dockerfile
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=production
+      - PORT=3002
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-password}@sample-db:5432/sample_db
+      - JWT_SECRET=${JWT_SECRET:-your-jwt-secret-key}
+      - LOG_LEVEL=info
+      - SERVICE_NAME=sample-management
+      - SERVICE_VERSION=1.0.0
+    depends_on:
+      - sample-db
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    volumes:
+      - sample-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # AI Processing Service - LLM and PDF processing
+  ai-processing:
+    build:
+      context: ../../services/ai-processing
+      dockerfile: Dockerfile
+    ports:
+      - "3003:3003"
+    environment:
+      - NODE_ENV=production
+      - PORT=3003
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-password}@ai-db:5432/ai_db
+      - OLLAMA_HOST=http://ollama:11434
+      - VECTOR_DB_URL=http://vector-db:6333
+      - JWT_SECRET=${JWT_SECRET:-your-jwt-secret-key}
+      - LOG_LEVEL=info
+      - SERVICE_NAME=ai-processing
+      - SERVICE_VERSION=1.0.0
+    depends_on:
+      - ai-db
+      - ollama
+      - vector-db
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    volumes:
+      - ai-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Authentication Service - User management and JWT
+  authentication:
+    build:
+      context: ../../services/authentication
+      dockerfile: Dockerfile
+    ports:
+      - "3004:3004"
+    environment:
+      - NODE_ENV=production
+      - PORT=3004
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-password}@auth-db:5432/auth_db
+      - JWT_SECRET=${JWT_SECRET:-your-jwt-secret-key}
+      - JWT_EXPIRES_IN=24h
+      - LOG_LEVEL=info
+      - SERVICE_NAME=authentication
+      - SERVICE_VERSION=1.0.0
+      - CORS_ORIGIN=http://localhost:3001
+    depends_on:
+      - auth-db
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # File Storage Service - File upload and management
+  file-storage:
+    build:
+      context: ../../services/file-storage
+      dockerfile: Dockerfile
+    ports:
+      - "3005:3005"
+    environment:
+      - NODE_ENV=production
+      - PORT=3005
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-password}@file-db:5432/file_db
+      - JWT_SECRET=${JWT_SECRET:-your-jwt-secret-key}
+      - STORAGE_PATH=/app/uploads
+      - MAX_FILE_SIZE=50MB
+      - LOG_LEVEL=info
+      - SERVICE_NAME=file-storage
+      - SERVICE_VERSION=1.0.0
+    depends_on:
+      - file-db
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    volumes:
+      - file-uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3005/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Audit Service - Activity logging and compliance
+  audit:
+    build:
+      context: ../../services/audit
+      dockerfile: Dockerfile
+    ports:
+      - "3006:3006"
+    environment:
+      - NODE_ENV=production
+      - PORT=3006
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-password}@audit-db:5432/audit_db
+      - JWT_SECRET=${JWT_SECRET:-your-jwt-secret-key}
+      - LOG_LEVEL=info
+      - SERVICE_NAME=audit
+      - SERVICE_VERSION=1.0.0
+    depends_on:
+      - audit-db
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    volumes:
+      - audit-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3006/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Submission Service - PRODUCTION READY Python service
+  submission-service:
+    build:
+      context: ../../services/submission-service
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - PORT=8000
+      - LOG_LEVEL=info
+      - CORS_ORIGINS=http://localhost:3001,http://localhost:3007
+      - MAX_UPLOAD_SIZE=50MB
+      - CHUNK_SIZE=100
+      - MEMORY_LIMIT=100MB
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    volumes:
+      - submission-uploads:/app/uploads
+      - submission-temp:/app/temp
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend Service - Astro + React UI
+  frontend:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    ports:
+      - "3007:3007"
+    environment:
+      - NODE_ENV=production
+      - PORT=3007
+      - API_GATEWAY_URL=http://api-gateway:3001
+      - BASE_URL=http://localhost:3007
+    depends_on:
+      - api-gateway
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3007/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Database Services
+  sample-db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=sample_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
+    volumes:
+      - sample-db-data:/var/lib/postgresql/data
+      - ../../database/service-migrations/sample-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ai-db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=ai_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
+    volumes:
+      - ai-db-data:/var/lib/postgresql/data
+      - ../../database/service-migrations/001_create_ai_database.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  auth-db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=auth_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
+    volumes:
+      - auth-db-data:/var/lib/postgresql/data
+      - ../../services/authentication/src/database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  file-db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=file_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
+    volumes:
+      - file-db-data:/var/lib/postgresql/data
+      - ../../services/file-storage/src/database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  audit-db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=audit_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
+    volumes:
+      - audit-db-data:/var/lib/postgresql/data
+      - ../../database/service-migrations/002_create_audit_database.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Supporting Services
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  vector-db:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+    volumes:
+      - vector-db-data:/qdrant/storage
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Monitoring Services
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - grafana-data:/var/lib/grafana
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  nanopore-network:
+    driver: bridge
+
+volumes:
+  # Service data
+  sample-data:
+  ai-data:
+  file-uploads:
+  audit-logs:
+  submission-uploads:
+  submission-temp:
+  
+  # Database data
+  sample-db-data:
+  ai-db-data:
+  auth-db-data:
+  file-db-data:
+  audit-db-data:
+  
+  # Supporting services data
+  ollama-data:
+  vector-db-data:
+  prometheus-data:
+  grafana-data:
+  redis-data: 

@@ -1,0 +1,432 @@
+version: '3.8'
+
+services:
+  # Python API Gateway - Central entry point
+  python-gateway:
+    build:
+      context: ../../services/python-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - PORT=8000
+      - LOG_LEVEL=info
+      - CORS_ORIGINS=http://localhost:3007,http://localhost:8000
+      - JWT_SECRET=${JWT_SECRET:-your-jwt-secret-key}
+      - SAMPLE_SERVICE_URL=http://sample-management:8001
+      - AI_SERVICE_URL=http://ai-processing:8002
+      - AUTH_SERVICE_URL=http://authentication:8003
+      - FILE_SERVICE_URL=http://file-storage:8004
+      - AUDIT_SERVICE_URL=http://audit:8005
+      - SUBMISSION_SERVICE_URL=http://submission:8006
+    depends_on:
+      - sample-management
+      - ai-processing
+      - authentication
+      - file-storage
+      - audit
+      - submission
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Sample Management Service - Python FastAPI
+  sample-management:
+    build:
+      context: ../../services/python-sample-management
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - ENVIRONMENT=production
+      - PORT=8001
+      - DATABASE_URL=postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-password}@sample-db:5432/sample_db
+      - LOG_LEVEL=info
+    depends_on:
+      - sample-db
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    volumes:
+      - sample-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # AI Processing Service - Python FastAPI
+  ai-processing:
+    build:
+      context: ../../services/python-ai-processing
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      - ENVIRONMENT=production
+      - PORT=8002
+      - DATABASE_URL=postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-password}@ai-db:5432/ai_db
+      - OLLAMA_HOST=http://ollama:11434
+      - VECTOR_DB_URL=http://vector-db:6333
+      - LOG_LEVEL=info
+      - MAX_WORKERS=4
+      - CHUNK_SIZE=1000
+    depends_on:
+      - ai-db
+      - ollama
+      - vector-db
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    volumes:
+      - ai-data:/app/data
+      - ai-temp:/app/temp
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Authentication Service - Python FastAPI
+  authentication:
+    build:
+      context: ../../services/python-authentication
+      dockerfile: Dockerfile
+    ports:
+      - "8003:8003"
+    environment:
+      - ENVIRONMENT=production
+      - PORT=8003
+      - DATABASE_URL=postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-password}@auth-db:5432/auth_db
+      - JWT_SECRET=${JWT_SECRET:-your-jwt-secret-key}
+      - JWT_EXPIRES_IN=24h
+      - PASSWORD_HASH_ROUNDS=12
+      - LOG_LEVEL=info
+    depends_on:
+      - auth-db
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # File Storage Service - Python FastAPI
+  file-storage:
+    build:
+      context: ../../services/python-file-storage
+      dockerfile: Dockerfile
+    ports:
+      - "8004:8004"
+    environment:
+      - ENVIRONMENT=production
+      - PORT=8004
+      - DATABASE_URL=postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-password}@file-db:5432/file_db
+      - STORAGE_PATH=/app/uploads
+      - MAX_FILE_SIZE=100MB
+      - ALLOWED_EXTENSIONS=pdf,csv,txt,xlsx,docx
+      - LOG_LEVEL=info
+    depends_on:
+      - file-db
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    volumes:
+      - file-uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Audit Service - Python FastAPI
+  audit:
+    build:
+      context: ../../services/python-audit
+      dockerfile: Dockerfile
+    ports:
+      - "8005:8005"
+    environment:
+      - ENVIRONMENT=production
+      - PORT=8005
+      - DATABASE_URL=postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-password}@audit-db:5432/audit_db
+      - RETENTION_DAYS=365
+      - LOG_LEVEL=info
+    depends_on:
+      - audit-db
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    volumes:
+      - audit-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8005/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Submission Service - EXISTING PYTHON SERVICE (Enhanced)
+  submission:
+    build:
+      context: ../../services/submission-service
+      dockerfile: Dockerfile
+    ports:
+      - "8006:8006"
+    environment:
+      - ENVIRONMENT=production
+      - PORT=8006
+      - LOG_LEVEL=info
+      - CORS_ORIGINS=http://localhost:8000,http://localhost:3007
+      - MAX_UPLOAD_SIZE=100MB
+      - CHUNK_SIZE=100
+      - MEMORY_LIMIT=100MB
+      - ENABLE_METRICS=true
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    volumes:
+      - submission-uploads:/app/uploads
+      - submission-temp:/app/temp
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8006/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend Service - Astro + React (communicates with Python Gateway)
+  frontend:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "3007:3007"
+    environment:
+      - NODE_ENV=production
+      - PORT=3007
+      - API_BASE_URL=http://python-gateway:8000
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - python-gateway
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3007/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Database Services
+  sample-db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=sample_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
+    volumes:
+      - sample-db-data:/var/lib/postgresql/data
+      - ../../database/python-migrations/sample-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ai-db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=ai_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
+    volumes:
+      - ai-db-data:/var/lib/postgresql/data
+      - ../../database/python-migrations/ai-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  auth-db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=auth_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
+    volumes:
+      - auth-db-data:/var/lib/postgresql/data
+      - ../../database/python-migrations/auth-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  file-db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=file_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
+    volumes:
+      - file-db-data:/var/lib/postgresql/data
+      - ../../database/python-migrations/file-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  audit-db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=audit_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
+    volumes:
+      - audit-db-data:/var/lib/postgresql/data
+      - ../../database/python-migrations/audit-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Supporting Services
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  vector-db:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+    volumes:
+      - vector-db-data:/qdrant/storage
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Monitoring Services
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus-python.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana-python-dashboards:/etc/grafana/provisioning/dashboards
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Python-specific monitoring
+  python-exporter:
+    image: prom/python-client:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - PYTHONPATH=/app
+    networks:
+      - nanopore-network
+    restart: unless-stopped
+
+networks:
+  nanopore-network:
+    driver: bridge
+
+volumes:
+  # Service data
+  sample-data:
+  ai-data:
+  ai-temp:
+  file-uploads:
+  audit-logs:
+  submission-uploads:
+  submission-temp:
+  
+  # Database data
+  sample-db-data:
+  ai-db-data:
+  auth-db-data:
+  file-db-data:
+  audit-db-data:
+  
+  # Supporting services data
+  ollama-data:
+  vector-db-data:
+  prometheus-data:
+  grafana-data:
+  redis-data: 
