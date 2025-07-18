@@ -219,4 +219,35 @@ export const nanoporeRouter = router({
         handleTRPCProcedureError(error as Error, extractRequestContext(ctx))
       }
     }),
+
+  // Export samples to CSV or JSON
+  export: publicProcedure
+    .input(z.object({
+      startDate: z.string().transform(str => new Date(str)),
+      endDate: z.string().transform(str => new Date(str)),
+      format: z.enum(['csv', 'json']),
+      includeAllUsers: z.boolean().optional().default(false)
+    }))
+    .query(async ({ input, ctx }) => {
+      try {
+        // Import the export function
+        const { exportNanoporeSamples } = await import('./nanopore/export')
+        const { db } = await import('../database')
+        
+        const result = await exportNanoporeSamples(
+          db,
+          {
+            startDate: input.startDate,
+            endDate: input.endDate,
+            format: input.format,
+            includeAllUsers: input.includeAllUsers
+          },
+          ctx.userId || undefined
+        )
+        
+        return result
+      } catch (error) {
+        handleTRPCProcedureError(error as Error, extractRequestContext(ctx))
+      }
+    }),
 })

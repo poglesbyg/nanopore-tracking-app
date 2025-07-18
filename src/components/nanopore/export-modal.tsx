@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Calendar, Download, FileText, Database } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
-import { apiClient } from '@/lib/api-client'
+import { trpc } from '@/client/trpc'
 import { Button } from '../ui/button'
 import {
   Dialog,
@@ -42,15 +42,18 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
     setIsExporting(true)
 
     try {
-      const result = await apiClient.exportSamples({
-        startDate: start,
-        endDate: end,
+      // Use tRPC to export samples
+      const result = await trpc.nanopore.export.query({
+        startDate: startDate,
+        endDate: endDate,
         format: exportFormat,
         includeAllUsers,
       })
 
       // Create and download the file
-      const blob = new Blob([result.data], { type: result.mimeType })
+      const blob = new Blob([result.data], { 
+        type: result.contentType 
+      })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
