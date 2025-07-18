@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     # API settings
     api_prefix: str = Field(default="/api/v1", env="API_PREFIX")
     cors_origins: str = Field(
-        default="http://localhost:3000,http://localhost:3001",
+        default="http://localhost:3000,http://localhost:3001,https://nanopore-frontend-final-dept-barc.apps.cloudapps.unc.edu,https://nanopore-tracking-route-dept-barc.apps.cloudapps.unc.edu",
         env="CORS_ORIGINS"
     )
     

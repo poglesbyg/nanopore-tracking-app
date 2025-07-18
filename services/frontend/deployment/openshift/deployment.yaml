@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nanopore-frontend
+  labels:
+    app: nanopore-frontend
+    service: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nanopore-frontend
+  template:
+    metadata:
+      labels:
+        app: nanopore-frontend
+        service: frontend
+    spec:
+      containers:
+      - name: nanopore-frontend
+        image: nanopore-frontend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+          name: http
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "3000"
+        - name: HOST
+          value: "0.0.0.0"
+        - name: SAMPLE_MANAGEMENT_URL
+          value: "http://sample-management:3002"
+        - name: SUBMISSION_SERVICE_URL
+          value: "https://submission-service-dept-barc.apps.cloudapps.unc.edu"
+        - name: AUTH_SERVICE_URL
+          value: "http://authentication:3003"
+        - name: FILE_STORAGE_URL
+          value: "http://file-storage:3004"
+        - name: AUDIT_SERVICE_URL
+          value: "http://audit:3005"
+        - name: AI_PROCESSING_URL
+          value: "http://ai-processing:3006"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nanopore-frontend
+  labels:
+    app: nanopore-frontend
+    service: frontend
+spec:
+  selector:
+    app: nanopore-frontend
+  ports:
+  - name: http
+    port: 3000
+    targetPort: 3000
+  type: ClusterIP
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: nanopore-frontend-route
+  labels:
+    app: nanopore-frontend
+    service: frontend
+spec:
+  host: nanopore-frontend-final-dept-barc.apps.cloudapps.unc.edu
+  to:
+    kind: Service
+    name: nanopore-frontend
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect 

@@ -32,6 +32,8 @@ spec:
           value: "8000"
         - name: HOST
           value: "0.0.0.0"
+        - name: CORS_ORIGINS
+          value: "https://nanopore-frontend-final-dept-barc.apps.cloudapps.unc.edu,https://nanopore-tracking-route-dept-barc.apps.cloudapps.unc.edu"
         - name: PYTHONUNBUFFERED
           value: "1"
         - name: PYTHONDONTWRITEBYTECODE

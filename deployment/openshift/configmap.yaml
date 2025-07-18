@@ -9,3 +9,4 @@ data:
   submission-service-url: "http://submission-service:8000"
   app-name: "Nanopore Tracking App"
   log-level: "info"
+  cors-origins: "https://nanopore-frontend-final-dept-barc.apps.cloudapps.unc.edu,https://nanopore-tracking-route-dept-barc.apps.cloudapps.unc.edu"
