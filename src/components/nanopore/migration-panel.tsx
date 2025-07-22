@@ -620,7 +620,9 @@ export function MigrationPanel({ adminSession }: MigrationPanelProps) {
                     <div>
                       <div className="text-sm text-gray-600">Direction</div>
                       <Badge variant={migrationData.plan?.direction === 'up' ? 'default' : 'destructive'}>
-                        {migrationData.plan?.direction?.toUpperCase() || 'UNKNOWN'}
+                        {(typeof migrationData.plan?.direction === 'string' && migrationData.plan.direction) 
+                          ? migrationData.plan.direction.toUpperCase() 
+                          : 'UNKNOWN'}
                       </Badge>
                     </div>
                     <div>

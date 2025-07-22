@@ -324,7 +324,7 @@ export function ShutdownPanel({ adminSession }: ShutdownPanelProps) {
           <div>
             <div className="text-sm text-gray-600">Current Status</div>
             <Badge className={`${getStatusColor(shutdownData.status.currentPhase)} text-white`}>
-              {shutdownData.status.currentPhase.toUpperCase()}
+              {shutdownData.status.currentPhase?.toUpperCase() || 'UNKNOWN'}
             </Badge>
           </div>
           <div>
@@ -392,7 +392,7 @@ export function ShutdownPanel({ adminSession }: ShutdownPanelProps) {
                     P{hook.priority}
                   </Badge>
                   <Badge variant={hook.status === 'failed' ? 'destructive' : 'secondary'}>
-                    {hook.status.toUpperCase()}
+                    {hook.status?.toUpperCase() || 'UNKNOWN'}
                   </Badge>
                 </div>
               </div>
