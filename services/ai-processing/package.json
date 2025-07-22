@@ -41,7 +41,7 @@
     "pdf-parse": "^1.1.1",
     "pg": "^8.11.3",
     "prom-client": "^15.1.0",
-    "qdrant": "^1.7.0",
+    "@qdrant/qdrant-js": "^1.15.0",
     "winston": "^3.11.0",
     "zod": "^3.22.4"
   },
