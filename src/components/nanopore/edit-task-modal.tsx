@@ -2,7 +2,8 @@ import {
   Edit, 
   Calendar, 
   Save,
-  X
+  X,
+  Trash2
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
@@ -50,6 +51,7 @@ interface EditTaskModalProps {
   isOpen: boolean
   onClose: () => void
   onSave: (id: string, updateData: Partial<NanoporeSample>) => void
+  onDelete?: (id: string) => void
   sample: NanoporeSample | null
   isLoading?: boolean
 }
@@ -58,6 +60,7 @@ export function EditTaskModal({
   isOpen,
   onClose,
   onSave,
+  onDelete,
   sample,
   isLoading = false,
 }: EditTaskModalProps) {
@@ -162,6 +165,15 @@ export function EditTaskModal({
 
   const handleCancel = () => {
     onClose()
+  }
+
+  const handleDelete = () => {
+    if (!sample || !onDelete) return
+
+    if (window.confirm(`Are you sure you want to delete sample "${sample.sampleName}"? This action cannot be undone.`)) {
+      onDelete(sample.id)
+      onClose()
+    }
   }
 
   if (!sample) {
@@ -416,6 +428,17 @@ export function EditTaskModal({
               <X className="h-4 w-4 mr-2" />
               Cancel
             </Button>
+            {onDelete && (
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={isLoading}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Sample
+              </Button>
+            )}
           </div>
         </form>
       </DialogContent>

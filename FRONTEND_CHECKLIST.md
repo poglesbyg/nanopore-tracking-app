@@ -80,8 +80,8 @@ This checklist covers all interactive elements in the frontend and their connect
 
 ### CSV Upload Modal
 - [✓] File selection/drop area - Working (uses react-dropzone)
-- [?] Preview data button - Need to verify
-- [?] Validate data button - Need to verify
+- [✓] Preview data button - Working (shown as "View Results" button after upload)
+- [✓] Validate data button - Working (automatic validation during processing)
 - [✓] Import button - Connected to `/api/submission/process-csv`
 - [✓] Cancel button - Working (closes modal)
 
@@ -97,27 +97,27 @@ This checklist covers all interactive elements in the frontend and their connect
 
 ### Audit Panel
 - [✓] Refresh audit logs button - Connected to `/api/audit?action=logs`
-- [?] Filter by action type - Need to verify implementation
-- [?] Filter by user - Need to verify implementation
-- [?] Export audit logs button - Need to verify implementation
+- [✓] Filter by action type - Working (filter buttons for categories)
+- [❌] Filter by user - Not implemented
+- [❌] Export audit logs button - Not implemented
 
 ### Config Panel
-- [?] Save configuration button - Need to verify `/api/config` connection
-- [?] Reset to defaults button - Need to verify
-- [?] Import config button - Need to verify
-- [?] Export config button - Need to verify
+- [⚠️] Save configuration button - Partial (UI exists but API mismatch - uses 'update' action instead of 'set_override')
+- [❌] Reset to defaults button - Not implemented
+- [❌] Import config button - Not implemented  
+- [❌] Export config button - Not implemented
 
 ### Shutdown Panel
-- [?] Graceful shutdown button - Need to verify `/api/shutdown` connection
-- [?] Force shutdown button - Need to verify
-- [?] Cancel shutdown button - Need to verify
-- [?] View shutdown status - Need to verify
+- [✓] Graceful shutdown button - Connected to `/api/shutdown` with action: 'graceful_shutdown'
+- [❌] Force shutdown button - Not implemented
+- [❌] Cancel shutdown button - Not implemented
+- [✓] View shutdown status - Working (shows status, progress, hooks)
 
 ### Migration Panel
-- [?] Run migration button - Need to verify `/api/migration` connection
-- [?] Rollback migration button - Need to verify
-- [?] View migration history - Need to verify
-- [?] Test migration button - Need to verify
+- [✓] Run migration button - Connected to `/api/migration` with action: 'execute_plan'
+- [✓] Rollback migration button - Connected to `/api/migration` with action: 'rollback'
+- [✓] View migration history - Working (history tab shows migration history)
+- [✓] Test migration button - Working (Dry Run button executes with dryRun: true)
 
 ## Workflow Components
 
@@ -126,7 +126,7 @@ This checklist covers all interactive elements in the frontend and their connect
 - [✓] Complete step button - Connected to `trpc.nanopore.completeProcessingStep`
 - [✓] Edit step button - Connected to `trpc.nanopore.updateProcessingStep`
 - [✓] Expand/collapse step details - Working (state management)
-- [?] Add notes button - Need to verify
+- [✓] Add notes button - Working (via Edit step modal with notes textarea)
 - [✓] Save step changes - Connected to update mutation
 
 ## API Endpoints Status
@@ -150,19 +150,18 @@ This checklist covers all interactive elements in the frontend and their connect
 - [✓] /api/submission/process-csv - Implemented, forwards to Python service
 - [✓] /api/memory-optimize - Implemented, connected to memory panel
 - [✓] /api/audit - Implemented with authentication
-- [?] /api/config - Need to test connection
-- [?] /api/shutdown - Need to test connection
-- [?] /api/migration - Need to test connection
-- [?] /api/backup - Need to test connection
+- [✓] /api/config - Implemented (GET/POST actions)
+- [✓] /api/shutdown - Implemented (graceful shutdown)
+- [✓] /api/migration - Implemented (plan/execute/rollback)
+- [❌] /api/backup - Not found (but /api/backup-recovery exists)
 
 ## Testing Status
 - Total Buttons: ~80+
-- Verified in Code: 53
-- Working: 52
-- Fixed: 1 (Export functionality)
-- Not Applicable: 3 (View modal buttons)
-- Need Testing: 24
-- Issues Found and Fixed: 1
+- Verified in Code: 77
+- Working: 65
+- Partially Working: 1
+- Not Implemented: 11
+- Not Applicable: 3
 
 ## Key Accomplishments
 
@@ -208,4 +207,30 @@ This checklist covers all interactive elements in the frontend and their connect
 - **Export Feature**: ✅ Fixed and Working
 - **File Processing**: ✅ Connected to Microservices
 - **Admin Features**: ⚠️ Need Runtime Testing
-- **Overall Health**: 🟢 Good - 65% Verified Working
+- **Overall Health**: 🟢 Good - 81% Verified Working
+
+## Updated Summary by Component
+
+### ✅ Fully Working Components:
+1. **Main Dashboard** - All core CRUD operations working
+2. **Sample Management** - Create, update, delete, assign, status updates
+3. **File Upload** - PDF and CSV upload with validation
+4. **Export Modal** - Fixed and working with date range filtering
+5. **Workflow Steps** - All step management including notes
+6. **Migration Panel** - Full migration lifecycle support
+
+### ⚠️ Partially Working:
+1. **Config Panel** - UI exists but API action mismatch
+
+### ❌ Not Implemented Features:
+1. **Config Panel**: Reset, Import, Export functionality
+2. **Shutdown Panel**: Force shutdown, Cancel shutdown
+3. **Audit Panel**: Filter by user, Export logs
+4. **General**: Delete in Edit Modal, Export in View Modal
+
+### 📝 Next Steps:
+1. Fix Config Panel API action mismatch
+2. Add missing export/import functionality to admin panels
+3. Implement user filtering in Audit Panel
+4. Add force/cancel options to Shutdown Panel
+5. Test all admin features with proper authentication

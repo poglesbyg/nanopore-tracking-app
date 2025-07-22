@@ -11,10 +11,12 @@ import {
   Play,
   Pause,
   Archive,
-  Flag
+  Flag,
+  Download
 } from 'lucide-react'
 
 import { Badge } from '../ui/badge'
+import { Button } from '../ui/button'
 import {
   Dialog,
   DialogContent,
@@ -24,6 +26,7 @@ import {
 } from '../ui/dialog'
 import WorkflowSteps from './workflow-steps'
 import { trpc } from '@/client/trpc'
+import { toast } from 'sonner'
 
 // Helper function to safely format dates
 const formatDate = (date: Date | string | null | undefined): string => {
@@ -165,6 +168,87 @@ export function ViewTaskModal({
 
   const handleStepComplete = async (stepId: string, notes?: string, resultsData?: any) => {
     await completeStepMutation.mutateAsync({ stepId, notes, resultsData })
+  }
+
+  // Export sample data
+  const exportSampleData = (format: 'json' | 'csv') => {
+    if (!sample) return
+
+    try {
+      let content: string
+      let filename: string
+      let mimeType: string
+
+      if (format === 'json') {
+        content = JSON.stringify({
+          sample: {
+            id: sample.id,
+            sampleName: sample.sampleName,
+            projectId: sample.projectId,
+            submitterName: sample.submitterName,
+            submitterEmail: sample.submitterEmail,
+            labName: sample.labName,
+            sampleType: sample.sampleType,
+            status: sample.status,
+            priority: sample.priority,
+            assignedTo: sample.assignedTo,
+            libraryPrepBy: sample.libraryPrepBy,
+            submittedAt: sample.submittedAt,
+            createdAt: sample.createdAt,
+            updatedAt: sample.updatedAt,
+            createdBy: sample.createdBy
+          },
+          processingSteps: processingSteps,
+          exportedAt: new Date().toISOString()
+        }, null, 2)
+        filename = `sample-${sample.sampleName}-${new Date().toISOString().split('T')[0]}.json`
+        mimeType = 'application/json'
+      } else {
+        // CSV format
+        const csvHeader = 'Field,Value\n'
+        const csvRows = [
+          ['Sample ID', sample.id],
+          ['Sample Name', sample.sampleName],
+          ['Project ID', sample.projectId || ''],
+          ['Submitter Name', sample.submitterName],
+          ['Submitter Email', sample.submitterEmail],
+          ['Lab Name', sample.labName || ''],
+          ['Sample Type', sample.sampleType],
+          ['Status', sample.status || ''],
+          ['Priority', sample.priority || ''],
+          ['Assigned To', sample.assignedTo || ''],
+          ['Library Prep By', sample.libraryPrepBy || ''],
+          ['Submitted At', sample.submittedAt?.toISOString() || ''],
+          ['Created At', sample.createdAt?.toISOString() || ''],
+          ['Updated At', sample.updatedAt?.toISOString() || ''],
+          ['Created By', sample.createdBy || '']
+        ].map(row => `"${row[0]}","${row[1]}"`).join('\n')
+
+        content = csvHeader + csvRows
+        filename = `sample-${sample.sampleName}-${new Date().toISOString().split('T')[0]}.csv`
+        mimeType = 'text/csv'
+      }
+
+      // Create and download file
+      const blob = new Blob([content], { type: mimeType })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+
+      toast.success(`Sample data exported as ${format.toUpperCase()}`, {
+        description: `Downloaded ${filename}`
+      })
+    } catch (error) {
+      console.error('Export failed:', error)
+      toast.error('Export failed', {
+        description: error instanceof Error ? error.message : 'Unknown error occurred'
+      })
+    }
   }
 
   if (!sample) {
@@ -341,6 +425,34 @@ export function ViewTaskModal({
             <div className="text-sm text-muted-foreground space-y-1">
               <p><span className="font-medium">Sample ID:</span> {sample.id}</p>
               <p><span className="font-medium">Created By:</span> {sample.createdBy}</p>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="border-t pt-4">
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                onClick={() => exportSampleData('csv')}
+                className="flex items-center gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Export CSV
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => exportSampleData('json')}
+                className="flex items-center gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Export JSON
+              </Button>
+              <Button
+                variant="outline"
+                onClick={onClose}
+              >
+                Close
+              </Button>
             </div>
           </div>
         </div>

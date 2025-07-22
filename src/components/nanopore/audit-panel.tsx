@@ -67,6 +67,10 @@ export function AuditPanel({ adminSession }: AuditPanelProps) {
   const [selectedFilter, setSelectedFilter] = useState<string>('all')
   const [autoRefresh, setAutoRefresh] = useState(false)
 
+  // Add user filtering state
+  const [selectedUser, setSelectedUser] = useState<string>('all')
+  const [userList, setUserList] = useState<string[]>([])
+
   // Fetch audit data with authentication
   const fetchAuditData = async () => {
     if (!adminSession) {
@@ -94,12 +98,23 @@ export function AuditPanel({ adminSession }: AuditPanelProps) {
       const statsData = await statsResponse.json()
 
       if (logsData.success && statsData.success) {
+        const logs = logsData.data.map((log: any) => ({
+          ...log,
+          timestamp: new Date(log.timestamp)
+        }))
+
+        // Extract unique users for filtering
+        const users: string[] = []
+        logs.forEach((log: AuditLogEntry) => {
+          if (log.username && !users.includes(log.username)) {
+            users.push(log.username)
+          }
+        })
+        setUserList(users)
+
         setAuditData(prev => ({
           ...prev,
-          logs: logsData.data.map((log: any) => ({
-            ...log,
-            timestamp: new Date(log.timestamp)
-          })),
+          logs: logs,
           stats: statsData.data,
           loading: false,
           lastUpdated: new Date()
@@ -114,6 +129,53 @@ export function AuditPanel({ adminSession }: AuditPanelProps) {
         loading: false, 
         error: error instanceof Error ? error.message : 'Failed to fetch audit data' 
       }))
+    }
+  }
+
+  // Export audit logs
+  const exportAuditLogs = async () => {
+    if (!adminSession) return
+
+    try {
+      // Get current filtered logs
+      const logsToExport = filteredLogs
+
+      // Create CSV content
+      const csvHeader = 'Timestamp,Event Type,Category,Severity,Username,Resource,Action,Success,IP Address,Error Message,Details\n'
+      const csvRows = logsToExport.map(log => {
+        const details = JSON.stringify(log.details).replace(/"/g, '""') // Escape quotes
+        return [
+          log.timestamp.toISOString(),
+          log.eventType,
+          log.category,
+          log.severity,
+          log.username || '',
+          log.resource,
+          log.action,
+          log.success ? 'TRUE' : 'FALSE',
+          log.ipAddress || '',
+          log.errorMessage || '',
+          `"${details}"`
+        ].join(',')
+      }).join('\n')
+
+      const csvContent = csvHeader + csvRows
+
+      // Create and download file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `audit-logs-${new Date().toISOString().split('T')[0]}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+
+      alert('Audit logs exported successfully!')
+    } catch (error) {
+      console.error('Error exporting audit logs:', error)
+      alert('Failed to export audit logs.')
     }
   }
 
@@ -156,11 +218,20 @@ export function AuditPanel({ adminSession }: AuditPanelProps) {
 
   // Filter logs based on selected filter
   const filteredLogs = auditData.logs.filter(log => {
-    if (selectedFilter === 'all') return true
-    if (selectedFilter === 'errors') return !log.success
-    if (selectedFilter === 'critical') return log.severity === 'CRITICAL'
-    if (selectedFilter === 'high') return log.severity === 'HIGH'
-    return log.category === selectedFilter
+    // Apply category/type filter
+    let passesFilter = false
+    if (selectedFilter === 'all') passesFilter = true
+    else if (selectedFilter === 'errors') passesFilter = !log.success
+    else if (selectedFilter === 'critical') passesFilter = log.severity === 'CRITICAL'
+    else if (selectedFilter === 'high') passesFilter = log.severity === 'HIGH'
+    else passesFilter = log.category === selectedFilter
+
+    // Apply user filter
+    let passesUserFilter = false
+    if (selectedUser === 'all') passesUserFilter = true
+    else passesUserFilter = log.username === selectedUser
+
+    return passesFilter && passesUserFilter
   })
 
   // Get severity color
@@ -211,6 +282,13 @@ export function AuditPanel({ adminSession }: AuditPanelProps) {
             className={autoRefresh ? 'bg-green-100' : ''}
           >
             {autoRefresh ? 'Auto-refresh On' : 'Auto-refresh Off'}
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={exportAuditLogs}
+            disabled={!adminSession || filteredLogs.length === 0}
+          >
+            Export Logs
           </Button>
           <Button 
             variant="outline" 
@@ -284,17 +362,46 @@ export function AuditPanel({ adminSession }: AuditPanelProps) {
       {/* Filters */}
       <Card className="p-4">
         <h3 className="text-lg font-semibold mb-3">Filter Logs</h3>
-        <div className="flex flex-wrap gap-2">
-          {['all', 'errors', 'critical', 'high', 'AUTHENTICATION', 'DATA_MODIFICATION', 'SECURITY'].map(filter => (
+        
+        {/* Action/Category Filters */}
+        <div className="mb-4">
+          <label className="text-sm font-medium mb-2 block">Filter by Action/Category:</label>
+          <div className="flex flex-wrap gap-2">
+            {['all', 'errors', 'critical', 'high', 'AUTHENTICATION', 'DATA_MODIFICATION', 'SECURITY'].map(filter => (
+              <Button
+                key={filter}
+                variant={selectedFilter === filter ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setSelectedFilter(filter)}
+              >
+                {filter.charAt(0).toUpperCase() + filter.slice(1)}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        {/* User Filter */}
+        <div>
+          <label className="text-sm font-medium mb-2 block">Filter by User:</label>
+          <div className="flex flex-wrap gap-2">
             <Button
-              key={filter}
-              variant={selectedFilter === filter ? 'default' : 'outline'}
+              variant={selectedUser === 'all' ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setSelectedFilter(filter)}
+              onClick={() => setSelectedUser('all')}
             >
-              {filter.charAt(0).toUpperCase() + filter.slice(1)}
+              All Users
             </Button>
-          ))}
+            {userList.map(username => (
+              <Button
+                key={username}
+                variant={selectedUser === username ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setSelectedUser(username)}
+              >
+                {username}
+              </Button>
+            ))}
+          </div>
         </div>
       </Card>
 

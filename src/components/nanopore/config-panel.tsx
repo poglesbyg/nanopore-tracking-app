@@ -141,26 +141,40 @@ export function ConfigPanel({ adminSession }: ConfigPanelProps) {
     if (!adminSession) return
 
     try {
-      const response = await fetch('/api/config', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          action: 'update',
-          config: newConfig
+      // Send multiple set_override requests for each config property
+      const updatePromises = Object.entries(newConfig).map(async ([path, value]) => {
+        const response = await fetch('/api/config', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            action: 'set_override',
+            path: path,
+            value: value
+          })
         })
+
+        const result = await response.json()
+        if (!result.success) {
+          throw new Error(`Failed to update ${path}: ${result.error}`)
+        }
+        return result
       })
 
-      const result = await response.json()
-      if (result.success) {
-        // Refresh configuration data
-        fetchConfigData()
-        setShowConfigEditor(false)
-      }
+      // Wait for all updates to complete
+      await Promise.all(updatePromises)
+      
+      // Refresh configuration data
+      fetchConfigData()
+      setShowConfigEditor(false)
     } catch (error) {
       console.error('Error updating configuration:', error)
+      setConfigData(prev => ({ 
+        ...prev, 
+        error: error instanceof Error ? error.message : 'Failed to update configuration' 
+      }))
     }
   }
 
@@ -207,6 +221,177 @@ export function ConfigPanel({ adminSession }: ConfigPanelProps) {
     } catch (error) {
       console.error('Error validating configuration:', error)
     }
+  }
+
+  // Reset configuration to defaults
+  const resetToDefaults = async () => {
+    if (!adminSession) return
+
+    if (!confirm('Are you sure you want to reset all configuration to defaults? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      // First, get the default configuration structure
+      const defaultConfig = {
+        'features.aiAnalysis': false,
+        'features.backupRecovery': true,
+        'features.performanceMonitoring': true,
+        'features.debugMode': false,
+        'database.connectionPoolSize': 10,
+        'database.queryTimeout': 30000,
+        'server.port': 3001,
+        'server.timeout': 30000,
+        'logging.level': 'info',
+        'logging.enableConsole': true,
+        'security.enableRateLimit': true,
+        'security.maxRequestsPerMinute': 100
+      }
+
+      // Send multiple set_override requests to reset each config property
+      const resetPromises = Object.entries(defaultConfig).map(async ([path, value]) => {
+        const response = await fetch('/api/config', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            action: 'set_override',
+            path: path,
+            value: value
+          })
+        })
+
+        const result = await response.json()
+        if (!result.success) {
+          throw new Error(`Failed to reset ${path}: ${result.error}`)
+        }
+        return result
+      })
+
+      // Wait for all resets to complete
+      await Promise.all(resetPromises)
+      
+      // Refresh configuration data
+      fetchConfigData()
+      
+      setConfigData(prev => ({ 
+        ...prev, 
+        error: null 
+      }))
+
+      alert('Configuration successfully reset to defaults!')
+    } catch (error) {
+      console.error('Error resetting configuration:', error)
+      setConfigData(prev => ({ 
+        ...prev, 
+        error: error instanceof Error ? error.message : 'Failed to reset configuration to defaults' 
+      }))
+    }
+  }
+
+  // Export configuration to JSON file
+  const exportConfig = () => {
+    if (!adminSession) return
+
+    try {
+      const exportData = {
+        environment: configData.environment,
+        config: configData.config,
+        features: configData.features,
+        exportedAt: new Date().toISOString(),
+        version: '1.0'
+      }
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { 
+        type: 'application/json' 
+      })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `nanopore-config-${new Date().toISOString().split('T')[0]}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+
+      alert('Configuration exported successfully!')
+    } catch (error) {
+      console.error('Error exporting configuration:', error)
+      setConfigData(prev => ({ 
+        ...prev, 
+        error: 'Failed to export configuration' 
+      }))
+    }
+  }
+
+  // Import configuration from JSON file
+  const importConfig = () => {
+    if (!adminSession) return
+
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.json'
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (!file) return
+
+      try {
+        const text = await file.text()
+        const importData = JSON.parse(text)
+
+        // Validate imported data structure
+        if (!importData.config || !importData.features) {
+          throw new Error('Invalid configuration file format')
+        }
+
+        if (!confirm(`Import configuration from ${file.name}? This will override current settings.`)) {
+          return
+        }
+
+        // Apply imported configuration
+        const configEntries = Object.entries(importData.config).concat(
+          Object.entries(importData.features).map(([key, value]) => [`features.${key}`, value])
+        )
+
+        const importPromises = configEntries.map(async ([path, value]) => {
+          const response = await fetch('/api/config', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+              action: 'set_override',
+              path: path,
+              value: value
+            })
+          })
+
+          const result = await response.json()
+          if (!result.success) {
+            throw new Error(`Failed to import ${path}: ${result.error}`)
+          }
+          return result
+        })
+
+        // Wait for all imports to complete
+        await Promise.all(importPromises)
+        
+        // Refresh configuration data
+        fetchConfigData()
+
+        alert('Configuration imported successfully!')
+      } catch (error) {
+        console.error('Error importing configuration:', error)
+        setConfigData(prev => ({ 
+          ...prev, 
+          error: error instanceof Error ? error.message : 'Failed to import configuration' 
+        }))
+      }
+    }
+    input.click()
   }
 
   // Load data on component mount
@@ -264,6 +449,27 @@ export function ConfigPanel({ adminSession }: ConfigPanelProps) {
               onClick={validateConfig}
             >
               Validate
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={resetToDefaults}
+            >
+              Reset Defaults
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportConfig}
+            >
+              Export
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={importConfig}
+            >
+              Import
             </Button>
             <Button
               variant="outline"

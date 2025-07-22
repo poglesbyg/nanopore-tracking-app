@@ -131,6 +131,193 @@ src/
 - Implement caching strategies for static data
 - Monitor bundle size and loading performance
 
+## Python Backend Development Guidelines
+
+### Core Architecture Principles
+
+#### 1. Clean Architecture
+- **Domain Layer**: Pure business logic with no dependencies
+- **Application Layer**: Use cases and application services
+- **Infrastructure Layer**: Database, external APIs, and framework-specific code
+- **Dependency Rule**: Dependencies only point inward (infrastructure → application → domain)
+- **Interface Segregation**: Define narrow, specific interfaces for each use case
+
+#### 2. Dependency Injection
+- **Container Pattern**: Use dependency injection containers for service registration
+- **Constructor Injection**: Prefer constructor injection over property injection
+- **Interface-Based**: Depend on abstractions, not concrete implementations
+- **Scoped Lifetimes**: Manage service lifetimes (singleton, scoped, transient)
+- **Example Structure**:
+  ```python
+  # services/python-sample-management/app/core/dependencies.py
+  def get_sample_service(db: Session = Depends(get_db)) -> SampleService:
+      repository = SampleRepository(db)
+      return SampleService(repository)
+  ```
+
+### Configuration Management
+
+#### Environment-Based Configuration
+- **Pydantic Settings**: Use Pydantic for type-safe configuration
+- **Environment Variables**: Load from `.env` files and environment
+- **Validation**: Automatic validation with helpful error messages
+- **Multiple Environments**: Support dev, staging, and production configs
+- **Example Pattern**:
+  ```python
+  # app/core/config.py
+  class Settings(BaseSettings):
+      database_url: PostgresDsn
+      redis_url: Optional[RedisDsn] = None
+      log_level: str = "INFO"
+      
+      class Config:
+          env_file = ".env"
+          env_file_encoding = "utf-8"
+  ```
+
+### Structured Logging
+
+#### Logging Standards
+- **JSON Format**: Use structured JSON logging in production
+- **Human-Readable**: Pretty-printed logs for development
+- **Correlation IDs**: Track requests across services
+- **Performance Metrics**: Log response times and resource usage
+- **Log Levels**: Use appropriate levels (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+- **Example Setup**:
+  ```python
+  # app/core/logging.py
+  logger = structlog.get_logger()
+  logger.bind(correlation_id=request_id)
+  ```
+
+### Error Handling
+
+#### Exception Hierarchy
+- **Base Exceptions**: Create custom base exception classes
+- **Domain Exceptions**: Business logic violations
+- **Application Exceptions**: Use case failures
+- **Infrastructure Exceptions**: External service failures
+- **HTTP Exceptions**: API-specific errors with status codes
+- **Error Responses**: Standardized error format with error codes
+- **Example Structure**:
+  ```python
+  # app/core/exceptions.py
+  class DomainException(Exception): pass
+  class NotFoundError(DomainException): pass
+  class ValidationError(DomainException): pass
+  ```
+
+### API Design Patterns
+
+#### RESTful API Standards
+- **Versioning**: URL path versioning (e.g., `/api/v1/`)
+- **OpenAPI Documentation**: Auto-generated with FastAPI
+- **Request Validation**: Pydantic models for all requests
+- **Response Models**: Consistent response structure
+- **Status Codes**: Appropriate HTTP status codes
+- **HATEOAS**: Include resource links where appropriate
+- **Pagination**: Consistent pagination for list endpoints
+- **Example Endpoint**:
+  ```python
+  @router.post("/samples", response_model=SampleResponse)
+  async def create_sample(
+      sample: SampleCreate,
+      service: SampleService = Depends(get_sample_service)
+  ):
+      return await service.create_sample(sample)
+  ```
+
+### Database Management
+
+#### Async SQLAlchemy Patterns
+- **Connection Pooling**: Configure appropriate pool sizes
+- **Repository Pattern**: Encapsulate data access logic
+- **Unit of Work**: Transaction management pattern
+- **Query Optimization**: Use eager loading for relationships
+- **Migration Strategy**: Alembic for schema versioning
+- **Example Repository**:
+  ```python
+  # app/repositories/sample_repository.py
+  class SampleRepository:
+      def __init__(self, db: AsyncSession):
+          self.db = db
+      
+      async def get_by_id(self, id: int) -> Optional[Sample]:
+          result = await self.db.execute(
+              select(Sample).where(Sample.id == id)
+          )
+          return result.scalar_one_or_none()
+  ```
+
+### Testing Strategy
+
+#### Comprehensive Testing
+- **Test Structure**: Arrange-Act-Assert pattern
+- **Unit Tests**: Test business logic in isolation
+- **Integration Tests**: Test API endpoints with real database
+- **Test Fixtures**: Use pytest fixtures for setup
+- **Test Factories**: Factory pattern for test data
+- **Mocking**: Mock external dependencies
+- **Coverage Goals**: Maintain >80% code coverage
+- **Example Test**:
+  ```python
+  # tests/unit/test_sample_service.py
+  @pytest.mark.asyncio
+  async def test_create_sample(sample_service, sample_data):
+      # Arrange
+      expected_sample = Sample(**sample_data)
+      
+      # Act
+      result = await sample_service.create_sample(sample_data)
+      
+      # Assert
+      assert result.id == expected_sample.id
+  ```
+
+### Python-Specific Best Practices
+
+#### Code Quality Standards
+1. **Type Hints**: Always use type hints for function signatures
+2. **Docstrings**: Document all public functions with Google/NumPy style
+3. **Code Formatting**: Use Black for consistent formatting
+4. **Linting**: Configure Pylint/Flake8 with project rules
+5. **Import Order**: Follow PEP 8 import ordering
+6. **Async/Await**: Use async patterns for I/O operations
+7. **Context Managers**: Use `with` statements for resource management
+8. **Error Messages**: Provide helpful, actionable error messages
+
+#### SOLID Principles Application
+- **Single Responsibility**: Each class/function has one reason to change
+- **Open/Closed**: Open for extension, closed for modification
+- **Liskov Substitution**: Subtypes must be substitutable
+- **Interface Segregation**: Many specific interfaces over general ones
+- **Dependency Inversion**: Depend on abstractions, not concretions
+
+#### Performance Considerations
+- **Database Queries**: Use select_related/prefetch_related
+- **Caching**: Implement Redis caching for expensive operations
+- **Connection Pooling**: Configure appropriate pool sizes
+- **Async Operations**: Use asyncio for concurrent operations
+- **Profiling**: Profile code to identify bottlenecks
+- **Memory Management**: Monitor memory usage in production
+
+#### Security Practices
+- **Input Validation**: Validate all inputs with Pydantic
+- **SQL Injection**: Use parameterized queries (SQLAlchemy)
+- **Authentication**: JWT tokens with proper expiration
+- **Authorization**: Role-based access control (RBAC)
+- **Secrets Management**: Never commit secrets to code
+- **CORS**: Configure appropriate CORS policies
+- **Rate Limiting**: Implement API rate limiting
+
+#### Development Workflow
+- **Virtual Environments**: Use venv or poetry for isolation
+- **Requirements Management**: Pin dependencies with versions
+- **Pre-commit Hooks**: Automate code quality checks
+- **CI/CD Integration**: Run tests on every commit
+- **Code Reviews**: Mandatory reviews for all changes
+- **Documentation**: Keep API docs and README updated
+
 ## OpenShift Development Guidelines
 
 ### Container Strategy

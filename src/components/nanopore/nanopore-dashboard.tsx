@@ -1330,6 +1330,11 @@ export default function NanoporeDashboard() {
           setSelectedSample(null)
         }}
         onSave={handleSampleUpdate}
+        onDelete={(id: string) => {
+          if (selectedSample) {
+            handleDeleteSample(selectedSample)
+          }
+        }}
         sample={selectedSample ? mapApiToModal(selectedSample) : null}
         isLoading={actionLoading === selectedSample?.id}
       />

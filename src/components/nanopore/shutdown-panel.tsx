@@ -149,6 +149,71 @@ export function ShutdownPanel({ adminSession }: ShutdownPanelProps) {
     }
   }
 
+  // Force shutdown (immediate shutdown without waiting for graceful cleanup)
+  const forceShutdown = async () => {
+    if (!adminSession) return
+
+    if (!confirm('⚠️ FORCE SHUTDOWN: This will immediately terminate the server without graceful cleanup. This may result in data loss or corruption. Are you absolutely sure?')) {
+      return
+    }
+
+    try {
+      const response = await fetch('/api/shutdown', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          action: 'force_shutdown',
+          confirm: true
+        })
+      })
+
+      const result = await response.json()
+      if (result.success) {
+        alert('Force shutdown initiated. The server will terminate immediately.')
+      } else {
+        console.error('Force shutdown failed:', result.error)
+        alert(`Force shutdown failed: ${result.error}`)
+      }
+    } catch (error) {
+      console.error('Error initiating force shutdown:', error)
+      alert('Error occurred while attempting force shutdown.')
+    }
+  }
+
+  // Cancel shutdown (abort ongoing shutdown process)
+  const cancelShutdown = async () => {
+    if (!adminSession) return
+
+    try {
+      const response = await fetch('/api/shutdown', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          action: 'cancel_shutdown',
+          confirm: true
+        })
+      })
+
+      const result = await response.json()
+      if (result.success) {
+        alert('Shutdown cancelled successfully.')
+        fetchShutdownData() // Refresh status
+      } else {
+        console.error('Cancel shutdown failed:', result.error)
+        alert(`Failed to cancel shutdown: ${result.error}`)
+      }
+    } catch (error) {
+      console.error('Error cancelling shutdown:', error)
+      alert('Error occurred while attempting to cancel shutdown.')
+    }
+  }
+
   // Auto-refresh during shutdown
   useEffect(() => {
     if (shutdownData.status.isShuttingDown) {
@@ -212,13 +277,34 @@ export function ShutdownPanel({ adminSession }: ShutdownPanelProps) {
           >
             {shutdownData.loading ? 'Testing...' : 'Test Hooks'}
           </Button>
-          <Button 
-            variant="destructive" 
-            onClick={() => setShowConfirmation(true)}
-            disabled={shutdownData.status.isShuttingDown}
-          >
-            Initiate Shutdown
-          </Button>
+          {shutdownData.status.isShuttingDown && (
+            <Button 
+              variant="outline" 
+              onClick={cancelShutdown}
+              disabled={!adminSession}
+            >
+              Cancel Shutdown
+            </Button>
+          )}
+          {!shutdownData.status.isShuttingDown && (
+            <>
+              <Button 
+                variant="destructive" 
+                onClick={() => setShowConfirmation(true)}
+                disabled={shutdownData.status.isShuttingDown}
+              >
+                Graceful Shutdown
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={forceShutdown}
+                disabled={!adminSession}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Force Shutdown
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
