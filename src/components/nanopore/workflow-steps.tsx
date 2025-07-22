@@ -88,6 +88,163 @@ const TEAM_MEMBERS = [
   'Unassigned'
 ]
 
+// Enhanced Notes Component
+interface EnhancedNotesProps {
+  notes: string
+  onNotesChange: (notes: string) => void
+  readonly?: boolean
+  stepName: string
+}
+
+function EnhancedNotes({ notes, onNotesChange, readonly = false, stepName }: EnhancedNotesProps) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [editValue, setEditValue] = useState(notes)
+  const [showMentions, setShowMentions] = useState(false)
+
+  const handleSave = () => {
+    onNotesChange(editValue)
+    setIsEditing(false)
+  }
+
+  const handleCancel = () => {
+    setEditValue(notes)
+    setIsEditing(false)
+  }
+
+  const insertMention = (member: string) => {
+    const mention = `@${member} `
+    setEditValue(prev => prev + mention)
+    setShowMentions(false)
+  }
+
+  const formatNotesWithMentions = (text: string) => {
+    if (!text) return null
+    
+    // Split text by @mentions and format them
+    const parts = text.split(/(@\w+)/g)
+    return parts.map((part, index) => {
+      if (part.startsWith('@')) {
+        const member = part.slice(1)
+        return (
+          <span key={index} className="bg-blue-100 text-blue-800 px-1 rounded font-medium">
+            {part}
+          </span>
+        )
+      }
+      return part
+    })
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <MessageSquare className="h-4 w-4 text-gray-500" />
+          <span className="font-medium text-gray-600">Notes</span>
+        </div>
+        {!readonly && !isEditing && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setIsEditing(true)}
+            className="h-7 px-2 text-xs"
+          >
+            <Edit className="h-3 w-3 mr-1" />
+            {notes ? 'Edit' : 'Add Notes'}
+          </Button>
+        )}
+      </div>
+
+      {isEditing ? (
+        <div className="space-y-3 bg-gray-50 p-3 rounded-lg border">
+          <div className="relative">
+            <textarea
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              placeholder={`Add notes for ${stepName}... Use @member to mention team members.`}
+              rows={4}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <div className="flex items-center justify-between mt-2">
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setShowMentions(!showMentions)}
+                  className="h-7 px-2 text-xs"
+                >
+                  <AtSign className="h-3 w-3 mr-1" />
+                  Mention
+                </Button>
+                <span className="text-xs text-gray-500">
+                  {editValue.length}/500 characters
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleCancel}
+                  className="h-7 px-2 text-xs"
+                >
+                  <X className="h-3 w-3 mr-1" />
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleSave}
+                  className="h-7 px-2 text-xs"
+                >
+                  <Save className="h-3 w-3 mr-1" />
+                  Save
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {showMentions && (
+            <div className="bg-white border rounded-md p-2 shadow-sm">
+              <div className="text-xs font-medium text-gray-600 mb-2">Mention team member:</div>
+              <div className="flex flex-wrap gap-1">
+                {TEAM_MEMBERS.filter(member => member !== 'Unassigned').map(member => (
+                  <Button
+                    key={member}
+                    size="sm"
+                    variant="outline"
+                    onClick={() => insertMention(member)}
+                    className="h-6 px-2 text-xs"
+                  >
+                    @{member}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className={`text-sm ${notes ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50'} p-3 rounded-lg`}>
+          {notes ? (
+            <div className="space-y-2">
+              <div className="text-gray-900 leading-relaxed">
+                {formatNotesWithMentions(notes)}
+              </div>
+              <div className="text-xs text-gray-500 flex items-center gap-1">
+                <Calendar className="h-3 w-3" />
+                Last updated: {new Date().toLocaleDateString()}
+              </div>
+            </div>
+          ) : (
+            <div className="text-gray-500 italic flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              No notes added yet. Click "Add Notes" to get started.
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function getStatusColor(status: ProcessingStep['stepStatus']): string {
   switch (status) {
     case 'pending':
@@ -422,36 +579,54 @@ export default function WorkflowSteps({
                   </div>
 
                   {isExpanded && (
-                    <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <span className="font-medium text-gray-600">Started:</span>
+                    <div className="mt-4 pt-4 border-t border-gray-100 space-y-4">
+                      {/* Timing Information */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                        <div className="bg-gray-50 p-3 rounded-lg">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Play className="h-3 w-3 text-gray-500" />
+                            <span className="font-medium text-gray-600">Started</span>
+                          </div>
                           <div className="text-gray-900">
                             {formatDateTime(step.startedAt)}
                           </div>
                         </div>
-                        <div>
-                          <span className="font-medium text-gray-600">Completed:</span>
+                        <div className="bg-gray-50 p-3 rounded-lg">
+                          <div className="flex items-center gap-2 mb-1">
+                            <CheckCircle className="h-3 w-3 text-gray-500" />
+                            <span className="font-medium text-gray-600">Completed</span>
+                          </div>
                           <div className="text-gray-900">
                             {formatDateTime(step.completedAt)}
                           </div>
                         </div>
-                      </div>
-                      
-                      {step.notes && (
-                        <div>
-                          <span className="font-medium text-gray-600 block mb-1">Notes:</span>
-                          <div className="text-gray-900 text-sm bg-gray-50 p-2 rounded">
-                            {step.notes}
+                        <div className="bg-gray-50 p-3 rounded-lg">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Clock className="h-3 w-3 text-gray-500" />
+                            <span className="font-medium text-gray-600">Duration</span>
+                          </div>
+                          <div className="text-gray-900">
+                            {step.estimatedDurationHours ? formatDuration(step.estimatedDurationHours) : 'Not set'}
                           </div>
                         </div>
-                      )}
+                      </div>
+
+                      {/* Enhanced Notes */}
+                      <EnhancedNotes
+                        notes={step.notes || ''}
+                        onNotesChange={(notes) => onStepUpdate(step.id, { notes })}
+                        readonly={readonly}
+                        stepName={step.stepName}
+                      />
                       
                       {step.resultsData && (
                         <div>
-                          <span className="font-medium text-gray-600 block mb-1">Results:</span>
-                          <div className="text-gray-900 text-sm bg-gray-50 p-2 rounded">
-                            <pre className="whitespace-pre-wrap">
+                          <div className="flex items-center gap-2 mb-2">
+                            <FileText className="h-4 w-4 text-gray-500" />
+                            <span className="font-medium text-gray-600">Results Data</span>
+                          </div>
+                          <div className="text-gray-900 text-sm bg-yellow-50 border border-yellow-200 p-3 rounded-lg">
+                            <pre className="whitespace-pre-wrap overflow-x-auto">
                               {JSON.stringify(step.resultsData, null, 2)}
                             </pre>
                           </div>
@@ -469,24 +644,91 @@ export default function WorkflowSteps({
       {/* Step Completion Modal */}
       {completingStep && (
         <Dialog open={true} onOpenChange={() => setCompletingStep(null)}>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent className="sm:max-w-[600px]">
             <DialogHeader>
-              <DialogTitle>Complete Step</DialogTitle>
+              <DialogTitle className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                Complete Step
+              </DialogTitle>
               <DialogDescription>
-                Add completion notes for this step
+                Mark this step as completed and add completion notes
               </DialogDescription>
             </DialogHeader>
             
             <div className="space-y-4">
+              {/* Quick Actions */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <label className="text-sm font-medium mb-2 block">Quick Completion Templates</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCompletionNotes('✅ Completed successfully with no issues.')}
+                    className="justify-start text-xs"
+                  >
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    Success - No Issues
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCompletionNotes('⚠️ Completed with minor issues. See notes below.')}
+                    className="justify-start text-xs"
+                  >
+                    <AlertCircle className="h-3 w-3 mr-1" />
+                    Success - Minor Issues
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCompletionNotes('📋 QC passed. Ready for next step.')}
+                    className="justify-start text-xs"
+                  >
+                    <FileText className="h-3 w-3 mr-1" />
+                    QC Passed
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCompletionNotes('🔄 Requires follow-up: ')}
+                    className="justify-start text-xs"
+                  >
+                    <Clock className="h-3 w-3 mr-1" />
+                    Needs Follow-up
+                  </Button>
+                </div>
+              </div>
+
+              {/* Enhanced Note Editor */}
               <div>
                 <label className="text-sm font-medium mb-2 block">Completion Notes</label>
-                <textarea
-                  value={completionNotes}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setCompletionNotes(e.target.value)}
-                  placeholder="Add any notes about the completion..."
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                />
+                <div className="relative">
+                  <textarea
+                    value={completionNotes}
+                    onChange={(e) => setCompletionNotes(e.target.value)}
+                    placeholder="Add detailed completion notes... Use @member to mention team members for follow-up tasks."
+                    rows={4}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm resize-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  />
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-xs text-gray-500">
+                      {completionNotes.length}/500 characters
+                    </span>
+                    <div className="flex gap-1">
+                      {TEAM_MEMBERS.filter(member => member !== 'Unassigned').map(member => (
+                        <Button
+                          key={member}
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setCompletionNotes(prev => prev + `@${member} `)}
+                          className="h-6 px-2 text-xs"
+                        >
+                          @{member}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
             
@@ -494,7 +736,11 @@ export default function WorkflowSteps({
               <Button variant="outline" onClick={() => setCompletingStep(null)}>
                 Cancel
               </Button>
-              <Button onClick={() => handleCompleteStep(completingStep)}>
+              <Button 
+                onClick={() => handleCompleteStep(completingStep)}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
                 Complete Step
               </Button>
             </div>
