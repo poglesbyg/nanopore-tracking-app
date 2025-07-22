@@ -15,7 +15,10 @@ import {
   Plus,
   Edit,
   Save,
-  X
+  X,
+  MessageSquare,
+  AtSign,
+  FileText
 } from 'lucide-react'
 
 import { Badge } from '../ui/badge'

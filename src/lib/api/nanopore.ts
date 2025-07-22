@@ -34,6 +34,34 @@ export const nanoporeRouter = router({
     }
   }),
 
+  // Get paginated nanopore samples with filters
+  getAllPaginated: publicProcedure
+    .input(z.object({
+      page: z.number().int().min(1).default(1),
+      limit: z.number().int().min(1).max(100).default(20),
+      search: z.string().optional(),
+      status: z.string().optional(),
+      priority: z.string().optional(),
+      sortBy: z.enum(['submittedAt', 'sampleName', 'status', 'priority']).default('submittedAt'),
+      sortOrder: z.enum(['asc', 'desc']).default('desc')
+    }))
+    .query(async ({ input, ctx }) => {
+      try {
+        const sampleService = getSampleService()
+        return await sampleService.getAllSamplesPaginated({
+          page: input.page,
+          limit: input.limit,
+          search: input.search,
+          status: input.status,
+          priority: input.priority,
+          sortBy: input.sortBy,
+          sortOrder: input.sortOrder
+        })
+      } catch (error) {
+        handleTRPCProcedureError(error as Error, extractRequestContext(ctx))
+      }
+    }),
+
   // Create new nanopore sample
   create: publicProcedure
     .input(createSampleValidation)

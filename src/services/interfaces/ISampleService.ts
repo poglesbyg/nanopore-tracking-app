@@ -97,11 +97,34 @@ export interface ProcessingStepUpdate {
   resultsData?: any
 }
 
+export interface PaginationOptions {
+  page: number
+  limit: number
+  search?: string
+  status?: string
+  priority?: string
+  sortBy?: 'submittedAt' | 'sampleName' | 'status' | 'priority'
+  sortOrder?: 'asc' | 'desc'
+}
+
+export interface PaginatedResult<T> {
+  data: T[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+    hasNextPage: boolean
+    hasPrevPage: boolean
+  }
+}
+
 export interface ISampleService {
   createSample(data: CreateSampleData): Promise<Sample>
   updateSample(id: string, data: UpdateSampleData): Promise<Sample>
   getSampleById(id: string): Promise<Sample | null>
   getAllSamples(): Promise<Sample[]>
+  getAllSamplesPaginated(options: PaginationOptions): Promise<PaginatedResult<Sample>>
   searchSamples(criteria: SearchCriteria): Promise<Sample[]>
   deleteSample(id: string): Promise<{ success: boolean }>
   assignSample(id: string, assignedTo: string, libraryPrepBy?: string): Promise<Sample>

@@ -3,7 +3,9 @@ import type {
   CreateSampleData, 
   UpdateSampleData, 
   Sample, 
-  SearchCriteria 
+  SearchCriteria,
+  PaginationOptions,
+  PaginatedResult
 } from '../interfaces/ISampleService'
 import type { ISampleRepository } from '../interfaces/ISampleRepository'
 import type { IAuditLogger } from '../interfaces/IAuditLogger'
@@ -132,6 +134,79 @@ export class SampleService implements ISampleService {
         namespace: 'samples'
       }
     )
+  }
+
+  async getAllSamplesPaginated(options: PaginationOptions): Promise<PaginatedResult<Sample>> {
+    const { page, limit, search, status, priority, sortBy = 'submittedAt', sortOrder = 'desc' } = options
+    
+    this.logger.info('Fetching paginated samples', {
+      action: 'get_samples_paginated',
+      metadata: { page, limit, search, status, priority, sortBy, sortOrder }
+    })
+
+    // Build search criteria from pagination options
+    const criteria: SearchCriteria = {}
+    if (search) criteria.searchTerm = search
+    if (status) criteria.status = status
+    if (priority) criteria.priority = priority
+
+    // Get all matching samples (for now, we'll implement basic pagination)
+    // In a production app, this should be done at the database level
+    const allSamples = await this.sampleRepository.search(criteria)
+    
+    // Sort samples
+    const sortedSamples = this.sortSamples(allSamples, sortBy, sortOrder)
+    
+    // Calculate pagination
+    const total = sortedSamples.length
+    const totalPages = Math.ceil(total / limit)
+    const offset = (page - 1) * limit
+    const paginatedSamples = sortedSamples.slice(offset, offset + limit)
+    
+    return {
+      data: paginatedSamples,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1
+      }
+    }
+  }
+
+  private sortSamples(samples: Sample[], sortBy: string, sortOrder: 'asc' | 'desc'): Sample[] {
+    return samples.sort((a, b) => {
+      let aValue: any
+      let bValue: any
+      
+      switch (sortBy) {
+        case 'sampleName':
+          aValue = a.sample_name
+          bValue = b.sample_name
+          break
+        case 'status':
+          aValue = a.status
+          bValue = b.status
+          break
+        case 'priority':
+          aValue = a.priority
+          bValue = b.priority
+          break
+        case 'submittedAt':
+        default:
+          aValue = a.submitted_at
+          bValue = b.submitted_at
+          break
+      }
+      
+      if (sortOrder === 'desc') {
+        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0
+      } else {
+        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0
+      }
+    })
   }
 
   async searchSamples(criteria: SearchCriteria): Promise<Sample[]> {

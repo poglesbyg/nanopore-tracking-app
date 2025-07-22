@@ -5,6 +5,7 @@ import { Button } from '../ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Input } from '../ui/input'
 import { Skeleton } from '../ui/skeleton'
+import { Progress } from '../ui/progress'
 import CreateSampleModal from './create-sample-modal'
 import { EditTaskModal } from './edit-task-modal'
 import { ViewTaskModal } from './view-task-modal'
@@ -43,7 +44,9 @@ import {
   Archive,
   Trash2,
   X,
-  Users
+  Users,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react'
 
 interface DashboardStats {
@@ -124,7 +127,7 @@ export default function NanoporeDashboard() {
   
   // State management
   const [showUserMenu, setShowUserMenu] = useState(false)
-  const [searchTerm, setSearchTerm] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [priorityFilter, setPriorityFilter] = useState<string>('all')
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -145,13 +148,57 @@ export default function NanoporeDashboard() {
   const [showPdfUploadModal, setShowPdfUploadModal] = useState(false)
   const [showCsvUploadModal, setShowCsvUploadModal] = useState(false)
 
+  // Pagination and search state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [sortBy, setSortBy] = useState<'submittedAt' | 'sampleName' | 'status' | 'priority'>('submittedAt')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+
+  // Bulk operation progress state
+  const [bulkOperationProgress, setBulkOperationProgress] = useState<{
+    isActive: boolean
+    total: number
+    completed: number
+    operation: string
+    errors: string[]
+  }>({
+    isActive: false,
+    total: 0,
+    completed: 0,
+    operation: '',
+    errors: []
+  })
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery)
+      setCurrentPage(1) // Reset to first page when search changes
+    }, 500) // 500ms debounce
+
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+  
   // tRPC hooks with optimistic updates
   const utils = trpc.useUtils()
-  const { data: samples = [], isLoading: loading, refetch } = trpc.nanopore.getAll.useQuery()
+  const { data: paginatedData, isLoading: loading, refetch } = trpc.nanopore.getAllPaginated.useQuery({
+    page: currentPage,
+    limit: pageSize,
+    search: debouncedSearch || undefined,
+    status: statusFilter === 'all' ? undefined : statusFilter,
+    priority: priorityFilter === 'all' ? undefined : priorityFilter,
+    sortBy,
+    sortOrder
+  })
+  
+  // Extract samples and pagination info
+  const samples = paginatedData?.data || []
+  const paginationInfo = paginatedData?.pagination
   
   // Debug samples data (only in development)
   if (process.env.NODE_ENV === 'development') {
-    console.log('Samples data:', samples)
+    console.log('Paginated samples data:', { samples, paginationInfo })
   }
   
   // Force re-render trigger
@@ -474,17 +521,8 @@ export default function NanoporeDashboard() {
     }
   }, [samples])
 
-  // Filter samples based on search criteria
-  const filteredSamples = samples.filter((sample: any) => {
-    const matchesSearch = sample.sample_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         sample.submitter_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         sample.project_id?.toLowerCase().includes(searchTerm.toLowerCase())
-    
-    const matchesStatus = statusFilter === 'all' || sample.status === statusFilter
-    const matchesPriority = priorityFilter === 'all' || sample.priority === priorityFilter
-    
-    return matchesSearch && matchesStatus && matchesPriority
-  })
+  // Samples are now filtered and sorted server-side via pagination API
+  const filteredSamples = samples // For compatibility with existing code
 
   const handleCreateSample = () => {
     setShowCreateModal(true)
@@ -790,30 +828,74 @@ export default function NanoporeDashboard() {
     }
   }
 
-  const handleBulkAssign = (assignedTo: string, libraryPrepBy?: string) => {
-    const promises = Array.from(selectedSamples).map(sampleId => {
-      return assignSampleMutation.mutateAsync({
-        id: sampleId,
-        assignedTo,
-        libraryPrepBy,
-      })
+  const handleBulkAssign = async (assignedTo: string, libraryPrepBy?: string) => {
+    const selectedIds = Array.from(selectedSamples)
+    
+    // Initialize progress tracking
+    setBulkOperationProgress({
+      isActive: true,
+      total: selectedIds.length,
+      completed: 0,
+      operation: 'Assigning samples',
+      errors: []
     })
 
     setActionLoading('bulk')
-    Promise.all(promises)
-      .then(() => {
-        refetch()
-        toast.success(`${selectedSamples.size} samples assigned successfully`)
-        setSelectedSamples(new Set())
-        setShowBulkAssignModal(false)
-      })
-      .catch((error) => {
-        console.error('Failed to assign samples:', error)
-        toast.error('Failed to assign samples')
-      })
-      .finally(() => {
-        setActionLoading(null)
-      })
+    
+    let completed = 0
+    const errors: string[] = []
+
+    try {
+      // Process assignments one by one to track progress
+      for (const sampleId of selectedIds) {
+        try {
+          await assignSampleMutation.mutateAsync({
+            id: sampleId,
+            assignedTo,
+            libraryPrepBy,
+          })
+          completed++
+          setBulkOperationProgress(prev => ({
+            ...prev,
+            completed: completed
+          }))
+        } catch (error) {
+          const errorMsg = `Failed to assign sample ${sampleId}: ${error instanceof Error ? error.message : 'Unknown error'}`
+          errors.push(errorMsg)
+          setBulkOperationProgress(prev => ({
+            ...prev,
+            errors: [...prev.errors, errorMsg]
+          }))
+        }
+      }
+
+      // Refresh data and show results
+      await refetch()
+      
+      if (errors.length === 0) {
+        toast.success(`${completed} samples assigned successfully`)
+      } else if (completed > 0) {
+        toast.warning(`${completed} samples assigned, ${errors.length} failed`)
+      } else {
+        toast.error('All assignments failed')
+      }
+      
+      setSelectedSamples(new Set())
+      setShowBulkAssignModal(false)
+      
+    } finally {
+      setActionLoading(null)
+      // Clear progress after a delay
+      setTimeout(() => {
+        setBulkOperationProgress({
+          isActive: false,
+          total: 0,
+          completed: 0,
+          operation: '',
+          errors: []
+        })
+      }, 3000)
+    }
   }
 
   const handleBulkStatusUpdate = async (newStatus: string) => {
@@ -823,24 +905,69 @@ export default function NanoporeDashboard() {
       return
     }
 
-    const promises = Array.from(selectedSamples).map(sampleId => 
-      updateStatusMutation.mutateAsync({
-        id: sampleId,
-        status: newStatus as typeof validStatuses[number],
-      })
-    )
+    const selectedIds = Array.from(selectedSamples)
+    
+    // Initialize progress tracking
+    setBulkOperationProgress({
+      isActive: true,
+      total: selectedIds.length,
+      completed: 0,
+      operation: `Updating status to ${newStatus}`,
+      errors: []
+    })
+
+    setActionLoading('bulk-status')
+    
+    let completed = 0
+    const errors: string[] = []
 
     try {
-      await Promise.all(promises)
+      // Process updates one by one to track progress
+      for (const sampleId of selectedIds) {
+        try {
+          await updateStatusMutation.mutateAsync({
+            id: sampleId,
+            status: newStatus as typeof validStatuses[number],
+          })
+          completed++
+          setBulkOperationProgress(prev => ({
+            ...prev,
+            completed: completed
+          }))
+        } catch (error) {
+          const errorMsg = `Failed to update sample ${sampleId}: ${error instanceof Error ? error.message : 'Unknown error'}`
+          errors.push(errorMsg)
+          setBulkOperationProgress(prev => ({
+            ...prev,
+            errors: [...prev.errors, errorMsg]
+          }))
+        }
+      }
+
+      // Refresh data and show results
+      await refetch()
       setSelectedSamples(new Set())
       
-      // Update stats after bulk update
-      setStats(calculateStats(samples))
+      if (errors.length === 0) {
+        toast.success(`Updated ${completed} samples to ${newStatus}`)
+      } else if (completed > 0) {
+        toast.warning(`${completed} samples updated, ${errors.length} failed`)
+      } else {
+        toast.error('All updates failed')
+      }
       
-      toast.success(`Updated ${selectedSamples.size} samples to ${newStatus}`)
-    } catch (error) {
-      console.error('Bulk update failed:', error)
-      toast.error('Failed to update some samples')
+    } finally {
+      setActionLoading(null)
+      // Clear progress after a delay
+      setTimeout(() => {
+        setBulkOperationProgress({
+          isActive: false,
+          total: 0,
+          completed: 0,
+          operation: '',
+          errors: []
+        })
+      }, 3000)
     }
   }
 
@@ -849,30 +976,67 @@ export default function NanoporeDashboard() {
       return
     }
 
-    const promises = Array.from(selectedSamples).map(sampleId => 
-      deleteSampleMutation.mutateAsync(sampleId)
-    )
+    const selectedIds = Array.from(selectedSamples)
+    
+    // Initialize progress tracking
+    setBulkOperationProgress({
+      isActive: true,
+      total: selectedIds.length,
+      completed: 0,
+      operation: 'Deleting samples',
+      errors: []
+    })
 
-    setActionLoading('bulk')
+    setActionLoading('bulk-delete')
+    
+    let completed = 0
+    const errors: string[] = []
+
     try {
-      await Promise.all(promises)
-      refetch()
+      // Process deletions one by one to track progress
+      for (const sampleId of selectedIds) {
+        try {
+          await deleteSampleMutation.mutateAsync(sampleId)
+          completed++
+          setBulkOperationProgress(prev => ({
+            ...prev,
+            completed: completed
+          }))
+        } catch (error) {
+          const errorMsg = `Failed to delete sample ${sampleId}: ${error instanceof Error ? error.message : 'Unknown error'}`
+          errors.push(errorMsg)
+          setBulkOperationProgress(prev => ({
+            ...prev,
+            errors: [...prev.errors, errorMsg]
+          }))
+        }
+      }
+
+      // Refresh data and show results
+      await refetch()
       
-      // Update stats
-      setStats(prev => ({
-        ...prev,
-        total: prev.total - selectedSamples.size,
-        // Note: This is a simplified stats update - in a real app we'd calculate properly
-        inProgress: Math.max(0, prev.inProgress - selectedSamples.size)
-      }))
+      if (errors.length === 0) {
+        toast.success(`Deleted ${completed} samples`)
+      } else if (completed > 0) {
+        toast.warning(`${completed} samples deleted, ${errors.length} failed`)
+      } else {
+        toast.error('All deletions failed')
+      }
       
-      toast.success(`${selectedSamples.size} samples deleted successfully`)
       setSelectedSamples(new Set())
-    } catch (error) {
-      console.error('Failed to delete samples:', error)
-      toast.error('Failed to delete samples')
+      
     } finally {
       setActionLoading(null)
+      // Clear progress after a delay
+      setTimeout(() => {
+        setBulkOperationProgress({
+          isActive: false,
+          total: 0,
+          completed: 0,
+          operation: '',
+          errors: []
+        })
+      }, 3000)
     }
   }
 
@@ -1035,6 +1199,46 @@ export default function NanoporeDashboard() {
           />
         </div>
 
+                 {/* Bulk Operation Progress Indicator */}
+         {bulkOperationProgress.isActive && (
+           <div className="mb-6">
+             <Card className="bg-blue-50 border-blue-200">
+               <CardContent className="py-4">
+                 <div className="space-y-3">
+                   <div className="flex items-center justify-between">
+                     <div className="flex items-center gap-2">
+                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600" />
+                       <span className="text-sm font-medium text-blue-900">
+                         {bulkOperationProgress.operation}
+                       </span>
+                     </div>
+                     <span className="text-sm text-blue-700">
+                       {bulkOperationProgress.completed} of {bulkOperationProgress.total} completed
+                     </span>
+                   </div>
+                   <Progress 
+                     value={(bulkOperationProgress.completed / bulkOperationProgress.total) * 100} 
+                     className="h-2 bg-blue-200" 
+                   />
+                   {bulkOperationProgress.errors.length > 0 && (
+                     <div className="text-xs text-red-600 bg-red-50 p-2 rounded border border-red-200">
+                       <span className="font-medium">Errors ({bulkOperationProgress.errors.length}):</span>
+                       <div className="mt-1 max-h-20 overflow-y-auto">
+                         {bulkOperationProgress.errors.slice(0, 3).map((error, i) => (
+                           <div key={i} className="truncate">{error}</div>
+                         ))}
+                         {bulkOperationProgress.errors.length > 3 && (
+                           <div className="text-gray-500">...and {bulkOperationProgress.errors.length - 3} more</div>
+                         )}
+                       </div>
+                     </div>
+                   )}
+                 </div>
+               </CardContent>
+             </Card>
+           </div>
+         )}
+
         {/* Admin Login and Memory Optimization Panel */}
         <div className="mb-8">
           <AdminLogin
@@ -1092,8 +1296,8 @@ export default function NanoporeDashboard() {
                   <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                   <Input
                     placeholder="Search samples, submitters, or labs..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-10"
                   />
                 </div>
@@ -1189,23 +1393,102 @@ export default function NanoporeDashboard() {
           </Card>
         )}
 
-        {/* Samples Table */}
+        {/* Samples Section */}
         <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Samples ({filteredSamples.length})</CardTitle>
+          <CardHeader className="pb-3">
+            <div className="flex justify-between items-center">
+              <CardTitle>Samples ({paginationInfo?.total || 0})</CardTitle>
               {filteredSamples.length > 0 && (
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    checked={selectedSamples.size === filteredSamples.length && filteredSamples.length > 0}
-                    onChange={(e) => handleSelectAll(e.target.checked)}
-                    className="rounded border-gray-300"
-                  />
-                  <span className="text-sm text-gray-600">Select All</span>
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedSamples.size === filteredSamples.length && filteredSamples.length > 0}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedSamples(new Set(filteredSamples.map((s: NanoporeSample) => s.id)))
+                        } else {
+                          setSelectedSamples(new Set())
+                        }
+                      }}
+                      className="rounded"
+                    />
+                    <span className="text-sm text-gray-600">Select All</span>
+                  </label>
                 </div>
               )}
             </div>
+
+            {/* Pagination Controls */}
+            {paginationInfo && (
+              <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">Show:</span>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => {
+                        setPageSize(Number(e.target.value))
+                        setCurrentPage(1) // Reset to first page
+                      }}
+                      className="border rounded px-2 py-1 text-sm"
+                    >
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                    <span className="text-sm text-gray-600">per page</span>
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    Showing {((paginationInfo.page - 1) * paginationInfo.limit) + 1} to{' '}
+                    {Math.min(paginationInfo.page * paginationInfo.limit, paginationInfo.total)} of{' '}
+                    {paginationInfo.total} results
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={!paginationInfo.hasPrevPage}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Previous
+                  </Button>
+                  
+                  <div className="flex items-center gap-1">
+                    {[...Array(Math.min(5, paginationInfo.totalPages))].map((_, i) => {
+                      const page = Math.max(1, currentPage - 2) + i
+                      if (page > paginationInfo.totalPages) return null
+                      
+                      return (
+                        <Button
+                          key={page}
+                          variant={page === currentPage ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setCurrentPage(page)}
+                          className="min-w-[2rem]"
+                        >
+                          {page}
+                        </Button>
+                      )
+                    })}
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(Math.min(paginationInfo.totalPages, currentPage + 1))}
+                    disabled={!paginationInfo.hasNextPage}
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -1299,7 +1582,7 @@ export default function NanoporeDashboard() {
                   <TestTube className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 mb-2">No samples found</h3>
                   <p className="text-gray-500 mb-4">
-                    {searchTerm || statusFilter !== 'all' || priorityFilter !== 'all' 
+                    {searchQuery || statusFilter !== 'all' || priorityFilter !== 'all' 
                       ? 'Try adjusting your filters or search terms'
                       : 'Get started by creating your first sample'
                     }
