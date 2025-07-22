@@ -19,8 +19,16 @@ const VALID_CHART_FIELDS = [
   'SEQ-001', 'SEQ-002', 'SEQ-003', 'SEQ-004', 'SEQ-005'
 ]
 
-function validateChartField(chartField: string): boolean {
-  return VALID_CHART_FIELDS.includes(chartField) || validators.isValidChartField(chartField)
+// Helper function to parse and validate chart field
+function validateChartField(chartField: string): string {
+  const normalizedField = chartField.trim().toUpperCase()
+  if (!VALID_CHART_FIELDS.includes(normalizedField)) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `Invalid chart field: ${chartField}. Must be one of: ${VALID_CHART_FIELDS.join(', ')}`,
+    })
+  }
+  return normalizedField
 }
 
 export const nanoporeRouter = router({
@@ -34,29 +42,33 @@ export const nanoporeRouter = router({
     }
   }),
 
-  // Get paginated nanopore samples with filters
+  // Get all nanopore samples with pagination
   getAllPaginated: publicProcedure
     .input(z.object({
-      page: z.number().int().min(1).default(1),
-      limit: z.number().int().min(1).max(100).default(20),
+      page: z.number().min(1).default(1),
+      limit: z.number().min(1).max(100).default(20),
       search: z.string().optional(),
       status: z.string().optional(),
       priority: z.string().optional(),
-      sortBy: z.enum(['submittedAt', 'sampleName', 'status', 'priority']).default('submittedAt'),
-      sortOrder: z.enum(['asc', 'desc']).default('desc')
+      sortBy: z.enum(['submittedAt', 'sampleName', 'status', 'priority']).optional().default('submittedAt'),
+      sortOrder: z.enum(['asc', 'desc']).optional().default('desc')
     }))
     .query(async ({ input, ctx }) => {
       try {
         const sampleService = getSampleService()
-        return await sampleService.getAllSamplesPaginated({
+        const paginationOptions: any = {
           page: input.page,
           limit: input.limit,
-          search: input.search,
-          status: input.status,
-          priority: input.priority,
           sortBy: input.sortBy,
           sortOrder: input.sortOrder
-        })
+        }
+        
+        // Only add optional fields if they have values
+        if (input.search) paginationOptions.search = input.search
+        if (input.status) paginationOptions.status = input.status  
+        if (input.priority) paginationOptions.priority = input.priority
+        
+        return await sampleService.getAllSamplesPaginated(paginationOptions)
       } catch (error) {
         handleTRPCProcedureError(error as Error, extractRequestContext(ctx))
       }
