@@ -6,7 +6,7 @@ export const GET: APIRoute = async ({ request }) => {
     const submissionServiceUrl = process.env.SUBMISSION_SERVICE_URL || 'http://localhost:8001'
     
     // Forward the request to the submission service
-    const response = await fetch(`${submissionServiceUrl}/health`, {
+    const response = await fetch(`${submissionServiceUrl}/api/v1/health`, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',

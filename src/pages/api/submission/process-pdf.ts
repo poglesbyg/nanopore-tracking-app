@@ -9,7 +9,7 @@ export const POST: APIRoute = async ({ request }) => {
     const formData = await request.formData()
     
     // Forward the request to the submission service
-    const response = await fetch(`${submissionServiceUrl}/process-pdf`, {
+    const response = await fetch(`${submissionServiceUrl}/api/v1/process-pdf`, {
       method: 'POST',
       body: formData,
       headers: {

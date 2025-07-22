@@ -104,7 +104,7 @@ export class SubmissionServiceClient {
     // Health check always goes direct to service
     const url = this.useGateway 
       ? `${this.baseUrl}/health`
-      : `${this.baseUrl}/health`
+      : `${this.baseUrl}/api/v1/health`
       
     const response = await fetch(url)
 
