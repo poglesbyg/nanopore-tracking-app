@@ -2,7 +2,7 @@ import { Component } from 'react'
 import type { ErrorInfo, ReactNode } from 'react'
 import { Toaster } from '../ui/sonner'
 import AuthWrapper from '../auth/auth-wrapper'
-import SubmissionDashboard from './submission-dashboard'
+import NanoporeDashboard from './nanopore-dashboard'
 import { TRPCProvider } from '../providers/trpc-provider'
 
 interface ErrorBoundaryState {
@@ -21,7 +21,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
   }
 
   override componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Nanopore App Error:', error, errorInfo)
+    console.error('Legacy Nanopore App Error:', error, errorInfo)
   }
 
   override render() {
@@ -58,15 +58,17 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
   }
 }
 
-export function NanoporeApp() {
+export function LegacyNanoporeApp() {
   return (
     <ErrorBoundary>
       <TRPCProvider>
         <AuthWrapper>
-          <SubmissionDashboard />
-          <Toaster />
+          <div className="max-w-7xl mx-auto px-4 py-8">
+            <NanoporeDashboard />
+            <Toaster />
+          </div>
         </AuthWrapper>
       </TRPCProvider>
     </ErrorBoundary>
   )
-}
+} 

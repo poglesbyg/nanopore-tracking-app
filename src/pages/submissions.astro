@@ -1,8 +1,8 @@
 ---
 import Layout from '@/layouts/layout.astro'
-import SubmissionDashboard from '@/components/nanopore/submission-dashboard'
+import { NanoporeApp } from '@/components/nanopore/nanopore-app'
 ---
 
 <Layout title="Nanopore Submissions | Tracking App">
-  <SubmissionDashboard client:load />
+  <NanoporeApp client:load />
 </Layout> 

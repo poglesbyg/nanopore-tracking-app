@@ -75,12 +75,12 @@ export interface CreateSubmissionInput {
   pdf_filename: string
   submitter_name: string
   submitter_email: string
-  lab_name?: string
-  department?: string
-  billing_account?: string
-  project_id?: string
-  project_name?: string
-  special_instructions?: string
+  lab_name?: string | undefined
+  department?: string | undefined
+  billing_account?: string | undefined
+  project_id?: string | undefined
+  project_name?: string | undefined
+  special_instructions?: string | undefined
   priority?: 'low' | 'normal' | 'high' | 'urgent'
   pdf_metadata?: Record<string, any>
   extracted_data?: Record<string, any>

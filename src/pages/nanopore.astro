@@ -1,9 +1,9 @@
 ---
 import Layout from '@/layouts/layout.astro'
-import { NanoporeApp } from '@/components/nanopore/nanopore-app'
+import { LegacyNanoporeApp } from '@/components/nanopore/legacy-app'
 ---
 
-<Layout title="Nanopore Sequencing">
+<Layout title="Legacy Nanopore Samples | Tracking App">
   <div
     id="nanopore-loading"
     class="min-h-screen bg-background text-foreground flex items-center justify-center"
@@ -12,7 +12,7 @@ import { NanoporeApp } from '@/components/nanopore/nanopore-app'
       <div class="flex items-center space-x-2">
         <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary">
         </div>
-        <span class="text-lg">Loading Nanopore Dashboard...</span>
+        <span class="text-lg">Loading Legacy Dashboard...</span>
       </div>
       <p class="text-sm text-muted-foreground">
         If this takes too long, please refresh the page.
@@ -20,7 +20,7 @@ import { NanoporeApp } from '@/components/nanopore/nanopore-app'
     </div>
   </div>
   <div id="nanopore-app" style="display: none;">
-    <NanoporeApp client:load />
+    <LegacyNanoporeApp client:load />
   </div>
 </Layout>
 

@@ -1,0 +1,26 @@
+{
+  "mcpServers": {
+    "sample-management": {
+      "command": "node",
+      "args": ["./services/mcp-servers/sample-management/dist/index.js"],
+      "env": {
+        "DB_HOST": "localhost",
+        "DB_PORT": "5432",
+        "DB_NAME": "nanopore_db",
+        "DB_USER": "postgres",
+        "DB_PASSWORD": "postgres"
+      }
+    },
+    "nanopore-domain-expert": {
+      "command": "node",
+      "args": ["./services/mcp-servers/nanopore-domain/dist/index.js"],
+      "env": {
+        "DB_HOST": "localhost",
+        "DB_PORT": "5432",
+        "DB_NAME": "nanopore_db",
+        "DB_USER": "postgres",
+        "DB_PASSWORD": "postgres"
+      }
+    }
+  }
+} 

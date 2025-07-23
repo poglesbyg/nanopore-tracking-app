@@ -67,39 +67,34 @@ export async function processPDFSubmission(file: File): Promise<PDFProcessingRes
       // Update submission data
       submissionData.submitter_name = data.submitterName || ''
       submissionData.submitter_email = data.submitterEmail || ''
-      submissionData.lab_name = data.labName
+      submissionData.lab_name = data.labName || undefined
       submissionData.project_name = data.projectName
-      submissionData.extraction_method = data.extractionMethod || 'pattern'
+      submissionData.extraction_method = (data.extractionMethod === 'llm' || data.extractionMethod === 'hybrid' || data.extractionMethod === 'rag') 
+        ? data.extractionMethod 
+        : 'pattern'
       submissionData.extraction_confidence = data.confidence || 0.5
       
       // Store all extracted data
       submissionData.extracted_data = data
       
-      // Check if we have sample table data
-      if (data.metadata?.sample_table && Array.isArray(data.metadata.sample_table)) {
-        // Multiple samples from table
-        data.metadata.sample_table.forEach((sample: any, index: number) => {
-          samples.push({
-            sample_name: sample.sample_name || `Sample-${index + 1}`,
-            sample_type: sample.sample_type || data.sampleType || 'DNA',
-            concentration: parseFloat(sample.concentration) || parseFloat(sample.qubit_conc) || undefined,
-            volume: parseFloat(sample.volume) || undefined,
-            flow_cell_type: sample.flow_cell || data.flowCellType,
-            organism: sample.organism,
-            genome_size: sample.genome_size,
-            buffer: sample.buffer || data.sampleBuffer,
-          })
-        })
-      } else {
-        // Single sample from form fields
-        samples.push({
-          sample_name: data.sampleName || 'Sample-1',
-          sample_type: data.sampleType || 'DNA',
-          concentration: data.concentration ? parseFloat(data.concentration) : undefined,
-          volume: data.volume ? parseFloat(data.volume) : undefined,
-          flow_cell_type: data.flowCellType,
-        })
+      // For now, create a single sample from the form data
+      // TODO: Implement multi-sample extraction from table data
+      const sample: any = {
+        sample_name: data.sampleName || 'Sample-1',
+        sample_type: data.sampleType || 'DNA',
       }
+      
+      if (data.concentration) {
+        sample.concentration = parseFloat(data.concentration)
+      }
+      if (data.volume) {
+        sample.volume = parseFloat(data.volume)
+      }
+      if (data.flowCellType) {
+        sample.flow_cell_type = data.flowCellType
+      }
+      
+      samples.push(sample)
       
       // Update billing account from samples if not set
       if (!submissionData.billing_account && samples.length > 0) {

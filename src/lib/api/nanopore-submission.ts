@@ -114,7 +114,7 @@ export const nanoporeSubmissionRouter = router({
     .query(async ({ input, ctx }) => {
       try {
         // For now, use a dummy user ID until auth is implemented
-        const userId = ctx.userId || 'default-user'
+        const userId = ctx.userId || '00000000-0000-0000-0000-000000000000'
         const submission = await getNanoporeSubmissionById(ctx.db, input.id, userId)
         
         if (!submission) {
@@ -142,7 +142,7 @@ export const nanoporeSubmissionRouter = router({
     }))
     .query(async ({ input, ctx }) => {
       try {
-        const userId = ctx.userId || 'default-user'
+        const userId = ctx.userId || '00000000-0000-0000-0000-000000000000'
         const submission = await getNanoporeSubmissionWithSamples(ctx.db, input.id, userId)
         
         if (!submission) {
@@ -181,7 +181,7 @@ export const nanoporeSubmissionRouter = router({
     .input(createSubmissionValidation)
     .mutation(async ({ input, ctx }) => {
       try {
-        const userId = ctx.userId || 'default-user'
+        const userId = ctx.userId || '00000000-0000-0000-0000-000000000000'
         return await createNanoporeSubmission(ctx.db, {
           ...input,
           created_by: userId,
@@ -200,7 +200,7 @@ export const nanoporeSubmissionRouter = router({
     .input(createSubmissionWithSamplesValidation)
     .mutation(async ({ input, ctx }) => {
       try {
-        const userId = ctx.userId || 'default-user'
+        const userId = ctx.userId || '00000000-0000-0000-0000-000000000000'
         return await createSubmissionWithSamples(
           ctx.db,
           {
