@@ -17,9 +17,9 @@ sphinx:
   builder: html
   fail_on_warning: false
 
-# Build PDF & ePub
+# Build formats - only HTML zip for simplicity
 formats:
-  - html  # Only build HTML to avoid complexity
+  - htmlzip
 
 # Python configuration
 python:
