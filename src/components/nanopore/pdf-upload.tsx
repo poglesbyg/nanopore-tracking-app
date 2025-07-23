@@ -78,6 +78,7 @@ export default function PDFUpload({
             const startTime = Date.now()
             const result: ProcessingResult = await submissionServiceClient.processPDF(uploadedFile.file)
             const processingTime = Date.now() - startTime
+            
             if (result.success) {
               setUploadedFiles((prev) =>
                 prev.map((f) =>
@@ -86,11 +87,15 @@ export default function PDFUpload({
                         ...f,
                         status: 'completed' as const,
                         processingTime,
+                        extractedData: (result as any).extractedData || (result as any).metadata
                       }
                     : f,
                 ),
               )
-              onDataExtracted?.(result as any, uploadedFile.file)
+              // Pass the extracted data to the parent component
+              if ((result as any).extractedData) {
+                onDataExtracted?.((result as any).extractedData, uploadedFile.file)
+              }
             } else {
               setUploadedFiles((prev) =>
                 prev.map((f) =>

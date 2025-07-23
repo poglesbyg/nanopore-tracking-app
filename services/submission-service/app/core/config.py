@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     # Database settings
     database_url: str = Field(default="postgresql://localhost/test", env="DATABASE_URL")
     
+    # AI Service settings
+    ai_service_url: str = Field(default="http://localhost:3003", env="AI_SERVICE_URL")
+    ai_service_timeout: int = Field(default=30, env="AI_SERVICE_TIMEOUT")
+    
     # File processing settings
     max_file_size: int = Field(default=100 * 1024 * 1024, env="MAX_FILE_SIZE")  # 100MB
     allowed_file_types: str = Field(

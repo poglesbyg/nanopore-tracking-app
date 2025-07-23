@@ -10,45 +10,18 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "removeComments": true,
-    "noImplicitAny": true,
-    "noImplicitReturns": true,
-    "noImplicitThis": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "exactOptionalPropertyTypes": true,
-    "noImplicitOverride": true,
-    "noPropertyAccessFromIndexSignature": true,
-    "noUncheckedIndexedAccess": true,
-    "allowUnusedLabels": false,
-    "allowUnreachableCode": false,
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
     "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
-    "baseUrl": "./src",
-    "paths": {
-      "@/*": ["*"],
-      "@/types/*": ["types/*"],
-      "@/services/*": ["services/*"],
-      "@/repositories/*": ["repositories/*"],
-      "@/database/*": ["database/*"]
-    }
+    "exactOptionalPropertyTypes": false,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "typeRoots": ["./node_modules/@types", "./src/@types"]
   },
-  "include": [
-    "src/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "**/*.test.ts",
-    "**/*.spec.ts"
-  ],
-  "ts-node": {
-    "esm": false,
-    "experimentalSpecifierResolution": "node"
-  }
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
 }

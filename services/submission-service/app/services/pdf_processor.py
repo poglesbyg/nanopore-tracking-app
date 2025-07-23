@@ -6,6 +6,7 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 import pdfplumber
 from PyPDF2 import PdfReader
+import httpx
 
 from app.models.schemas import SampleData, ProcessingResult, ProcessingStatus
 from app.core.config import settings
@@ -20,6 +21,8 @@ class PDFProcessor:
     def __init__(self):
         self.max_pages = settings.pdf_max_pages
         self.patterns = self._compile_patterns()
+        self.ai_service_url = settings.ai_service_url
+        self.ai_service_timeout = settings.ai_service_timeout
     
     def _compile_patterns(self) -> Dict[str, re.Pattern]:
         """Compile regex patterns for field extraction."""
@@ -78,8 +81,21 @@ class PDFProcessor:
                     errors=["PDF appears to be empty or contains only images"]
                 )
             
-            # Extract sample data
+            # Extract sample data using regex patterns
             sample_data = self._extract_sample_data(text_content)
+            
+            # If basic extraction didn't find much, try AI-enhanced extraction
+            if not sample_data or len(sample_data.__dict__) < 5:
+                logger.info(f"Basic extraction found limited data, trying AI-enhanced extraction for {filename}")
+                ai_enhanced_data = await self._extract_with_ai(text_content, filename)
+                if ai_enhanced_data:
+                    # Merge AI-extracted data with basic extraction
+                    if sample_data:
+                        for key, value in ai_enhanced_data.items():
+                            if not getattr(sample_data, key, None) and value:
+                                setattr(sample_data, key, value)
+                    else:
+                        sample_data = SampleData(**ai_enhanced_data)
             
             if sample_data:
                 samples.append(sample_data)
@@ -102,7 +118,8 @@ class PDFProcessor:
                 metadata={
                     "filename": filename,
                     "pages_processed": len(text_content.split('\n\n')),
-                    "text_length": len(text_content)
+                    "text_length": len(text_content),
+                    "ai_enhanced": bool(sample_data and hasattr(sample_data, '_ai_enhanced'))
                 }
             )
             
@@ -114,6 +131,56 @@ class PDFProcessor:
                 errors=[str(e)],
                 processing_time=(datetime.now() - start_time).total_seconds()
             )
+    
+    async def _extract_with_ai(self, text_content: str, filename: str) -> Optional[Dict[str, Any]]:
+        """Use AI service to extract data from PDF text."""
+        try:
+            async with httpx.AsyncClient(timeout=self.ai_service_timeout) as client:
+                response = await client.post(
+                    f"{self.ai_service_url}/api/extract/text",
+                    json={
+                        "text": text_content[:10000],  # Limit text to prevent oversized requests
+                        "extractionPrompt": "Extract sample submission information including sample names, submitter details, organism, concentration, volume, and any nanopore-specific fields",
+                        "fields": [
+                            "sample_name", "submitter_name", "submitter_email",
+                            "organism", "concentration", "volume", "buffer",
+                            "quote_identifier", "lab_name", "phone", "sample_type",
+                            "flow_cell", "genome_size", "coverage", "pi_name"
+                        ]
+                    }
+                )
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    extracted_data = {}
+                    
+                    # Convert AI response to our format
+                    for field in result.get("extractedFields", []):
+                        field_name = field.get("fieldName")
+                        field_value = field.get("value")
+                        if field_name and field_value:
+                            # Convert numeric fields
+                            if field_name in ["concentration", "volume"]:
+                                try:
+                                    extracted_data[field_name] = float(re.findall(r'[\d.]+', field_value)[0])
+                                except (ValueError, IndexError):
+                                    extracted_data[field_name] = field_value
+                            else:
+                                extracted_data[field_name] = field_value
+                    
+                    if extracted_data:
+                        extracted_data["_ai_enhanced"] = True
+                        logger.info(f"AI extraction found {len(extracted_data)} fields for {filename}")
+                        return extracted_data
+                else:
+                    logger.warning(f"AI service returned status {response.status_code}: {response.text}")
+                    
+        except httpx.TimeoutException:
+            logger.warning(f"AI service timeout for {filename}")
+        except Exception as e:
+            logger.warning(f"AI extraction failed for {filename}: {str(e)}")
+        
+        return None
     
     async def _extract_text_optimized(self, file_content: bytes) -> str:
         """Extract text from PDF with memory optimization."""

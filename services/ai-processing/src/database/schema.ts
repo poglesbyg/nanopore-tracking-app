@@ -50,7 +50,7 @@ export interface VectorEmbeddingTable {
   id: string
   job_id: string
   content: string
-  embedding: number[] // Vector as array
+  embedding: string // Vector stored as JSON array string
   metadata?: string // JSON string
   created_at: Date
   updated_at: Date
@@ -116,11 +116,11 @@ export async function migrateAIProcessingDatabase(db: Kysely<AIProcessingDatabas
     .ifNotExists()
     .addColumn('id', 'uuid', (col) => col.primaryKey().defaultTo(sql`gen_random_uuid()`))
     .addColumn('job_id', 'uuid', (col) => col.notNull().references('processing_jobs.id').onDelete('cascade'))
-    .addColumn('field_name', 'varchar(255)', (col) => col.notNull())
+    .addColumn('field_name', 'varchar(100)', (col) => col.notNull())
     .addColumn('field_value', 'text', (col) => col.notNull())
-    .addColumn('confidence', 'decimal(3,2)', (col) => col.notNull())
+    .addColumn('confidence', 'numeric', (col) => col.notNull())
     .addColumn('confidence_level', 'varchar(20)', (col) => col.notNull())
-    .addColumn('source', 'varchar(100)', (col) => col.notNull())
+    .addColumn('source', 'varchar(50)', (col) => col.notNull())
     .addColumn('page_number', 'integer')
     .addColumn('bounding_box', 'jsonb')
     .addColumn('validation_errors', 'jsonb')
@@ -128,14 +128,14 @@ export async function migrateAIProcessingDatabase(db: Kysely<AIProcessingDatabas
     .addColumn('updated_at', 'timestamp', (col) => col.notNull().defaultTo(sql`now()`))
     .execute()
 
-  // Create vector embeddings table
+  // Create vector embeddings table (using jsonb for embeddings instead of vector type)
   await db.schema
     .createTable('vector_embeddings')
     .ifNotExists()
     .addColumn('id', 'uuid', (col) => col.primaryKey().defaultTo(sql`gen_random_uuid()`))
     .addColumn('job_id', 'uuid', (col) => col.notNull().references('processing_jobs.id').onDelete('cascade'))
     .addColumn('content', 'text', (col) => col.notNull())
-    .addColumn('embedding', 'vector(1536)', (col) => col.notNull()) // OpenAI embedding dimension
+    .addColumn('embedding', 'jsonb', (col) => col.notNull()) // Store as JSON array
     .addColumn('metadata', 'jsonb')
     .addColumn('created_at', 'timestamp', (col) => col.notNull().defaultTo(sql`now()`))
     .addColumn('updated_at', 'timestamp', (col) => col.notNull().defaultTo(sql`now()`))
@@ -146,7 +146,7 @@ export async function migrateAIProcessingDatabase(db: Kysely<AIProcessingDatabas
     .createTable('processing_templates')
     .ifNotExists()
     .addColumn('id', 'uuid', (col) => col.primaryKey().defaultTo(sql`gen_random_uuid()`))
-    .addColumn('name', 'varchar(255)', (col) => col.notNull().unique())
+    .addColumn('name', 'varchar(100)', (col) => col.notNull().unique())
     .addColumn('description', 'text')
     .addColumn('processing_type', 'varchar(50)', (col) => col.notNull())
     .addColumn('template_config', 'jsonb', (col) => col.notNull())
@@ -161,223 +161,110 @@ export async function migrateAIProcessingDatabase(db: Kysely<AIProcessingDatabas
     .ifNotExists()
     .addColumn('id', 'uuid', (col) => col.primaryKey().defaultTo(sql`gen_random_uuid()`))
     .addColumn('template_id', 'uuid', (col) => col.notNull().references('processing_templates.id').onDelete('cascade'))
-    .addColumn('field_name', 'varchar(255)', (col) => col.notNull())
+    .addColumn('field_name', 'varchar(100)', (col) => col.notNull())
     .addColumn('required', 'boolean', (col) => col.notNull().defaultTo(false))
-    .addColumn('field_type', 'varchar(50)', (col) => col.notNull())
+    .addColumn('field_type', 'varchar(20)', (col) => col.notNull())
     .addColumn('min_length', 'integer')
     .addColumn('max_length', 'integer')
-    .addColumn('min_value', 'decimal(10,2)')
-    .addColumn('max_value', 'decimal(10,2)')
-    .addColumn('pattern', 'varchar(500)')
+    .addColumn('min_value', 'numeric')
+    .addColumn('max_value', 'numeric')
+    .addColumn('pattern', 'text')
     .addColumn('allowed_values', 'jsonb')
     .addColumn('custom_validation', 'text')
     .addColumn('created_at', 'timestamp', (col) => col.notNull().defaultTo(sql`now()`))
     .addColumn('updated_at', 'timestamp', (col) => col.notNull().defaultTo(sql`now()`))
     .execute()
 
-  // Insert default processing templates
-  const defaultTemplates = [
-    {
-      name: 'nanopore_sample_form',
-      description: 'Default template for nanopore sample form processing',
-      processing_type: 'pdf_extraction',
-      template_config: JSON.stringify({
-        fields: [
-          'sample_name',
-          'project_id',
-          'submitter_name',
-          'submitter_email',
-          'lab_name',
-          'sample_type',
-          'sample_buffer',
-          'concentration',
-          'volume',
-          'total_amount',
-          'flow_cell_type',
-          'flow_cell_count',
-          'priority',
-          'chart_field'
-        ],
-        extractionPrompt: 'Extract the following fields from this nanopore sample form:',
-        confidenceThreshold: 0.7
-      })
-    },
-    {
-      name: 'ai_extraction_template',
-      description: 'Template for AI-powered text extraction',
-      processing_type: 'ai_extraction',
-      template_config: JSON.stringify({
-        model: 'llama2',
-        maxTokens: 1000,
-        temperature: 0.1,
-        systemPrompt: 'You are an expert at extracting structured data from scientific documents.'
-      })
-    }
-  ]
-
-  for (const template of defaultTemplates) {
-    await db
-      .insertInto('processing_templates')
-      .values({
-        name: template.name,
-        description: template.description,
-        processing_type: template.processing_type,
-        template_config: template.template_config,
-        is_active: true
-      })
-      .onConflict((oc) => oc.column('name').doNothing())
-      .execute()
-  }
-
-  // Insert default validation rules for nanopore sample form
-  const nanoporeTemplate = await db
-    .selectFrom('processing_templates')
-    .select('id')
-    .where('name', '=', 'nanopore_sample_form')
-    .executeTakeFirst()
-
-  if (nanoporeTemplate) {
-    const defaultRules = [
-      { field_name: 'sample_name', required: true, field_type: 'string', min_length: 1, max_length: 255 },
-      { field_name: 'project_id', required: true, field_type: 'string', min_length: 1, max_length: 255 },
-      { field_name: 'submitter_name', required: true, field_type: 'string', min_length: 1, max_length: 255 },
-      { field_name: 'submitter_email', required: true, field_type: 'email' },
-      { field_name: 'lab_name', required: true, field_type: 'string', min_length: 1, max_length: 255 },
-      { field_name: 'sample_type', required: true, field_type: 'string', allowed_values: ['dna', 'rna', 'protein', 'other'] },
-      { field_name: 'concentration', required: true, field_type: 'number', min_value: 0 },
-      { field_name: 'volume', required: true, field_type: 'number', min_value: 0 },
-      { field_name: 'total_amount', required: true, field_type: 'number', min_value: 0 },
-      { field_name: 'flow_cell_count', required: true, field_type: 'number', min_value: 1 }
-    ]
-
-    for (const rule of defaultRules) {
-      await db
-        .insertInto('validation_rules')
-        .values({
-          template_id: nanoporeTemplate.id,
-          field_name: rule.field_name,
-          required: rule.required,
-          field_type: rule.field_type,
-          min_length: rule.min_length,
-          max_length: rule.max_length,
-          min_value: rule.min_value,
-          max_value: rule.max_value,
-          allowed_values: rule.allowed_values ? JSON.stringify(rule.allowed_values) : undefined
-        })
-        .onConflict((oc) => oc.columns(['template_id', 'field_name']).doNothing())
-        .execute()
-    }
-  }
-
-  // Create indexes for better performance
+  // Create indexes
   await db.schema
-    .createIndex('processing_jobs_status_idx')
-    .ifNotExists()
-    .on('processing_jobs')
-    .column('status')
-    .execute()
-
-  await db.schema
-    .createIndex('processing_jobs_sample_id_idx')
-    .ifNotExists()
+    .createIndex('idx_processing_jobs_sample_id')
     .on('processing_jobs')
     .column('sample_id')
     .execute()
 
   await db.schema
-    .createIndex('processing_jobs_created_at_idx')
-    .ifNotExists()
+    .createIndex('idx_processing_jobs_status')
     .on('processing_jobs')
-    .column('created_at')
+    .column('status')
     .execute()
 
   await db.schema
-    .createIndex('extracted_data_job_id_idx')
-    .ifNotExists()
+    .createIndex('idx_extracted_data_job_id')
     .on('extracted_data')
     .column('job_id')
     .execute()
 
   await db.schema
-    .createIndex('extracted_data_field_name_idx')
-    .ifNotExists()
-    .on('extracted_data')
-    .column('field_name')
-    .execute()
-
-  await db.schema
-    .createIndex('vector_embeddings_job_id_idx')
-    .ifNotExists()
+    .createIndex('idx_vector_embeddings_job_id')
     .on('vector_embeddings')
     .column('job_id')
     .execute()
 
-  await db.schema
-    .createIndex('processing_templates_name_idx')
-    .ifNotExists()
-    .on('processing_templates')
-    .column('name')
+  // Insert default processing templates
+  const defaultTemplates = [
+    {
+      name: 'Nanopore Submission Form',
+      description: 'Template for processing nanopore submission forms',
+      processing_type: 'pdf_extraction',
+      template_config: JSON.stringify({
+        expectedFields: [
+          'sample_name', 'submitter_name', 'submitter_email', 'organism',
+          'concentration', 'volume', 'buffer', 'library_prep', 'sequencing_type'
+        ],
+        requiredFields: ['sample_name', 'submitter_name', 'submitter_email'],
+        extractionPrompt: 'Extract nanopore sample submission information from this form'
+      }),
+      is_active: true
+    }
+  ]
+
+  // Only insert if templates don't exist
+  const existingTemplates = await db
+    .selectFrom('processing_templates')
+    .select('id')
     .execute()
 
-  await db.schema
-    .createIndex('validation_rules_template_id_idx')
-    .ifNotExists()
-    .on('validation_rules')
-    .column('template_id')
-    .execute()
+  if (existingTemplates.length === 0) {
+    for (const template of defaultTemplates) {
+      await db
+        .insertInto('processing_templates')
+        .values(template)
+        .execute()
+    }
+  }
+}
 
-  // Create updated_at trigger function
-  await db.schema
-    .createFunction('update_updated_at_column')
-    .ifNotExists()
-    .returns('trigger')
-    .language('plpgsql')
-    .as(sql`
-      BEGIN
+// Helper function to create update triggers (simplified - just for documentation)
+export function getUpdateTriggerSQL(): string {
+  return `
+    -- Create update trigger function
+    CREATE OR REPLACE FUNCTION update_updated_at_column()
+    RETURNS TRIGGER AS $$
+    BEGIN
         NEW.updated_at = now();
         RETURN NEW;
-      END;
-    `)
-    .execute()
+    END;
+    $$ language 'plpgsql';
 
-  // Create triggers for updated_at
-  await db.schema
-    .createTrigger('processing_jobs_updated_at_trigger')
-    .ifNotExists()
-    .on('processing_jobs')
-    .beforeUpdate()
-    .execute(sql`update_updated_at_column()`)
-    .execute()
+    -- Apply triggers to tables
+    CREATE TRIGGER processing_jobs_updated_at_trigger
+      BEFORE UPDATE ON processing_jobs
+      FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-  await db.schema
-    .createTrigger('extracted_data_updated_at_trigger')
-    .ifNotExists()
-    .on('extracted_data')
-    .beforeUpdate()
-    .execute(sql`update_updated_at_column()`)
-    .execute()
+    CREATE TRIGGER extracted_data_updated_at_trigger
+      BEFORE UPDATE ON extracted_data
+      FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-  await db.schema
-    .createTrigger('vector_embeddings_updated_at_trigger')
-    .ifNotExists()
-    .on('vector_embeddings')
-    .beforeUpdate()
-    .execute(sql`update_updated_at_column()`)
-    .execute()
+    CREATE TRIGGER vector_embeddings_updated_at_trigger
+      BEFORE UPDATE ON vector_embeddings
+      FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-  await db.schema
-    .createTrigger('processing_templates_updated_at_trigger')
-    .ifNotExists()
-    .on('processing_templates')
-    .beforeUpdate()
-    .execute(sql`update_updated_at_column()`)
-    .execute()
+    CREATE TRIGGER processing_templates_updated_at_trigger
+      BEFORE UPDATE ON processing_templates
+      FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-  await db.schema
-    .createTrigger('validation_rules_updated_at_trigger')
-    .ifNotExists()
-    .on('validation_rules')
-    .beforeUpdate()
-    .execute(sql`update_updated_at_column()`)
-    .execute()
+    CREATE TRIGGER validation_rules_updated_at_trigger
+      BEFORE UPDATE ON validation_rules
+      FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+  `
 }

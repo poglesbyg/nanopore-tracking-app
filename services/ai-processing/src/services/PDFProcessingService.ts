@@ -1,5 +1,9 @@
-import * as pdfParse from 'pdf-parse'
-import { ExtractedField, ConfidenceLevel } from '../types/processing'
+import pdfParse from 'pdf-parse'
+import {
+  ExtractedField,
+  ConfidenceLevel,
+  ValidationError
+} from '../types/processing'
 
 export class PDFProcessingService {
   /**

@@ -1668,10 +1668,108 @@ export default function NanoporeDashboard() {
               </Button>
             </div>
             <PDFUpload
-              onDataExtracted={(data, file) => {
-                // Handle extracted data - could create a new sample or update existing
+              onDataExtracted={async (data, file) => {
+                // Handle extracted data - create samples if sample_table exists
                 console.log('PDF data extracted:', data, file)
-                toast.success('PDF processed successfully')
+                
+                if (data && Array.isArray(data)) {
+                  // Handle array of samples
+                  const samples = data
+                  if (samples.length > 0) {
+                    toast.info(`Found ${samples.length} samples in PDF. Creating samples...`)
+                    
+                    let created = 0
+                    let failed = 0
+                    
+                    for (const sample of samples) {
+                      try {
+                        // Extract sample information
+                        const sampleData = {
+                          submitterName: sample.submitter_name || '',
+                          submitterEmail: sample.submitter_email || '',
+                          labName: sample.lab_name || '',
+                          sampleName: sample.sample_name || `Sample-${Date.now()}`,
+                          organism: sample.organism || '',
+                          concentration: sample.concentration || sample.qubit_conc || null,
+                          volume: sample.volume || null,
+                          buffer: sample.buffer || 'Unknown',
+                          priority: 'normal' as const,
+                          status: 'submitted' as const,
+                          flowCell: sample.flow_cell || '',
+                          genomeSize: sample.genome_size || '',
+                          coverage: sample.coverage || '',
+                          serviceRequested: sample.service_requested || '',
+                          sequencingType: sample.sequencing_type || '',
+                          sampleType: (sample.sample_type || 'DNA') as 'DNA' | 'RNA' | 'Protein' | 'Other',
+                          chartField: sample.billing_account || 'TBD',
+                          metadata: {
+                            pdfSource: file.name,
+                            extractedAt: new Date().toISOString(),
+                            ...(sample.metadata || {}),
+                            sample_table: sample.sample_table || []
+                          }
+                        }
+                        
+                        // Create the sample
+                        await createSampleMutation.mutateAsync(sampleData)
+                        created++
+                      } catch (error) {
+                        console.error('Failed to create sample:', error)
+                        failed++
+                      }
+                    }
+                    
+                    if (created > 0) {
+                      toast.success(`Successfully created ${created} samples from PDF`)
+                    }
+                    if (failed > 0) {
+                      toast.error(`Failed to create ${failed} samples`)
+                    }
+                    
+                    // Close the modal and refresh the list
+                    setShowPdfUploadModal(false)
+                    refetch()
+                  }
+                } else if (data && typeof data === 'object') {
+                  // Handle single sample object
+                  try {
+                    const sampleData = {
+                      submitterName: data.submitter_name || data.submitterName || '',
+                      submitterEmail: data.submitter_email || data.submitterEmail || '',
+                      labName: data.lab_name || data.labName || '',
+                      sampleName: data.sample_name || data.sampleName || `Sample-${Date.now()}`,
+                      organism: data.organism || '',
+                      concentration: data.concentration || data.qubit_conc || null,
+                      volume: data.volume || null,
+                      buffer: data.buffer || 'Unknown',
+                      priority: 'normal' as const,
+                      status: 'submitted' as const,
+                      flowCell: data.flow_cell || data.flowCell || '',
+                      genomeSize: data.genome_size || data.genomeSize || '',
+                      coverage: data.coverage || '',
+                      serviceRequested: data.service_requested || data.serviceRequested || '',
+                      sequencingType: data.sequencing_type || data.sequencingType || '',
+                      sampleType: (data.sample_type || data.sampleType || 'DNA') as 'DNA' | 'RNA' | 'Protein' | 'Other',
+                      chartField: data.billing_account || 'TBD',
+                      metadata: {
+                        pdfSource: file.name,
+                        extractedAt: new Date().toISOString(),
+                        ...(data.metadata || {}),
+                        sample_table: data.sample_table || []
+                      }
+                    }
+                    
+                    await createSampleMutation.mutateAsync(sampleData)
+                    toast.success('Successfully created sample from PDF')
+                    setShowPdfUploadModal(false)
+                    refetch()
+                  } catch (error) {
+                    console.error('Failed to create sample:', error)
+                    toast.error('Failed to create sample from PDF')
+                  }
+                } else {
+                  toast.warning('No valid sample data found in PDF')
+                }
               }}
               onFileUploaded={(file) => {
                 console.log('PDF uploaded:', file)

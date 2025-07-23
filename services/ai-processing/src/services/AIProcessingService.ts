@@ -14,7 +14,8 @@ import {
   FormValidationRequest,
   ValidationResult,
   RAGRequest,
-  RAGResult
+  RAGResult,
+  ValidationError
 } from '../types/processing'
 
 export class AIProcessingService {
@@ -59,7 +60,7 @@ export class AIProcessingService {
       // Step 3: Use AI to extract additional data
       const aiFields = await this.aiService.extractDataFromText({
         text: pdfData.text,
-        sampleId: request.sampleId,
+        sampleId: request.sampleId || undefined,
         extractionPrompt: 'Extract any missing fields from this nanopore sample form',
         fields: this.getMissingFields(regexFields)
       })
@@ -130,7 +131,7 @@ export class AIProcessingService {
       
       // Search in vector database
       const results = await this.vectorService.searchByText(query, queryEmbeddings, {
-        query: queryEmbeddings,
+        query: query,
         limit,
         threshold
       })
@@ -152,12 +153,29 @@ export class AIProcessingService {
       // Combine with rule-based validation
       const ruleValidation = this.validateAgainstRules(request.extractedFields, request.validationRules)
       
+      // Combine validation errors
+      const errors: ValidationError[] = [
+        ...aiValidation.errors.map((error: string) => ({
+          fieldName: 'general',
+          error,
+          severity: 'error' as const
+        }))
+      ]
+      
+      // Add rule validation errors if they exist
+      if (ruleValidation && ruleValidation.errors) {
+        errors.push(...ruleValidation.errors)
+      }
+
       return {
-        isValid: aiValidation.isValid && ruleValidation.isValid,
-        score: (aiValidation.confidence + ruleValidation.score) / 2,
-        errors: [...aiValidation.errors, ...ruleValidation.errors],
-        warnings: [...aiValidation.suggestions, ...ruleValidation.warnings],
-        suggestions: ruleValidation.suggestions
+        isValid: aiValidation.isValid && (ruleValidation ? ruleValidation.isValid : true),
+        score: ruleValidation ? (aiValidation.confidence + ruleValidation.score) / 2 : aiValidation.confidence,
+        errors,
+        warnings: [
+          ...aiValidation.suggestions,
+          ...(ruleValidation ? ruleValidation.warnings : [])
+        ],
+        suggestions: ruleValidation ? ruleValidation.suggestions : []
       }
     } catch (error) {
       throw new Error(`Form validation failed: ${error}`)
@@ -172,7 +190,7 @@ export class AIProcessingService {
       // Search for relevant documents
       const queryEmbeddings = await this.aiService.generateEmbeddings(request.query)
       const searchResults = await this.vectorService.searchByText(request.query, queryEmbeddings, {
-        query: queryEmbeddings,
+        query: request.query,
         limit: request.maxResults,
         threshold: request.threshold
       })
@@ -344,14 +362,8 @@ export class AIProcessingService {
   private validateAgainstRules(
     fields: ExtractedField[],
     rules: any[]
-  ): {
-    isValid: boolean
-    score: number
-    errors: string[]
-    warnings: string[]
-    suggestions: string[]
-  } {
-    const errors: string[] = []
+  ): ValidationResult {
+    const errors: ValidationError[] = []
     const warnings: string[] = []
     const suggestions: string[] = []
     let validFields = 0
@@ -362,7 +374,11 @@ export class AIProcessingService {
       totalFields++
 
       if (rule.required && (!field || !field.value)) {
-        errors.push(`Required field '${rule.fieldName}' is missing`)
+        errors.push({
+          fieldName: rule.fieldName,
+          error: `Required field '${rule.fieldName}' is missing`,
+          severity: 'error'
+        })
         continue
       }
 
@@ -373,20 +389,36 @@ export class AIProcessingService {
         if (rule.type === 'email') {
           const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
           if (!emailPattern.test(field.value)) {
-            errors.push(`Invalid email format for '${rule.fieldName}': ${field.value}`)
+            errors.push({
+              fieldName: rule.fieldName,
+              error: `Invalid email format: ${field.value}`,
+              severity: 'error'
+            })
           }
         }
 
         if (rule.type === 'number') {
           const num = Number(field.value)
           if (isNaN(num)) {
-            errors.push(`Invalid number format for '${rule.fieldName}': ${field.value}`)
+            errors.push({
+              fieldName: rule.fieldName,
+              error: `Invalid number format: ${field.value}`,
+              severity: 'error'
+            })
           } else {
             if (rule.minValue !== undefined && num < rule.minValue) {
-              errors.push(`Value for '${rule.fieldName}' is below minimum: ${num} < ${rule.minValue}`)
+              errors.push({
+                fieldName: rule.fieldName,
+                error: `Value is below minimum: ${num} < ${rule.minValue}`,
+                severity: 'error'
+              })
             }
             if (rule.maxValue !== undefined && num > rule.maxValue) {
-              errors.push(`Value for '${rule.fieldName}' is above maximum: ${num} > ${rule.maxValue}`)
+              errors.push({
+                fieldName: rule.fieldName,
+                error: `Value is above maximum: ${num} > ${rule.maxValue}`,
+                severity: 'error'
+              })
             }
           }
         }
@@ -401,13 +433,21 @@ export class AIProcessingService {
         }
 
         if (rule.allowedValues && !rule.allowedValues.includes(field.value)) {
-          errors.push(`Invalid value for '${rule.fieldName}': ${field.value}. Allowed values: ${rule.allowedValues.join(', ')}`)
+          errors.push({
+            fieldName: rule.fieldName,
+            error: `Invalid value for '${rule.fieldName}': ${field.value}. Allowed values: ${rule.allowedValues.join(', ')}`,
+            severity: 'error'
+          })
         }
 
         if (rule.pattern) {
           const regex = new RegExp(rule.pattern)
           if (!regex.test(field.value)) {
-            errors.push(`Field '${rule.fieldName}' does not match required pattern: ${field.value}`)
+            errors.push({
+              fieldName: rule.fieldName,
+              error: `Field '${rule.fieldName}' does not match required pattern: ${field.value}`,
+              severity: 'error'
+            })
           }
         }
       }

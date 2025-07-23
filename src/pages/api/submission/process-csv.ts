@@ -22,8 +22,21 @@ export const POST: APIRoute = async ({ request }) => {
     // Get the response data
     const data = await response.json()
 
-    // Return the response with the same status code
-    return new Response(JSON.stringify(data), {
+    // Transform the response to match the ProcessingResult interface
+    const transformedResponse = {
+      success: data.status === 'completed' || data.status === 'success',
+      message: data.message || `Successfully processed CSV: ${data.metadata?.filename || 'unknown'}`,
+      samples_processed: data.samples_processed || (data.data ? data.data.length : 0),
+      samples_created: data.samples_created || 0,
+      errors: data.errors || [],
+      processing_time: data.processing_time || 0,
+      // Include the original data for the frontend
+      data: data.data,
+      metadata: data.metadata
+    }
+
+    // Return the transformed response
+    return new Response(JSON.stringify(transformedResponse), {
       status: response.status,
       headers: {
         'Content-Type': 'application/json',
@@ -33,8 +46,12 @@ export const POST: APIRoute = async ({ request }) => {
     console.error('Error processing CSV:', error)
     return new Response(
       JSON.stringify({
-        error: 'Failed to process CSV',
-        message: error instanceof Error ? error.message : 'Unknown error',
+        success: false,
+        message: 'Failed to process CSV',
+        samples_processed: 0,
+        samples_created: 0,
+        errors: [error instanceof Error ? error.message : 'Unknown error'],
+        processing_time: 0
       }),
       {
         status: 500,

@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { VectorSearchRequest, VectorSearchResult } from '../types/processing'
+import { v4 as uuidv4 } from 'uuid'
 
 export class VectorService {
   private qdrantUrl: string
@@ -26,21 +27,21 @@ export class VectorService {
   }
 
   /**
-   * Store vector embeddings in the database
+   * Store vector embeddings
    */
   async storeEmbeddings(
     embeddings: number[],
-    payload: Record<string, any>,
-    id?: string
+    metadata: Record<string, any>
   ): Promise<string> {
     try {
-      const pointId = id || this.generateId()
+      const vectorId = uuidv4()
       
+      // Store in Qdrant
       const response = await axios.put(`${this.qdrantUrl}/collections/${this.defaultCollection}/points`, {
         points: [{
-          id: pointId,
+          id: vectorId,
           vector: embeddings,
-          payload
+          payload: metadata
         }]
       })
 
@@ -48,7 +49,7 @@ export class VectorService {
         throw new Error(`Failed to store embeddings: ${response.statusText}`)
       }
 
-      return pointId
+      return vectorId
     } catch (error) {
       throw new Error(`Failed to store embeddings: ${error}`)
     }
@@ -272,7 +273,7 @@ export class VectorService {
   ): Promise<string[]> {
     try {
       const points = embeddings.map(item => ({
-        id: item.id || this.generateId(),
+        id: item.id || uuidv4(),
         vector: item.vector,
         payload: item.payload
       }))

@@ -1,41 +1,17 @@
-# Nanopore Submission Service Dependencies
-# Install with: uv pip install -r requirements.txt
-
-# Web Framework
 fastapi==0.111.0
-uvicorn[standard]==0.30.1
-
-# Data Processing
+uvicorn[standard]==0.29.0
+pydantic==2.7.1
+pydantic-settings==2.2.1
+psycopg2-binary==2.9.9
+sqlalchemy==2.0.29
+alembic==1.13.1
+asyncpg==0.29.0
 pandas==2.2.2
-pydantic==2.10.5
-pydantic-settings==2.7.1
-
-# PDF Processing
-pdfplumber==0.11.0
-PyPDF2==3.0.1
-
-# Task Queue (optional, for background processing)
-celery==5.4.0
-redis==5.0.6
-
-# HTTP Client
-httpx==0.27.0
-
-# Environment Variables
-python-dotenv==1.0.1
-
-# CORS and Security
+openpyxl==3.1.2
 python-multipart==0.0.9
-
-# System Monitoring
-psutil==6.0.0
-
-# Development Dependencies
-pytest==8.2.2
-pytest-asyncio==0.23.7
-black==24.4.2
-ruff==0.5.0
-
-# Additional test dependencies
-pytest-cov==5.0.0
-pytest-mock==3.14.0 
+PyPDF2==3.0.1
+pdfplumber==0.11.0
+psutil==5.9.8
+pytest==8.2.0
+pytest-asyncio==0.23.6
+httpx==0.27.0 
