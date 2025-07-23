@@ -1,4 +1,4 @@
-import type { DB } from '../../db/types'
+import type { Database } from '../../database'
 import type { Selectable, Insertable, Updateable, Kysely, Transaction } from 'kysely'
 import type { CreateSubmissionInput, UpdateSubmissionInput, CreateSampleForSubmissionInput } from '@/types/nanopore-submission'
 
@@ -6,9 +6,9 @@ import type { CreateSubmissionInput, UpdateSubmissionInput, CreateSampleForSubmi
  * Create a new submission
  */
 export async function createNanoporeSubmission(
-  db: Kysely<DB>,
+  db: Kysely<Database>,
   submissionData: CreateSubmissionInput & { created_by: string },
-): Promise<Selectable<DB['nanopore_submissions']>> {
+): Promise<Selectable<Database['nanopore_submissions']>> {
   const now = new Date().toISOString()
   
   return await db
@@ -44,10 +44,10 @@ export async function createNanoporeSubmission(
  * Update a submission
  */
 export async function updateNanoporeSubmission(
-  db: Kysely<DB>,
+  db: Kysely<Database>,
   submissionId: string,
   updateData: UpdateSubmissionInput,
-): Promise<Selectable<DB['nanopore_submissions']>> {
+): Promise<Selectable<Database['nanopore_submissions']>> {
   const now = new Date().toISOString()
   
   const finalUpdateData: any = {
@@ -67,11 +67,11 @@ export async function updateNanoporeSubmission(
  * Create samples for a submission
  */
 export async function createSamplesForSubmission(
-  db: Kysely<DB>,
+  db: Kysely<Database>,
   submissionId: string,
   samples: Array<CreateSampleForSubmissionInput>,
   createdBy: string,
-): Promise<Array<Selectable<DB['nanopore_samples']>>> {
+): Promise<Array<Selectable<Database['nanopore_samples']>>> {
   const now = new Date().toISOString()
   
   // Get submission data to inherit some fields
@@ -104,8 +104,6 @@ export async function createSamplesForSubmission(
     assigned_to: null,
     library_prep_by: null,
     submitted_at: now,
-    started_at: null,
-    completed_at: null,
     created_at: now,
     updated_at: now,
     created_by: createdBy,
@@ -122,14 +120,14 @@ export async function createSamplesForSubmission(
  * Create a submission with samples in a transaction
  */
 export async function createSubmissionWithSamples(
-  db: Kysely<DB>,
+  db: Kysely<Database>,
   submissionData: CreateSubmissionInput & { created_by: string },
   samples: Array<Omit<CreateSampleForSubmissionInput, 'submission_id'>>,
 ): Promise<{
-  submission: Selectable<DB['nanopore_submissions']>
-  samples: Array<Selectable<DB['nanopore_samples']>>
+  submission: Selectable<Database['nanopore_submissions']>
+  samples: Array<Selectable<Database['nanopore_samples']>>
 }> {
-  return await db.transaction().execute(async (trx: Transaction<DB>) => {
+  return await db.transaction().execute(async (trx: Transaction<Database>) => {
     // Create submission
     const submission = await createNanoporeSubmission(trx, submissionData)
     
@@ -146,7 +144,7 @@ export async function createSubmissionWithSamples(
       .updateTable('nanopore_submissions')
       .set({
         sample_count: createdSamples.length,
-        updated_at: new Date().toISOString(),
+        updated_at: new Date().toISOString() as any,
       })
       .where('id', '=', submission.id)
       .execute()
@@ -162,7 +160,7 @@ export async function createSubmissionWithSamples(
  * Delete a submission (and all its samples via CASCADE)
  */
 export async function deleteNanoporeSubmission(
-  db: Kysely<DB>,
+  db: Kysely<Database>,
   submissionId: string,
 ): Promise<void> {
   await db
@@ -175,17 +173,17 @@ export async function deleteNanoporeSubmission(
  * Update submission status
  */
 export async function updateSubmissionStatus(
-  db: Kysely<DB>,
+  db: Kysely<Database>,
   submissionId: string,
   status: 'pending' | 'processing' | 'completed' | 'failed',
-): Promise<Selectable<DB['nanopore_submissions']>> {
+): Promise<Selectable<Database['nanopore_submissions']>> {
   const now = new Date().toISOString()
   
   return await db
     .updateTable('nanopore_submissions')
     .set({
       status,
-      updated_at: now,
+      updated_at: now as any,
     })
     .where('id', '=', submissionId)
     .returningAll()

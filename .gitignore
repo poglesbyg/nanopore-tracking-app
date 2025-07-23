@@ -194,3 +194,6 @@ ca-certificates/
 # Local development overrides
 docker-compose.local.yml
 config/local.json
+
+# Documentation build output
+docs/_build/

@@ -34,7 +34,6 @@ extensions = [
     'sphinxcontrib.mermaid',
     'sphinx_copybutton',
     'sphinx_tabs.tabs',
-    'autodoc_pydantic',
 ]
 
 # MyST configuration
@@ -45,7 +44,6 @@ myst_enable_extensions = [
     "colon_fence",
     "smartquotes",
     "substitution",
-    "linkify",
 ]
 
 # Add any paths that contain templates here, relative to this directory.

@@ -1,4 +1,4 @@
-import type { DB } from '../../db/types'
+import type { Database } from '../../database'
 import type { Selectable, Kysely, ExpressionBuilder } from 'kysely'
 import type { NanoporeSubmission, NanoporeSampleWithSubmission } from '@/types/nanopore-submission'
 
@@ -6,7 +6,7 @@ import type { NanoporeSubmission, NanoporeSampleWithSubmission } from '@/types/n
  * Get all nanopore submissions
  */
 export async function getAllNanoporeSubmissions(
-  db: Kysely<DB>,
+  db: Kysely<Database>,
 ): Promise<Array<Selectable<DB['nanopore_submissions']>>> {
   return await db
     .selectFrom('nanopore_submissions')
@@ -19,7 +19,7 @@ export async function getAllNanoporeSubmissions(
  * Get submission by ID
  */
 export async function getNanoporeSubmissionById(
-  db: Kysely<DB>,
+  db: Kysely<Database>,
   submissionId: string,
   userId: string,
 ): Promise<Selectable<DB['nanopore_submissions']> | null> {
@@ -35,7 +35,7 @@ export async function getNanoporeSubmissionById(
  * Get submission with all its samples
  */
 export async function getNanoporeSubmissionWithSamples(
-  db: Kysely<DB>,
+  db: Kysely<Database>,
   submissionId: string,
   userId: string,
 ): Promise<(Selectable<DB['nanopore_submissions']> & { samples: Array<Selectable<DB['nanopore_samples']>> }) | null> {
@@ -62,7 +62,7 @@ export async function getNanoporeSubmissionWithSamples(
  * Get all submissions with their sample counts
  */
 export async function getAllSubmissionsWithCounts(
-  db: Kysely<DB>,
+  db: Kysely<Database>,
   userId?: string,
 ): Promise<Array<Selectable<DB['nanopore_submissions']>>> {
   let query = db
@@ -82,7 +82,7 @@ export async function getAllSubmissionsWithCounts(
  * Get submissions by status
  */
 export async function getSubmissionsByStatus(
-  db: Kysely<DB>,
+  db: Kysely<Database>,
   status: 'pending' | 'processing' | 'completed' | 'failed',
   userId?: string,
 ): Promise<Array<Selectable<DB['nanopore_submissions']>>> {
@@ -104,14 +104,14 @@ export async function getSubmissionsByStatus(
  * Search submissions
  */
 export async function searchSubmissions(
-  db: Kysely<DB>,
+  db: Kysely<Database>,
   searchTerm: string,
   userId?: string,
 ): Promise<Array<Selectable<DB['nanopore_submissions']>>> {
   let query = db
     .selectFrom('nanopore_submissions')
     .selectAll()
-    .where((eb: ExpressionBuilder<DB, 'nanopore_submissions'>) => eb.or([
+    .where((eb: ExpressionBuilder<Database, 'nanopore_submissions'>) => eb.or([
       eb('submission_number', 'ilike', `%${searchTerm}%`),
       eb('submitter_name', 'ilike', `%${searchTerm}%`),
       eb('submitter_email', 'ilike', `%${searchTerm}%`),
@@ -132,7 +132,7 @@ export async function searchSubmissions(
  * Get submission statistics
  */
 export async function getSubmissionStats(
-  db: Kysely<DB>,
+  db: Kysely<Database>,
   userId?: string,
 ): Promise<{
   total: number
@@ -185,7 +185,7 @@ export async function getSubmissionStats(
  * Get submissions with paginated results
  */
 export async function getSubmissionsPaginated(
-  db: Kysely<DB>,
+  db: Kysely<Database>,
   options: {
     page: number
     limit: number
@@ -220,7 +220,7 @@ export async function getSubmissionsPaginated(
   }
   
   if (search) {
-    const searchCondition = (eb: ExpressionBuilder<DB, 'nanopore_submissions'>) => eb.or([
+    const searchCondition = (eb: ExpressionBuilder<Database, 'nanopore_submissions'>) => eb.or([
       eb('submission_number', 'ilike', `%${search}%`),
       eb('submitter_name', 'ilike', `%${search}%`),
       eb('submitter_email', 'ilike', `%${search}%`),

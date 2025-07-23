@@ -54,13 +54,6 @@ PROMETHEUS_DEPLOYMENT_SUMMARY
 MICROSERVICES_PROGRESS
 ```
 
-## Quick Links
-
-- [API Documentation](api/index)
-- [Frontend Components](frontend/index)
-- [Backend Services](backend/index)
-- [Database Schema](database/index)
-
 ## Technology Stack
 
 ### Frontend
@@ -106,7 +99,7 @@ nanopore-tracking-app/
 
 ## Contributing
 
-We welcome contributions! Please see our [Contributing Guide](contributing) for details on:
+We welcome contributions! Please see our Contributing Guide for details on:
 - Setting up your development environment
 - Code style and standards
 - Submitting pull requests
@@ -117,8 +110,8 @@ We welcome contributions! Please see our [Contributing Guide](contributing) for 
 For questions or issues:
 - 📧 Email: support@unc.edu
 - 🐛 GitHub Issues: [Report a bug](https://github.com/unc-barc/nanopore-tracking-app/issues)
-- 📚 Wiki: [Internal documentation](https://wiki.unc.edu/nanopore-tracking)
+- 📚 Wiki: Internal documentation
 
 ---
 
-*Last updated: {sub-ref}`today`* 
+*Last updated: January 2025* 

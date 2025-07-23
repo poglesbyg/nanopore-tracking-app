@@ -33,6 +33,7 @@ const createRouter = () => {
 // Lazy load and merge routers
 export const createAppRouter = async () => {
   const { nanoporeRouter } = await import(/* @vite-ignore */ './api/nanopore')
+  const { nanoporeSubmissionRouter } = await import(/* @vite-ignore */ './api/nanopore-submission')
   
   return t.router({
     // Health check endpoint
@@ -42,6 +43,9 @@ export const createAppRouter = async () => {
     
     // Nanopore module
     nanopore: nanoporeRouter,
+    
+    // Nanopore submission module
+    nanoporeSubmission: nanoporeSubmissionRouter,
   })
 }
 

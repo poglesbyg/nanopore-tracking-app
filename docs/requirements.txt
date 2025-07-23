@@ -22,7 +22,7 @@ sphinxcontrib-mermaid==1.0.0
 
 # Auto-generation of API docs
 # Removed sphinx-js as it has complex node.js dependencies
-autodoc-pydantic==2.2.0
+# Removed autodoc-pydantic as it's causing import issues
 
 # For building multiple formats
 # Removed rst2pdf as it's not essential and has heavy dependencies
