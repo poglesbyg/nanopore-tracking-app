@@ -1710,8 +1710,48 @@ export default function NanoporeDashboard() {
                           }
                         }
                         
-                        // Create the sample
-                        await createSampleMutation.mutateAsync(sampleData)
+                        // Sanitize and validate data before submission
+                        const sanitizedData = {
+                          // Sanitize sample name to only allow alphanumeric, spaces, hyphens, underscores, dots
+                          sampleName: (sampleData.sampleName || `Sample-${Date.now()}`).replace(/[^a-zA-Z0-9\s\-_\.]/g, '').trim() || `Sample-${Date.now()}`,
+                          
+                          // Sanitize names to only allow letters, spaces, hyphens, apostrophes, dots
+                          submitterName: sampleData.submitterName.replace(/[^a-zA-Z\s\-'\.]/g, '').trim() || 'Unknown Submitter',
+                          submitterEmail: sampleData.submitterEmail.trim() || 'unknown@email.com',
+                          
+                          // Sanitize lab name to allow alphanumeric, spaces, hyphens, underscores, dots, commas, apostrophes
+                          labName: sampleData.labName ? sampleData.labName.replace(/[^a-zA-Z0-9\s\-_\.,']/g, '').trim() : undefined,
+                          
+                          // Map sample type to valid enum values
+                          sampleType: (() => {
+                            const typeStr = (sample.sample_type || '').toLowerCase()
+                            if (typeStr.includes('dna')) return 'DNA'
+                            if (typeStr.includes('rna')) return 'RNA'
+                            if (typeStr.includes('protein')) return 'Protein'
+                            return 'Other'
+                          })() as 'DNA' | 'RNA' | 'Protein' | 'Other',
+                          
+                          // Generate valid chart field - use HTSF-001 as default
+                          chartField: (() => {
+                            const billing = sample.billing_account || ''
+                            if (/^(HTSF|NANO|SEQ)-\d{3}$/.test(billing)) {
+                              return billing
+                            }
+                            // Generate a new HTSF number based on current timestamp
+                            const num = (Date.now() % 900) + 100 // Generates 100-999
+                            return `HTSF-${num.toString().padStart(3, '0')}`
+                          })(),
+                          
+                          // Keep other fields
+                          projectId: sample.project_id || sampleData.sampleName,
+                          concentration: sampleData.concentration,
+                          volume: sampleData.volume,
+                          flowCellType: sample.flow_cell || undefined,
+                          priority: 'normal' as const,
+                        }
+                        
+                        // Create the sample with sanitized data
+                        await createSampleMutation.mutateAsync(sanitizedData)
                         created++
                       } catch (error) {
                         console.error('Failed to create sample:', error)
@@ -1759,7 +1799,47 @@ export default function NanoporeDashboard() {
                       }
                     }
                     
-                    await createSampleMutation.mutateAsync(sampleData)
+                    // Sanitize and validate data before submission (same logic as array handler)
+                    const sanitizedData = {
+                      // Sanitize sample name to only allow alphanumeric, spaces, hyphens, underscores, dots
+                      sampleName: (sampleData.sampleName || `Sample-${Date.now()}`).replace(/[^a-zA-Z0-9\s\-_\.]/g, '').trim() || `Sample-${Date.now()}`,
+                      
+                      // Sanitize names to only allow letters, spaces, hyphens, apostrophes, dots
+                      submitterName: sampleData.submitterName.replace(/[^a-zA-Z\s\-'\.]/g, '').trim() || 'Unknown Submitter',
+                      submitterEmail: sampleData.submitterEmail.trim() || 'unknown@email.com',
+                      
+                      // Sanitize lab name to allow alphanumeric, spaces, hyphens, underscores, dots, commas, apostrophes
+                      labName: sampleData.labName ? sampleData.labName.replace(/[^a-zA-Z0-9\s\-_\.,']/g, '').trim() : undefined,
+                      
+                      // Map sample type to valid enum values
+                      sampleType: (() => {
+                        const typeStr = (data.sample_type || data.sampleType || '').toLowerCase()
+                        if (typeStr.includes('dna')) return 'DNA'
+                        if (typeStr.includes('rna')) return 'RNA'
+                        if (typeStr.includes('protein')) return 'Protein'
+                        return 'Other'
+                      })() as 'DNA' | 'RNA' | 'Protein' | 'Other',
+                      
+                      // Generate valid chart field - use HTSF-001 as default
+                      chartField: (() => {
+                        const billing = data.billing_account || ''
+                        if (/^(HTSF|NANO|SEQ)-\d{3}$/.test(billing)) {
+                          return billing
+                        }
+                        // Generate a new HTSF number based on current timestamp
+                        const num = (Date.now() % 900) + 100 // Generates 100-999
+                        return `HTSF-${num.toString().padStart(3, '0')}`
+                      })(),
+                      
+                      // Keep other fields
+                      projectId: data.project_id || sampleData.sampleName,
+                      concentration: sampleData.concentration,
+                      volume: sampleData.volume,
+                      flowCellType: data.flow_cell || data.flowCell || undefined,
+                      priority: 'normal' as const,
+                    }
+                    
+                    await createSampleMutation.mutateAsync(sanitizedData)
                     toast.success('Successfully created sample from PDF')
                     setShowPdfUploadModal(false)
                     refetch()
