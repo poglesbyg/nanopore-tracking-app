@@ -48,7 +48,7 @@ export function MCPEnhancedDashboard({
 
   // Get submission data if submissionId is provided
   const { data: submission } = trpc.nanoporeSubmission.getWithSamples.useQuery(
-    submissionId!,
+    { id: submissionId! },
     { enabled: !!submissionId }
   );
 
@@ -235,7 +235,7 @@ export function MCPEnhancedDashboard({
         <TabsContent value="quality" className="space-y-4">
           <QualityAssessmentPanel
             sampleData={selectedSample}
-            qualityMetrics={mockQualityMetrics}
+            qualityMetrics={mockQualityMetrics || {}}
             intendedApplication="genome sequencing"
             onAssessmentComplete={(assessment) => {
               console.log('Quality assessment complete:', assessment);

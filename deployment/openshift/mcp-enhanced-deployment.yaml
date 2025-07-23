@@ -1,0 +1,698 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nanopore-mcp
+  labels:
+    app: nanopore-tracking
+    environment: production
+    mcp-enabled: "true"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mcp-config
+  namespace: nanopore-mcp
+data:
+  # MCP Server Configuration
+  MCP_ENABLED: "true"
+  MCP_SAMPLE_MANAGEMENT_URL: "http://mcp-sample-management:3010"
+  MCP_NANOPORE_DOMAIN_URL: "http://mcp-nanopore-domain:3011"
+  MCP_TIMEOUT: "30000"
+  MCP_RETRY_ATTEMPTS: "3"
+  
+  # Application Configuration
+  NODE_ENV: "production"
+  PORT: "3001"
+  DATABASE_URL: "postgresql://nanopore_user:nanopore_pass@postgresql:5432/nanopore_db"
+  
+  # AI Processing Configuration
+  AI_PROCESSING_ENABLED: "true"
+  OLLAMA_BASE_URL: "http://ollama-service:11434"
+  PDF_PROCESSING_ENABLED: "true"
+  
+  # Memory Management
+  MEMORY_MONITORING_ENABLED: "true"
+  MEMORY_THRESHOLD_MB: "200"
+  HEAP_MONITORING_ENABLED: "true"
+  
+  # Logging Configuration
+  LOG_LEVEL: "info"
+  STRUCTURED_LOGGING: "true"
+  LOG_FORMAT: "json"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mcp-secrets
+  namespace: nanopore-mcp
+type: Opaque
+data:
+  # Database credentials (base64 encoded)
+  DATABASE_URL: cG9zdGdyZXNxbDovL25hbm9wb3JlX3VzZXI6bmFub3BvcmVfcGFzc0Bwb3N0Z3Jlc3FsOjU0MzIvbmFub3BvcmVfZGI=
+  JWT_SECRET: eW91ci1zZWN1cmUtand0LXNlY3JldC1oZXJl
+  ADMIN_PASSWORD: YWRtaW4tcGFzc3dvcmQtaGVyZQ==
+---
+# PostgreSQL Database
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgresql
+  namespace: nanopore-mcp
+  labels:
+    app: postgresql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgresql
+  template:
+    metadata:
+      labels:
+        app: postgresql
+    spec:
+      containers:
+      - name: postgresql
+        image: postgres:15-alpine
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_DB
+          value: nanopore_db
+        - name: POSTGRES_USER
+          value: nanopore_user
+        - name: POSTGRES_PASSWORD
+          value: nanopore_pass
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - nanopore_user
+            - -d
+            - nanopore_db
+          initialDelaySeconds: 15
+          periodSeconds: 5
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - nanopore_user
+            - -d
+            - nanopore_db
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: postgres-storage
+        persistentVolumeClaim:
+          claimName: postgres-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql
+  namespace: nanopore-mcp
+spec:
+  selector:
+    app: postgresql
+  ports:
+  - port: 5432
+    targetPort: 5432
+  type: ClusterIP
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: nanopore-mcp
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+# MCP Sample Management Server
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-sample-management
+  namespace: nanopore-mcp
+  labels:
+    app: mcp-sample-management
+    component: mcp-server
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mcp-sample-management
+  template:
+    metadata:
+      labels:
+        app: mcp-sample-management
+        component: mcp-server
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3010"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: mcp-sample-management
+        image: node:20-alpine
+        workingDir: /app
+        command:
+        - /bin/sh
+        - -c
+        - |
+          # Install dependencies and run MCP server
+          npm install
+          npm run build
+          npm start
+        ports:
+        - containerPort: 3010
+          name: mcp-port
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "3010"
+        - name: MCP_SERVER_NAME
+          value: "sample-management"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: mcp-secrets
+              key: DATABASE_URL
+        volumeMounts:
+        - name: mcp-sample-code
+          mountPath: /app
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3010
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3010
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: mcp-sample-code
+        configMap:
+          name: mcp-sample-management-code
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-sample-management
+  namespace: nanopore-mcp
+spec:
+  selector:
+    app: mcp-sample-management
+  ports:
+  - port: 3010
+    targetPort: 3010
+  type: ClusterIP
+---
+# MCP Nanopore Domain Server
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-nanopore-domain
+  namespace: nanopore-mcp
+  labels:
+    app: mcp-nanopore-domain
+    component: mcp-server
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mcp-nanopore-domain
+  template:
+    metadata:
+      labels:
+        app: mcp-nanopore-domain
+        component: mcp-server
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3011"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: mcp-nanopore-domain
+        image: node:20-alpine
+        workingDir: /app
+        command:
+        - /bin/sh
+        - -c
+        - |
+          # Install dependencies and run MCP server
+          npm install
+          npm run build
+          npm start
+        ports:
+        - containerPort: 3011
+          name: mcp-port
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "3011"
+        - name: MCP_SERVER_NAME
+          value: "nanopore-domain"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: mcp-secrets
+              key: DATABASE_URL
+        volumeMounts:
+        - name: mcp-domain-code
+          mountPath: /app
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3011
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3011
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: mcp-domain-code
+        configMap:
+          name: mcp-nanopore-domain-code
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-nanopore-domain
+  namespace: nanopore-mcp
+spec:
+  selector:
+    app: mcp-nanopore-domain
+  ports:
+  - port: 3011
+    targetPort: 3011
+  type: ClusterIP
+---
+# Main Application Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nanopore-app
+  namespace: nanopore-mcp
+  labels:
+    app: nanopore-app
+    component: frontend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nanopore-app
+  template:
+    metadata:
+      labels:
+        app: nanopore-app
+        component: frontend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3001"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: nanopore-app
+        image: node:20-alpine
+        workingDir: /app
+        command:
+        - /bin/sh
+        - -c
+        - |
+          # Install dependencies and build application
+          npm install
+          npm run build
+          npm start
+        ports:
+        - containerPort: 3001
+          name: http
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "3001"
+        - name: MCP_ENABLED
+          valueFrom:
+            configMapKeyRef:
+              name: mcp-config
+              key: MCP_ENABLED
+        - name: MCP_SAMPLE_MANAGEMENT_URL
+          valueFrom:
+            configMapKeyRef:
+              name: mcp-config
+              key: MCP_SAMPLE_MANAGEMENT_URL
+        - name: MCP_NANOPORE_DOMAIN_URL
+          valueFrom:
+            configMapKeyRef:
+              name: mcp-config
+              key: MCP_NANOPORE_DOMAIN_URL
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: mcp-secrets
+              key: DATABASE_URL
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: mcp-secrets
+              key: JWT_SECRET
+        volumeMounts:
+        - name: app-code
+          mountPath: /app
+        - name: uploads
+          mountPath: /app/uploads
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3001
+          initialDelaySeconds: 15
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: app-code
+        configMap:
+          name: nanopore-app-code
+      - name: uploads
+        persistentVolumeClaim:
+          claimName: uploads-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nanopore-app
+  namespace: nanopore-mcp
+spec:
+  selector:
+    app: nanopore-app
+  ports:
+  - port: 3001
+    targetPort: 3001
+  type: ClusterIP
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: uploads-pvc
+  namespace: nanopore-mcp
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
+---
+# Ollama AI Service (Optional)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama-service
+  namespace: nanopore-mcp
+  labels:
+    app: ollama-service
+    component: ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ollama-service
+  template:
+    metadata:
+      labels:
+        app: ollama-service
+        component: ai
+    spec:
+      containers:
+      - name: ollama
+        image: ollama/ollama:latest
+        ports:
+        - containerPort: 11434
+          name: ollama-port
+        env:
+        - name: OLLAMA_HOST
+          value: "0.0.0.0"
+        volumeMounts:
+        - name: ollama-data
+          mountPath: /root/.ollama
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        readinessProbe:
+          httpGet:
+            path: /api/tags
+            port: 11434
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /api/tags
+            port: 11434
+          initialDelaySeconds: 60
+          periodSeconds: 30
+      volumes:
+      - name: ollama-data
+        persistentVolumeClaim:
+          claimName: ollama-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama-service
+  namespace: nanopore-mcp
+spec:
+  selector:
+    app: ollama-service
+  ports:
+  - port: 11434
+    targetPort: 11434
+  type: ClusterIP
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ollama-pvc
+  namespace: nanopore-mcp
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+---
+# Routes for External Access
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: nanopore-app-route
+  namespace: nanopore-mcp
+  labels:
+    app: nanopore-app
+spec:
+  host: nanopore-mcp.apps.your-cluster.com
+  to:
+    kind: Service
+    name: nanopore-app
+    weight: 100
+  port:
+    targetPort: 3001
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None
+---
+# Horizontal Pod Autoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: nanopore-app-hpa
+  namespace: nanopore-mcp
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: nanopore-app
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+---
+# MCP Server HPA
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: mcp-servers-hpa
+  namespace: nanopore-mcp
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: mcp-sample-management
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 60
+---
+# Network Policies for Security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: nanopore-mcp-network-policy
+  namespace: nanopore-mcp
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: nanopore-mcp
+    - podSelector: {}
+  - from: []
+    ports:
+    - protocol: TCP
+      port: 3001
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: nanopore-mcp
+    - podSelector: {}
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+---
+# Service Monitor for Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: nanopore-mcp-monitoring
+  namespace: nanopore-mcp
+  labels:
+    app: nanopore-tracking
+spec:
+  selector:
+    matchLabels:
+      component: frontend
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+  - port: mcp-port
+    path: /metrics
+    interval: 30s
+---
+# Pod Disruption Budget
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: nanopore-app-pdb
+  namespace: nanopore-mcp
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: nanopore-app
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: mcp-servers-pdb
+  namespace: nanopore-mcp
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      component: mcp-server 

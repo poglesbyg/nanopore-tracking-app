@@ -327,7 +327,7 @@ export function SubmissionDashboard({ className = '' }: SubmissionDashboardProps
                               Samples ({submission.samples.length})
                             </h4>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                              {submission.samples.slice(0, 6).map((sample, index) => (
+                              {submission.samples.slice(0, 6).map((sample: any, index: number) => (
                                 <div key={index} className="bg-white p-3 rounded border">
                                   <div className="font-medium text-sm">{sample.sample_name}</div>
                                   <div className="text-xs text-gray-600 mt-1">
@@ -424,4 +424,6 @@ export function SubmissionDashboard({ className = '' }: SubmissionDashboardProps
       )}
     </div>
   )
-} 
+}
+
+export default SubmissionDashboard 
