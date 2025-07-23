@@ -1,11 +1,8 @@
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
-import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
-import { Input } from '../ui/input'
 import { Skeleton } from '../ui/skeleton'
-import { Progress } from '../ui/progress'
 import CreateSampleModal from './create-sample-modal'
 import { EditTaskModal } from './edit-task-modal'
 import { ViewTaskModal } from './view-task-modal'
@@ -22,11 +19,26 @@ import type { UserSession } from '../../lib/auth/AdminAuth'
 import PDFUpload from './pdf-upload'
 import CSVUpload from './csv-upload'
 import { useAuth } from '../auth/auth-wrapper'
-import { trpc } from '@/client/trpc'
 import type { NanoporeSample } from '@/lib/api-client'
+
+// Import our new modular components
+// Import our new modular components
+import { StatusBadge } from '@/shared/components/StatusBadge'
+import { PriorityBadge } from '@/shared/components/PriorityBadge'
+import { SampleFilters } from '@/features/samples/components/SampleFilters'
+import { BulkActions } from '@/features/samples/components/BulkActions'
+import { BulkOperationProgress } from '@/features/samples/components/BulkOperationProgress'
+import { useSamples } from '@/features/samples/hooks/useSamples'
+import { useSampleOperations } from '@/features/samples/hooks/useSampleOperations'
+import { useSampleStore } from '@/stores/sampleStore'
+
+import { Badge } from '../ui/badge'
+import { Input } from '../ui/input'
+import { Progress } from '../ui/progress'
+import { trpc } from '@/client/trpc'
 import { 
   Plus, 
-  Search, 
+  Search,
   Download, 
   Upload, 
   AlertCircle, 
@@ -57,45 +69,7 @@ interface DashboardStats {
   urgent: number
 }
 
-const StatusBadge = ({ status }: { status: string }) => {
-  if (process.env.NODE_ENV === 'development') {
-    console.log('StatusBadge rendering with status:', status)
-  }
-  
-  const statusConfig = {
-    submitted: { color: 'bg-blue-100 text-blue-800', icon: Clock },
-    prep: { color: 'bg-yellow-100 text-yellow-800', icon: TestTube },
-    sequencing: { color: 'bg-purple-100 text-purple-800', icon: Zap },
-    analysis: { color: 'bg-orange-100 text-orange-800', icon: Activity },
-    completed: { color: 'bg-green-100 text-green-800', icon: CheckCircle },
-    archived: { color: 'bg-gray-100 text-gray-800', icon: Archive }
-  }
-
-  const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.submitted
-  const Icon = config.icon
-
-  return (
-    <Badge className={`${config.color} flex items-center gap-1`}>
-      <Icon className="w-3 h-3" />
-      {status.charAt(0).toUpperCase() + status.slice(1)}
-    </Badge>
-  )
-}
-
-const PriorityBadge = ({ priority }: { priority: string }) => {
-  const priorityConfig = {
-    low: 'bg-gray-100 text-gray-600',
-    normal: 'bg-blue-100 text-blue-700',
-    high: 'bg-orange-100 text-orange-700',
-    urgent: 'bg-red-100 text-red-700'
-  }
-
-  return (
-    <Badge className={priorityConfig[priority as keyof typeof priorityConfig] || priorityConfig.normal}>
-      {priority.charAt(0).toUpperCase() + priority.slice(1)}
-    </Badge>
-  )
-}
+// StatusBadge and PriorityBadge components are now imported from shared components
 
 const StatCard = ({ title, value, icon: Icon, color, change }: {
   title: string
@@ -1678,6 +1652,11 @@ export default function NanoporeDashboard() {
                   if (samples.length > 0) {
                     toast.info(`Found ${samples.length} samples in PDF. Creating samples...`)
                     
+                    // Debug log the raw PDF data
+                    if (process.env.NODE_ENV === 'development') {
+                      console.log('Raw PDF sample data:', samples)
+                    }
+                    
                     let created = 0
                     let failed = 0
                     
@@ -1715,6 +1694,15 @@ export default function NanoporeDashboard() {
                           // Sanitize sample name to only allow alphanumeric, spaces, hyphens, underscores, dots
                           sampleName: (sampleData.sampleName || `Sample-${Date.now()}`).replace(/[^a-zA-Z0-9\s\-_\.]/g, '').trim() || `Sample-${Date.now()}`,
                           
+                          // Add projectId field (was missing!)
+                          projectId: (() => {
+                            const rawProjectId = sample.project_id || sampleData.sampleName || ''
+                            console.log('Raw projectId from PDF (array):', rawProjectId) // DEBUG
+                            const sanitized = rawProjectId.replace(/[^a-zA-Z0-9\s\-_\.]/g, '').trim()
+                            console.log('Sanitized projectId (array):', sanitized) // DEBUG
+                            return sanitized || undefined
+                          })(),
+                          
                           // Sanitize names to only allow letters, spaces, hyphens, apostrophes, dots
                           submitterName: sampleData.submitterName.replace(/[^a-zA-Z\s\-'\.]/g, '').trim() || 'Unknown Submitter',
                           submitterEmail: sampleData.submitterEmail.trim() || 'unknown@email.com',
@@ -1742,20 +1730,72 @@ export default function NanoporeDashboard() {
                             return `HTSF-${num.toString().padStart(3, '0')}`
                           })(),
                           
+                          // Fix flowCellType - handle "Selection:" and other invalid values
+                          flowCellType: (() => {
+                            const flowCell = (sample.flow_cell || sampleData.flowCell || '').trim()
+                            console.log('PDF flowCell value (array):', flowCell) // DEBUG
+                            
+                            // Check if it's a valid enum value
+                            if (['R9.4.1', 'R10.4.1', 'R10.5.1', 'Other'].includes(flowCell)) {
+                              return flowCell as 'R9.4.1' | 'R10.4.1' | 'R10.5.1' | 'Other'
+                            }
+                            // Check for common patterns
+                            if (flowCell.includes('R9')) return 'R9.4.1'
+                            if (flowCell.includes('R10.4')) return 'R10.4.1'
+                            if (flowCell.includes('R10.5')) return 'R10.5.1'
+                            // Skip if invalid or empty - including "Selection:"
+                            if (flowCell === 'Selection:' || flowCell.startsWith('Selection')) {
+                              console.log('Skipping invalid flowCell value (array):', flowCell) // DEBUG
+                              return undefined
+                            }
+                            return undefined
+                          })(),
+                          
                           // Keep other fields
-                          projectId: sample.project_id || sampleData.sampleName,
                           concentration: sampleData.concentration,
                           volume: sampleData.volume,
-                          flowCellType: sample.flow_cell || undefined,
                           priority: 'normal' as const,
                         }
                         
+                        // Remove undefined fields before sending
+                        const dataToSend = Object.entries(sanitizedData).reduce((acc, [key, value]) => {
+                          if (value !== undefined) {
+                            acc[key] = value
+                          }
+                          return acc
+                        }, {} as any)
+                        
+                        // Debug log the sanitized data before sending
+                        if (process.env.NODE_ENV === 'development') {
+                          console.log('Sanitized sample data being sent to API:', dataToSend)
+                          console.log('CODE VERSION: 2.1 - with flowCell fix') // VERSION CHECK
+                        }
+                        
                         // Create the sample with sanitized data
-                        await createSampleMutation.mutateAsync(sanitizedData)
+                        await createSampleMutation.mutateAsync(dataToSend)
                         created++
                       } catch (error) {
                         console.error('Failed to create sample:', error)
                         failed++
+                        
+                        // Extract detailed error information
+                        let errorMessage = 'Unknown error'
+                        if (error && typeof error === 'object' && 'message' in error) {
+                          errorMessage = error.message as string
+                        }
+                        
+                        // Show specific validation errors if available
+                        if (error && typeof error === 'object' && 'data' in error && error.data) {
+                          const errorData = error.data as any
+                          if (errorData.zodError && errorData.zodError.issues) {
+                            const validationErrors = errorData.zodError.issues.map((issue: any) => 
+                              `${issue.path.join('.')}: ${issue.message}`
+                            )
+                            errorMessage = `Validation errors: ${validationErrors.join(', ')}`
+                          }
+                        }
+                        
+                        console.error(`Sample ${sample.sample_name || 'Unknown'} failed: ${errorMessage}`)
                       }
                     }
                     
@@ -1772,6 +1812,12 @@ export default function NanoporeDashboard() {
                   }
                 } else if (data && typeof data === 'object') {
                   // Handle single sample object
+                  
+                  // Debug log the raw PDF data
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log('Raw PDF single sample data:', data)
+                  }
+                  
                   try {
                     const sampleData = {
                       submitterName: data.submitter_name || data.submitterName || '',
@@ -1804,6 +1850,15 @@ export default function NanoporeDashboard() {
                       // Sanitize sample name to only allow alphanumeric, spaces, hyphens, underscores, dots
                       sampleName: (sampleData.sampleName || `Sample-${Date.now()}`).replace(/[^a-zA-Z0-9\s\-_\.]/g, '').trim() || `Sample-${Date.now()}`,
                       
+                      // Add projectId field (was missing!)
+                      projectId: (() => {
+                        const rawProjectId = data.project_id || sampleData.sampleName || ''
+                        console.log('Raw projectId from PDF:', rawProjectId) // DEBUG
+                        const sanitized = rawProjectId.replace(/[^a-zA-Z0-9\s\-_\.]/g, '').trim()
+                        console.log('Sanitized projectId:', sanitized) // DEBUG
+                        return sanitized || undefined
+                      })(),
+                      
                       // Sanitize names to only allow letters, spaces, hyphens, apostrophes, dots
                       submitterName: sampleData.submitterName.replace(/[^a-zA-Z\s\-'\.]/g, '').trim() || 'Unknown Submitter',
                       submitterEmail: sampleData.submitterEmail.trim() || 'unknown@email.com',
@@ -1831,15 +1886,48 @@ export default function NanoporeDashboard() {
                         return `HTSF-${num.toString().padStart(3, '0')}`
                       })(),
                       
+                      // Fix flowCellType - handle "Selection:" and other invalid values
+                      flowCellType: (() => {
+                        const flowCell = (data.flow_cell || data.flowCell || '').trim()
+                        console.log('PDF flowCell value:', flowCell) // DEBUG
+                        
+                        // Check if it's a valid enum value
+                        if (['R9.4.1', 'R10.4.1', 'R10.5.1', 'Other'].includes(flowCell)) {
+                          return flowCell as 'R9.4.1' | 'R10.4.1' | 'R10.5.1' | 'Other'
+                        }
+                        // Check for common patterns
+                        if (flowCell.includes('R9')) return 'R9.4.1'
+                        if (flowCell.includes('R10.4')) return 'R10.4.1'
+                        if (flowCell.includes('R10.5')) return 'R10.5.1'
+                        // Skip if invalid or empty - including "Selection:"
+                        if (flowCell === 'Selection:' || flowCell.startsWith('Selection')) {
+                          console.log('Skipping invalid flowCell value:', flowCell) // DEBUG
+                          return undefined
+                        }
+                        return undefined
+                      })(),
+                      
                       // Keep other fields
-                      projectId: data.project_id || sampleData.sampleName,
                       concentration: sampleData.concentration,
                       volume: sampleData.volume,
-                      flowCellType: data.flow_cell || data.flowCell || undefined,
                       priority: 'normal' as const,
                     }
                     
-                    await createSampleMutation.mutateAsync(sanitizedData)
+                    // Remove undefined fields before sending
+                    const dataToSend = Object.entries(sanitizedData).reduce((acc, [key, value]) => {
+                      if (value !== undefined) {
+                        acc[key] = value
+                      }
+                      return acc
+                    }, {} as any)
+                    
+                    // Debug log the sanitized data before sending
+                    if (process.env.NODE_ENV === 'development') {
+                      console.log('Sanitized single sample data being sent to API:', dataToSend)
+                      console.log('CODE VERSION: 2.1 - with flowCell fix') // VERSION CHECK
+                    }
+                    
+                    await createSampleMutation.mutateAsync(dataToSend)
                     toast.success('Successfully created sample from PDF')
                     setShowPdfUploadModal(false)
                     refetch()

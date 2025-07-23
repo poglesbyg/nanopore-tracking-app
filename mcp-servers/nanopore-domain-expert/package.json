@@ -1,0 +1,20 @@
+{
+  "name": "@nanopore-tracking/mcp-domain-expert",
+  "version": "1.0.0",
+  "description": "MCP server providing nanopore sequencing domain expertise",
+  "main": "server.py",
+  "scripts": {
+    "start": "python server.py",
+    "dev": "python -m watchdog server.py",
+    "test": "pytest tests/"
+  },
+  "dependencies": {
+    "mcp": "^0.1.0"
+  },
+  "devDependencies": {
+    "pytest": "^7.4.0",
+    "watchdog": "^3.0.0"
+  },
+  "author": "Nanopore Tracking Team",
+  "license": "MIT"
+} 
