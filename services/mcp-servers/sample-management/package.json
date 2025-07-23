@@ -11,11 +11,11 @@
     "test": "vitest"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
-    "zod": "^3.22.4",
+    "@modelcontextprotocol/sdk": "^1.16.0",
+    "date-fns": "^3.0.0",
     "kysely": "^0.27.0",
     "pg": "^8.11.0",
-    "date-fns": "^3.0.0"
+    "zod": "^3.22.4"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
@@ -31,4 +31,4 @@
     "workflow",
     "automation"
   ]
-} 
+}
