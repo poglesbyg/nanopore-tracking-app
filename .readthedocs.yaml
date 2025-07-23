@@ -13,6 +13,14 @@ build:
   apt_packages:
     - postgresql-client
     - redis-tools
+  jobs:
+    pre_build:
+      # Generate API documentation from TypeScript/Python code
+      - echo "Generating API documentation..."
+      - cd docs && python generate_api_docs.py || true
+    post_build:
+      # Copy additional assets if needed
+      - echo "Build completed"
 
 # Build documentation in the docs/ directory with Sphinx
 sphinx:
@@ -41,16 +49,4 @@ python:
 # This helps maintain docs for different releases
 submodules:
   include: all
-  recursive: true
-
-# Additional build commands
-# These run before the documentation build
-build:
-  jobs:
-    pre_build:
-      # Generate API documentation from TypeScript/Python code
-      - echo "Generating API documentation..."
-      - cd docs && python generate_api_docs.py || true
-    post_build:
-      # Copy additional assets if needed
-      - echo "Build completed" 
+  recursive: true 
