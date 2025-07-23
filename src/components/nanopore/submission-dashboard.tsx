@@ -8,6 +8,8 @@ import { Skeleton } from '../ui/skeleton'
 import { Input } from '../ui/input'
 import { trpc } from '@/client/trpc'
 import { MCPEnhancedDashboard } from './mcp-enhanced-dashboard'
+import PDFUpload from './pdf-upload'
+import { toast } from 'sonner'
 import { 
   ChevronDown, 
   ChevronRight, 
@@ -19,7 +21,8 @@ import {
   Plus,
   Brain,
   Lightbulb,
-  TrendingUp
+  TrendingUp,
+  X
 } from 'lucide-react'
 
 interface SubmissionDashboardProps {
@@ -31,6 +34,7 @@ export function SubmissionDashboard({ className = '' }: SubmissionDashboardProps
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [activeView, setActiveView] = useState<'submissions' | 'ai-assistant'>('submissions')
+  const [showCreateSubmission, setShowCreateSubmission] = useState(false)
   const pageSize = 10
 
   const { data: submissions, isLoading, error, refetch } = trpc.nanoporeSubmission.getAllPaginated.useQuery({
@@ -132,47 +136,6 @@ export function SubmissionDashboard({ className = '' }: SubmissionDashboardProps
       {/* AI Assistant View */}
       {activeView === 'ai-assistant' && (
         <div className="space-y-6">
-          {/* AI Assistant Introduction */}
-          <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Brain className="h-6 w-6 text-blue-600" />
-                AI-Powered Laboratory Intelligence
-                <Badge variant="secondary" className="ml-auto bg-blue-100 text-blue-800">
-                  MCP Enabled
-                </Badge>
-              </CardTitle>
-              <CardDescription>
-                Get intelligent assistance for protocol recommendations, quality assessment, and workflow optimization
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="flex items-center gap-3 p-3 bg-white rounded-lg border">
-                  <Lightbulb className="h-8 w-8 text-yellow-500" />
-                  <div>
-                    <div className="font-medium">Smart Protocols</div>
-                    <div className="text-sm text-gray-600">AI recommends optimal sequencing protocols</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 p-3 bg-white rounded-lg border">
-                  <TestTube className="h-8 w-8 text-purple-500" />
-                  <div>
-                    <div className="font-medium">Quality Analysis</div>
-                    <div className="text-sm text-gray-600">Intelligent sample quality assessment</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 p-3 bg-white rounded-lg border">
-                  <TrendingUp className="h-8 w-8 text-green-500" />
-                  <div>
-                    <div className="font-medium">Workflow Insights</div>
-                    <div className="text-sm text-gray-600">Performance optimization suggestions</div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
           {/* MCP Enhanced Dashboard */}
           <MCPEnhancedDashboard 
             submissionId={submissions?.data?.[0]?.id}
@@ -195,7 +158,7 @@ export function SubmissionDashboard({ className = '' }: SubmissionDashboardProps
                 className="pl-10"
               />
             </div>
-            <Button>
+            <Button onClick={() => setShowCreateSubmission(true)}>
               <Plus className="h-4 w-4 mr-2" />
               New Submission
             </Button>
@@ -413,7 +376,7 @@ export function SubmissionDashboard({ className = '' }: SubmissionDashboardProps
                 <p className="text-gray-600 mb-4">
                   {searchTerm ? 'Try adjusting your search terms' : 'Get started by creating your first submission'}
                 </p>
-                <Button>
+                <Button onClick={() => setShowCreateSubmission(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Create Submission
                 </Button>
@@ -421,6 +384,36 @@ export function SubmissionDashboard({ className = '' }: SubmissionDashboardProps
             </Card>
           )}
         </>
+      )}
+
+      {/* PDF Upload Modal for New Submission */}
+      {showCreateSubmission && (
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            <div className="p-6 border-b flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Create New Submission</h2>
+              <button
+                onClick={() => setShowCreateSubmission(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+              <PDFUpload 
+                onDataExtracted={(data: any, file: File) => {
+                  // Handle the extracted data
+                  refetch()
+                  setShowCreateSubmission(false)
+                  toast.success('Submission created successfully!')
+                }}
+                onFileUploaded={() => {
+                  // Handle file upload completion
+                }}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
