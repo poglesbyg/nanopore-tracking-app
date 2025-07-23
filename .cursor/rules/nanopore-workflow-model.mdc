@@ -1,68 +1,88 @@
 ---
-description: Specifications for the 8-step nanopore sequencing workflow model including state transitions and validation rules
-globs: src/features/workflowManagement/**,src/validation/workflowStepValidation.ts,src/lib/api/nanopore/setters.ts
+description: Defines core 8-step workflow model for nanopore sample processing including state transitions, validation, and timing requirements
+globs: **/nanopore/**,**/workflow/**,**/sample-management/**
 alwaysApply: false
 ---
 
 
 # nanopore-workflow-model
 
-## Core Workflow Steps
-Importance Score: 95
-
-The nanopore sequencing workflow consists of 8 standardized steps:
+Core 8-Step Nanopore Sample Processing Workflow:
 
 1. Sample QC (1h)
-   - Initial quality control validation
-   - Concentration and purity measurements
+- Initial quality control validation 
+- Concentration verification (0.1-1000 ng/μL)
+- Volume validation (0.1-1000 μL)
+- Required fields: sample name, submitter info, chart field
 
 2. Library Preparation (4h)
-   - DNA/RNA library construction
-   - Adapter ligation verification
+- DNA/RNA library construction
+- Kit compatibility validation
+- Barcoding requirements check
+- Records library prep specialist assignment
 
 3. Library QC (1h)
-   - Quality metrics validation
-   - Fragment size analysis
+- Validates library quality metrics
+- Fragment size analysis
+- Concentration re-verification
+- Go/no-go quality gate
 
 4. Sequencing Setup (1h)
-   - Flow cell preparation
-   - Device configuration
+- Flow cell preparation 
+- Chemistry validation (R9.4.1, R10.4.1)
+- Device type matching (PromethION/MinION)
+- Run parameters configuration
 
 5. Sequencing Run (48h)
-   - Active sequencing monitoring
-   - Real-time data collection
+- Active sequencing monitoring
+- Real-time quality metrics
+- Run progress tracking
+- Error state detection
 
 6. Basecalling (2h)
-   - Raw signal conversion
-   - Initial sequence assembly
+- Raw signal conversion
+- Model selection logic
+- Quality score calculation
+- Read length distribution analysis
 
 7. Quality Assessment (1h)
-   - Read quality metrics
-   - Coverage analysis
+- Read quality verification
+- Coverage calculation
+- Error rate analysis 
+- Pass/fail determination
 
 8. Data Delivery (1h)
-   - Results packaging
-   - Data transfer validation
+- Results packaging
+- Delivery method selection
+- Archive requirements check
+- Completion notification
 
-## State Transitions
-Importance Score: 85
+Workflow State Transitions:
+- Sequential progression through all 8 stages
+- Each stage requires completion before advancement
+- Failed stages trigger rework or sample rejection
+- Priority levels affect queue position
 
-Workflow progression follows strict state transitions:
-- submitted → prep → sequencing → analysis → completed → archived
-- Each transition requires validation of completion criteria
-- Priority levels affect transition timing: low, normal, high, urgent
+Key Validation Rules:
+- Chart field format: (HTSF|NANO|SEQ)-\d{3}
+- Concentration ranges by type:
+  - DNA: 0.1-1000 ng/μL
+  - RNA: 0.1-500 ng/μL
+  - Protein: 0.5-2000 μg/mL
+- Volume minimum: 0.1 μL
+- Required fields enforced at each stage
 
-## Validation Rules
-Importance Score: 80
+Priority Classifications:
+- urgent: Skip queue, immediate processing
+- high: Next in queue
+- normal: Standard processing
+- low: Process when resources available
 
-Step-specific validation requirements:
-- Sample QC: Concentration thresholds (ng/μL), purity ratios
-- Library QC: Fragment size ranges, adapter presence
-- Sequencing: Flow cell performance metrics
-- Quality Assessment: Read quality scores, coverage depth
-
-Located in: `src/validation/workflowStepValidation.ts`
+Implementation Paths:
+- src/services/sample-management/workflow.ts
+- src/lib/nanopore/processing-steps.ts
+- src/repositories/WorkflowStateManager.ts
 
 $END$
 
- If you're using this file in context, clearly say in italics in one small line that "Context added by Giga nanopore-workflow-model".
+ If you're using this file in context, clearly say in italics in one small line that "Context added by Giga nanopore-workflow-model" along with specifying exactly what information was used from this file in a human-friendly way, instead of using kebab-case use normal sentence case.
