@@ -99,14 +99,24 @@ export default function NanoporeDashboard() {
   // Authentication check
   const { user, logout } = useAuth()
   
-  // State management
-  const [showUserMenu, setShowUserMenu] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [priorityFilter, setPriorityFilter] = useState<string>('all')
-  const [showCreateModal, setShowCreateModal] = useState(false)
+  // Use our new Zustand store and hooks
+  const { 
+    selectedSamples, 
+    currentPage, 
+    pageSize,
+    setCurrentPage,
+    setPageSize,
+    toggleSampleSelection,
+    selectAllSamples,
+    clearSelection
+  } = useSampleStore()
   
-  // Admin session state
+  const { samples, pagination, isLoading, refetch } = useSamples()
+  const sampleOperations = useSampleOperations()
+  
+  // Local UI state (not related to samples)
+  const [showUserMenu, setShowUserMenu] = useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(false)
   const [adminSession, setAdminSession] = useState<UserSession | null>(null)
   
   // Modal state management
@@ -117,62 +127,16 @@ export default function NanoporeDashboard() {
   const [selectedSample, setSelectedSample] = useState<NanoporeSample | null>(null)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [openDropdown, setOpenDropdown] = useState<string | null>(null)
-  const [selectedSamples, setSelectedSamples] = useState<Set<string>>(new Set())
   const [showBulkAssignModal, setShowBulkAssignModal] = useState(false)
   const [showPdfUploadModal, setShowPdfUploadModal] = useState(false)
   const [showCsvUploadModal, setShowCsvUploadModal] = useState(false)
 
-  // Pagination and search state
-  const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
-  const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [sortBy, setSortBy] = useState<'submittedAt' | 'sampleName' | 'status' | 'priority'>('submittedAt')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
-
-  // Bulk operation progress state
-  const [bulkOperationProgress, setBulkOperationProgress] = useState<{
-    isActive: boolean
-    total: number
-    completed: number
-    operation: string
-    errors: string[]
-  }>({
-    isActive: false,
-    total: 0,
-    completed: 0,
-    operation: '',
-    errors: []
-  })
-
-  // Debounce search input
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchQuery)
-      setCurrentPage(1) // Reset to first page when search changes
-    }, 500) // 500ms debounce
-
-    return () => clearTimeout(timer)
-  }, [searchQuery])
-  
-  // tRPC hooks with optimistic updates
+  // tRPC utils for mutations
   const utils = trpc.useUtils()
-  const { data: paginatedData, isLoading: loading, refetch } = trpc.nanopore.getAllPaginated.useQuery({
-    page: currentPage,
-    limit: pageSize,
-    search: debouncedSearch || undefined,
-    status: statusFilter === 'all' ? undefined : statusFilter,
-    priority: priorityFilter === 'all' ? undefined : priorityFilter,
-    sortBy,
-    sortOrder
-  })
-  
-  // Extract samples and pagination info
-  const samples = paginatedData?.data || []
-  const paginationInfo = paginatedData?.pagination
   
   // Debug samples data (only in development)
   if (process.env.NODE_ENV === 'development') {
-    console.log('Paginated samples data:', { samples, paginationInfo })
+    console.log('Paginated samples data:', { samples, pagination })
   }
   
   // Force re-render trigger
@@ -783,167 +747,25 @@ export default function NanoporeDashboard() {
 
   // Bulk actions handlers
   const handleSelectSample = (sampleId: string, checked: boolean) => {
-    setSelectedSamples(prev => {
-      const newSet = new Set(prev)
-      if (checked) {
-        newSet.add(sampleId)
-      } else {
-        newSet.delete(sampleId)
-      }
-      return newSet
-    })
+    toggleSampleSelection(sampleId)
   }
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedSamples(new Set(filteredSamples.map((s: NanoporeSample) => s.id)))
+      selectAllSamples(filteredSamples.map((s: NanoporeSample) => s.id))
     } else {
-      setSelectedSamples(new Set())
+      clearSelection()
     }
   }
 
   const handleBulkAssign = async (assignedTo: string, libraryPrepBy?: string) => {
     const selectedIds = Array.from(selectedSamples)
-    
-    // Initialize progress tracking
-    setBulkOperationProgress({
-      isActive: true,
-      total: selectedIds.length,
-      completed: 0,
-      operation: 'Assigning samples',
-      errors: []
-    })
-
-    setActionLoading('bulk')
-    
-    let completed = 0
-    const errors: string[] = []
-
-    try {
-      // Process assignments one by one to track progress
-      for (const sampleId of selectedIds) {
-        try {
-          await assignSampleMutation.mutateAsync({
-            id: sampleId,
-            assignedTo,
-            libraryPrepBy,
-          })
-          completed++
-          setBulkOperationProgress(prev => ({
-            ...prev,
-            completed: completed
-          }))
-        } catch (error) {
-          const errorMsg = `Failed to assign sample ${sampleId}: ${error instanceof Error ? error.message : 'Unknown error'}`
-          errors.push(errorMsg)
-          setBulkOperationProgress(prev => ({
-            ...prev,
-            errors: [...prev.errors, errorMsg]
-          }))
-        }
-      }
-
-      // Refresh data and show results
-      await refetch()
-      
-      if (errors.length === 0) {
-        toast.success(`${completed} samples assigned successfully`)
-      } else if (completed > 0) {
-        toast.warning(`${completed} samples assigned, ${errors.length} failed`)
-      } else {
-        toast.error('All assignments failed')
-      }
-      
-      setSelectedSamples(new Set())
-      setShowBulkAssignModal(false)
-      
-    } finally {
-      setActionLoading(null)
-      // Clear progress after a delay
-      setTimeout(() => {
-        setBulkOperationProgress({
-          isActive: false,
-          total: 0,
-          completed: 0,
-          operation: '',
-          errors: []
-        })
-      }, 3000)
-    }
+    await sampleOperations.bulkAssign(selectedIds, assignedTo, libraryPrepBy)
+    clearSelection()
+    setShowBulkAssignModal(false)
   }
 
-  const handleBulkStatusUpdate = async (newStatus: string) => {
-    const validStatuses = ['submitted', 'prep', 'sequencing', 'analysis', 'completed', 'archived'] as const
-    if (!validStatuses.includes(newStatus as any)) {
-      console.error('Invalid status:', newStatus)
-      return
-    }
-
-    const selectedIds = Array.from(selectedSamples)
-    
-    // Initialize progress tracking
-    setBulkOperationProgress({
-      isActive: true,
-      total: selectedIds.length,
-      completed: 0,
-      operation: `Updating status to ${newStatus}`,
-      errors: []
-    })
-
-    setActionLoading('bulk-status')
-    
-    let completed = 0
-    const errors: string[] = []
-
-    try {
-      // Process updates one by one to track progress
-      for (const sampleId of selectedIds) {
-        try {
-          await updateStatusMutation.mutateAsync({
-            id: sampleId,
-            status: newStatus as typeof validStatuses[number],
-          })
-          completed++
-          setBulkOperationProgress(prev => ({
-            ...prev,
-            completed: completed
-          }))
-        } catch (error) {
-          const errorMsg = `Failed to update sample ${sampleId}: ${error instanceof Error ? error.message : 'Unknown error'}`
-          errors.push(errorMsg)
-          setBulkOperationProgress(prev => ({
-            ...prev,
-            errors: [...prev.errors, errorMsg]
-          }))
-        }
-      }
-
-      // Refresh data and show results
-      await refetch()
-      setSelectedSamples(new Set())
-      
-      if (errors.length === 0) {
-        toast.success(`Updated ${completed} samples to ${newStatus}`)
-      } else if (completed > 0) {
-        toast.warning(`${completed} samples updated, ${errors.length} failed`)
-      } else {
-        toast.error('All updates failed')
-      }
-      
-    } finally {
-      setActionLoading(null)
-      // Clear progress after a delay
-      setTimeout(() => {
-        setBulkOperationProgress({
-          isActive: false,
-          total: 0,
-          completed: 0,
-          operation: '',
-          errors: []
-        })
-      }, 3000)
-    }
-  }
+  // Bulk operations are now handled by the useSampleOperations hook
 
   const handleBulkDelete = async () => {
     if (!window.confirm(`Are you sure you want to delete ${selectedSamples.size} selected samples?`)) {
@@ -951,67 +773,8 @@ export default function NanoporeDashboard() {
     }
 
     const selectedIds = Array.from(selectedSamples)
-    
-    // Initialize progress tracking
-    setBulkOperationProgress({
-      isActive: true,
-      total: selectedIds.length,
-      completed: 0,
-      operation: 'Deleting samples',
-      errors: []
-    })
-
-    setActionLoading('bulk-delete')
-    
-    let completed = 0
-    const errors: string[] = []
-
-    try {
-      // Process deletions one by one to track progress
-      for (const sampleId of selectedIds) {
-        try {
-          await deleteSampleMutation.mutateAsync(sampleId)
-          completed++
-          setBulkOperationProgress(prev => ({
-            ...prev,
-            completed: completed
-          }))
-        } catch (error) {
-          const errorMsg = `Failed to delete sample ${sampleId}: ${error instanceof Error ? error.message : 'Unknown error'}`
-          errors.push(errorMsg)
-          setBulkOperationProgress(prev => ({
-            ...prev,
-            errors: [...prev.errors, errorMsg]
-          }))
-        }
-      }
-
-      // Refresh data and show results
-      await refetch()
-      
-      if (errors.length === 0) {
-        toast.success(`Deleted ${completed} samples`)
-      } else if (completed > 0) {
-        toast.warning(`${completed} samples deleted, ${errors.length} failed`)
-      } else {
-        toast.error('All deletions failed')
-      }
-      
-      setSelectedSamples(new Set())
-      
-    } finally {
-      setActionLoading(null)
-      // Clear progress after a delay
-      setTimeout(() => {
-        setBulkOperationProgress({
-          isActive: false,
-          total: 0,
-          completed: 0,
-          operation: '',
-          errors: []
-        })
-      }, 3000)
-    }
+    await sampleOperations.bulkDelete(selectedIds)
+    clearSelection()
   }
 
   // Helper function to map API data to modal format
@@ -1023,7 +786,7 @@ export default function NanoporeDashboard() {
     }
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="p-6 space-y-6">
         <div className="flex justify-between items-center">
@@ -1173,45 +936,8 @@ export default function NanoporeDashboard() {
           />
         </div>
 
-                 {/* Bulk Operation Progress Indicator */}
-         {bulkOperationProgress.isActive && (
-           <div className="mb-6">
-             <Card className="bg-blue-50 border-blue-200">
-               <CardContent className="py-4">
-                 <div className="space-y-3">
-                   <div className="flex items-center justify-between">
-                     <div className="flex items-center gap-2">
-                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600" />
-                       <span className="text-sm font-medium text-blue-900">
-                         {bulkOperationProgress.operation}
-                       </span>
-                     </div>
-                     <span className="text-sm text-blue-700">
-                       {bulkOperationProgress.completed} of {bulkOperationProgress.total} completed
-                     </span>
-                   </div>
-                   <Progress 
-                     value={(bulkOperationProgress.completed / bulkOperationProgress.total) * 100} 
-                     className="h-2 bg-blue-200" 
-                   />
-                   {bulkOperationProgress.errors.length > 0 && (
-                     <div className="text-xs text-red-600 bg-red-50 p-2 rounded border border-red-200">
-                       <span className="font-medium">Errors ({bulkOperationProgress.errors.length}):</span>
-                       <div className="mt-1 max-h-20 overflow-y-auto">
-                         {bulkOperationProgress.errors.slice(0, 3).map((error, i) => (
-                           <div key={i} className="truncate">{error}</div>
-                         ))}
-                         {bulkOperationProgress.errors.length > 3 && (
-                           <div className="text-gray-500">...and {bulkOperationProgress.errors.length - 3} more</div>
-                         )}
-                       </div>
-                     </div>
-                   )}
-                 </div>
-               </CardContent>
-             </Card>
-           </div>
-         )}
+        {/* Bulk Operation Progress Indicator */}
+        <BulkOperationProgress />
 
         {/* Admin Login and Memory Optimization Panel */}
         <div className="mb-8">
@@ -1256,122 +982,16 @@ export default function NanoporeDashboard() {
         </div>
 
         {/* Filters and Search */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-lg">Sample Management</CardTitle>
-            <CardDescription>
-              Track and manage nanopore sequencing samples through the complete workflow
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="Search samples, submitters, or labs..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-              
-              <div className="flex gap-2">
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md bg-white text-sm"
-                >
-                  <option value="all">All Status</option>
-                  <option value="submitted">Submitted</option>
-                  <option value="prep">Prep</option>
-                  <option value="sequencing">Sequencing</option>
-                  <option value="analysis">Analysis</option>
-                  <option value="completed">Completed</option>
-                  <option value="archived">Archived</option>
-                </select>
-                
-                <select
-                  value={priorityFilter}
-                  onChange={(e) => setPriorityFilter(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md bg-white text-sm"
-                >
-                  <option value="all">All Priority</option>
-                  <option value="low">Low</option>
-                  <option value="normal">Normal</option>
-                  <option value="high">High</option>
-                  <option value="urgent">Urgent</option>
-                </select>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <SampleFilters />
 
         {/* Bulk Actions Bar */}
-        {selectedSamples.size > 0 && (
-          <Card className="mb-4 bg-blue-50 border-blue-200">
-            <CardContent className="py-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <span className="text-sm font-medium text-blue-900">
-                    {selectedSamples.size} sample{selectedSamples.size !== 1 ? 's' : ''} selected
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowBulkAssignModal(true)}
-                    disabled={actionLoading === 'bulk'}
-                  >
-                    <Users className="h-4 w-4 mr-2" />
-                    Bulk Assign
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleBulkStatusUpdate('prep')}
-                    disabled={actionLoading === 'bulk'}
-                  >
-                    <Activity className="h-4 w-4 mr-2" />
-                    → Prep
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleBulkStatusUpdate('sequencing')}
-                    disabled={actionLoading === 'bulk'}
-                  >
-                    <Activity className="h-4 w-4 mr-2" />
-                    → Sequencing
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleBulkDelete}
-                    disabled={actionLoading === 'bulk'}
-                    className="text-red-600 hover:text-red-700"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete Selected
-                  </Button>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSelectedSamples(new Set())}
-                >
-                  Clear Selection
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        <BulkActions onBulkAssign={() => setShowBulkAssignModal(true)} />
 
         {/* Samples Section */}
         <Card>
           <CardHeader className="pb-3">
             <div className="flex justify-between items-center">
-              <CardTitle>Samples ({paginationInfo?.total || 0})</CardTitle>
+              <CardTitle>Samples ({pagination?.total || 0})</CardTitle>
               {filteredSamples.length > 0 && (
                 <div className="flex items-center gap-2">
                   <label className="flex items-center gap-2">
@@ -1380,9 +1000,9 @@ export default function NanoporeDashboard() {
                       checked={selectedSamples.size === filteredSamples.length && filteredSamples.length > 0}
                       onChange={(e) => {
                         if (e.target.checked) {
-                          setSelectedSamples(new Set(filteredSamples.map((s: NanoporeSample) => s.id)))
+                          selectAllSamples(filteredSamples.map((s: NanoporeSample) => s.id))
                         } else {
-                          setSelectedSamples(new Set())
+                          clearSelection()
                         }
                       }}
                       className="rounded"
@@ -1394,7 +1014,7 @@ export default function NanoporeDashboard() {
             </div>
 
             {/* Pagination Controls */}
-            {paginationInfo && (
+            {pagination && (
               <div className="flex items-center justify-between mt-4 pt-4 border-t">
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2">
@@ -1415,9 +1035,9 @@ export default function NanoporeDashboard() {
                     <span className="text-sm text-gray-600">per page</span>
                   </div>
                   <div className="text-sm text-gray-600">
-                    Showing {((paginationInfo.page - 1) * paginationInfo.limit) + 1} to{' '}
-                    {Math.min(paginationInfo.page * paginationInfo.limit, paginationInfo.total)} of{' '}
-                    {paginationInfo.total} results
+                    Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
+                    {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
+                    {pagination.total} results
                   </div>
                 </div>
 
@@ -1426,16 +1046,16 @@ export default function NanoporeDashboard() {
                     variant="outline"
                     size="sm"
                     onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                    disabled={!paginationInfo.hasPrevPage}
+                    disabled={!pagination.hasPrevPage}
                   >
                     <ChevronLeft className="h-4 w-4" />
                     Previous
                   </Button>
                   
                   <div className="flex items-center gap-1">
-                    {[...Array(Math.min(5, paginationInfo.totalPages))].map((_, i) => {
+                    {[...Array(Math.min(5, pagination.totalPages))].map((_, i) => {
                       const page = Math.max(1, currentPage - 2) + i
-                      if (page > paginationInfo.totalPages) return null
+                      if (page > pagination.totalPages) return null
                       
                       return (
                         <Button
@@ -1454,8 +1074,8 @@ export default function NanoporeDashboard() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setCurrentPage(Math.min(paginationInfo.totalPages, currentPage + 1))}
-                    disabled={!paginationInfo.hasNextPage}
+                    onClick={() => setCurrentPage(Math.min(pagination.totalPages, currentPage + 1))}
+                    disabled={!pagination.hasNextPage}
                   >
                     Next
                     <ChevronRight className="h-4 w-4" />
@@ -1556,7 +1176,7 @@ export default function NanoporeDashboard() {
                   <TestTube className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 mb-2">No samples found</h3>
                   <p className="text-gray-500 mb-4">
-                    {searchQuery || statusFilter !== 'all' || priorityFilter !== 'all' 
+                    {samples.length === 0 && pagination?.total && pagination.total > 0
                       ? 'Try adjusting your filters or search terms'
                       : 'Get started by creating your first sample'
                     }

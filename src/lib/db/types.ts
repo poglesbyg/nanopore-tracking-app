@@ -3,6 +3,7 @@ import type { ColumnType, Generated, Insertable, Selectable, Updateable } from '
 
 export interface Database {
   users: UsersTable
+  nanopore_submissions: NanoporeSubmissionsTable
   nanopore_samples: NanoporeSamplesTable
   nanopore_sample_details: NanoporeSampleDetailsTable
   nanopore_processing_steps: NanoporeProcessingStepsTable
@@ -18,8 +19,36 @@ export interface UsersTable {
   updated_at: ColumnType<Date, string | undefined, never>
 }
 
+export interface NanoporeSubmissionsTable {
+  id: Generated<string>
+  submission_number: Generated<string>
+  pdf_filename: string
+  submitter_name: string
+  submitter_email: string
+  lab_name: string | null
+  department: string | null
+  billing_account: string | null
+  submission_date: ColumnType<Date, string | undefined, never>
+  project_id: string | null
+  project_name: string | null
+  status: 'pending' | 'processing' | 'completed' | 'failed'
+  sample_count: number
+  samples_completed: number
+  pdf_metadata: any | null
+  extracted_data: any | null
+  extraction_method: string | null
+  extraction_confidence: number | null
+  special_instructions: string | null
+  priority: 'low' | 'normal' | 'high' | 'urgent'
+  created_by: string
+  created_at: ColumnType<Date, string | undefined, never>
+  updated_at: ColumnType<Date, string | undefined, never>
+}
+
 export interface NanoporeSamplesTable {
   id: Generated<string>
+  submission_id: string | null
+  sample_number: number | null
   sample_name: string
   project_id: string | null
   submitter_name: string
@@ -42,6 +71,7 @@ export interface NanoporeSamplesTable {
   created_at: ColumnType<Date, string | undefined, never>
   updated_at: ColumnType<Date, string | undefined, never>
   created_by: string
+  chart_field: string
 }
 
 export interface NanoporeSampleDetailsTable {

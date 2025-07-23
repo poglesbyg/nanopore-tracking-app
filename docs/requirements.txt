@@ -1,34 +1,40 @@
 # Documentation requirements for nanopore-tracking-app
 # These packages are needed to build the documentation on Read the Docs
 
-# Sphinx documentation generator
-sphinx>=7.2.6
-sphinx-rtd-theme>=2.0.0
-sphinx-autodoc-typehints>=1.25.2
-sphinx-copybutton>=0.5.2
+# Sphinx documentation generator - pinned to stable versions
+sphinx==7.4.7
+sphinx-rtd-theme==3.0.2
+sphinx-autodoc-typehints==2.2.3
+sphinx-copybutton==0.5.2
 
-# Markdown support
-myst-parser>=2.0.0
-myst-nb>=1.0.0
+# Markdown support - using compatible versions
+myst-parser==3.0.1
+# Removed myst-nb as it causes dependency conflicts
 
 # API documentation
-sphinxcontrib-openapi>=0.8.0
-sphinxcontrib-redoc>=1.6.0
+sphinxcontrib-openapi==0.8.4
+# Removed sphinxcontrib-redoc as it has complex dependencies
 
 # Extensions for better documentation
-sphinx-tabs>=3.4.0
-sphinx-panels>=0.6.0
-sphinxcontrib-mermaid>=0.9.0
+sphinx-tabs==3.4.5
+# Removed sphinx-panels as it's causing resolution issues
+sphinxcontrib-mermaid==1.0.0
 
 # Auto-generation of API docs
-sphinx-js>=3.2.0
-autodoc-pydantic>=2.0.0
+# Removed sphinx-js as it has complex node.js dependencies
+autodoc-pydantic==2.2.0
 
 # For building multiple formats
-rst2pdf>=0.101
+# Removed rst2pdf as it's not essential and has heavy dependencies
 
 # Code highlighting
-pygments>=2.17.0
+pygments==2.19.2
 
 # Documentation linting
-doc8>=1.1.1 
+doc8==2.0.0
+
+# Additional dependencies that are commonly needed
+docutils==0.21.2
+Jinja2==3.1.6
+pyyaml==6.0.2
+importlib-metadata==8.7.0 

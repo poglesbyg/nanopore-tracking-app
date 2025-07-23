@@ -15,8 +15,35 @@ export interface Database {
     created_at: Date
     updated_at: Date
   }
+  nanopore_submissions: {
+    id: string
+    submission_number: string
+    pdf_filename: string
+    submitter_name: string
+    submitter_email: string
+    lab_name: string | null
+    department: string | null
+    billing_account: string | null
+    submission_date: Date
+    project_id: string | null
+    project_name: string | null
+    status: 'pending' | 'processing' | 'completed' | 'failed'
+    sample_count: number
+    samples_completed: number
+    pdf_metadata: any | null
+    extracted_data: any | null
+    extraction_method: string | null
+    extraction_confidence: number | null
+    special_instructions: string | null
+    priority: 'low' | 'normal' | 'high' | 'urgent'
+    created_by: string
+    created_at: Date
+    updated_at: Date
+  }
   nanopore_samples: {
     id: string
+    submission_id: string | null
+    sample_number: number | null
     sample_name: string
     project_id: string | null
     submitter_name: string

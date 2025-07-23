@@ -31,11 +31,9 @@ extensions = [
     'sphinx.ext.githubpages',
     'sphinx_rtd_theme',
     'myst_parser',
-    'myst_nb',
     'sphinxcontrib.mermaid',
     'sphinx_copybutton',
     'sphinx_tabs.tabs',
-    'sphinx_panels',
     'autodoc_pydantic',
 ]
 

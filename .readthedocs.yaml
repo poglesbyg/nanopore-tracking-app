@@ -9,18 +9,7 @@ build:
   os: ubuntu-22.04
   tools:
     python: "3.11"
-    nodejs: "20"
-  apt_packages:
-    - postgresql-client
-    - redis-tools
-  jobs:
-    pre_build:
-      # Generate API documentation from TypeScript/Python code
-      - echo "Generating API documentation..."
-      - cd docs && python generate_api_docs.py || true
-    post_build:
-      # Copy additional assets if needed
-      - echo "Build completed"
+  # Removed nodejs and apt packages to simplify the build
 
 # Build documentation in the docs/ directory with Sphinx
 sphinx:
@@ -30,23 +19,9 @@ sphinx:
 
 # Build PDF & ePub
 formats:
-  - pdf
-  - epub
+  - html  # Only build HTML to avoid complexity
 
 # Python configuration
 python:
   install:
-    - requirements: docs/requirements.txt
-    - method: pip
-      path: .
-      extra_requirements:
-        - docs
-    # Install dependencies for Python services documentation
-    - requirements: services/python-sample-management/requirements-dev.txt
-    - requirements: services/submission-service/requirements.txt
-
-# Build documentation for multiple versions
-# This helps maintain docs for different releases
-submodules:
-  include: all
-  recursive: true 
+    - requirements: docs/requirements.txt 
