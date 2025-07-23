@@ -1,0 +1,21 @@
+# Simple Read the Docs configuration file
+# This version uses MkDocs which works better with existing Markdown files
+
+# Required
+version: 2
+
+# Set the OS and Python version
+build:
+  os: ubuntu-22.04
+  tools:
+    python: "3.11"
+
+# Build documentation with MkDocs
+mkdocs:
+  configuration: mkdocs.yml
+  fail_on_warning: false
+
+# Python configuration
+python:
+  install:
+    - requirements: docs/requirements-mkdocs.txt 

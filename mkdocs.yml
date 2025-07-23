@@ -1,0 +1,98 @@
+site_name: Nanopore Tracking Application
+site_description: Documentation for the Nanopore Tracking Application
+site_author: UNC BARC Team
+site_url: https://nanopore-tracking-app.readthedocs.io
+repo_url: https://github.com/unc-barc/nanopore-tracking-app
+repo_name: nanopore-tracking-app
+
+# Theme configuration
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.tabs.link
+    - content.code.annotation
+    - content.code.copy
+  language: en
+  palette:
+    - scheme: default
+      toggle:
+        icon: material/toggle-switch-off-outline
+        name: Switch to dark mode
+      primary: indigo
+      accent: indigo
+    - scheme: slate
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to light mode
+      primary: indigo
+      accent: indigo
+
+# Plugins
+plugins:
+  - search
+  - mermaid2
+  - git-revision-date-localized:
+      enable_creation_date: true
+
+# Markdown extensions
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - admonition
+  - pymdownx.arithmatex:
+      generic: true
+  - footnotes
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.mark
+  - attr_list
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
+
+# Page tree
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Quick Reference: docs/QUICK_REFERENCE.md
+      - Implementation Guide: docs/COMPLETE_IMPLEMENTATION_GUIDE.md
+  - Architecture:
+      - Microservices Analysis: docs/MICROSERVICES_ANALYSIS.md
+      - Migration Plan: docs/MICROSERVICES_MIGRATION_PLAN.md
+      - Database Separation: docs/DATABASE_SEPARATION_GUIDE.md
+      - Service Mesh: docs/SERVICE_MESH_IMPLEMENTATION.md
+  - Development:
+      - Service Communication: docs/SERVICE_COMMUNICATION_GUIDE.md
+      - CORS Configuration: docs/CORS_CONFIGURATION_GUIDE.md
+      - Resource Optimization: docs/QUOTA_OPTIMIZED_SERVICE_MESH.md
+  - Operations:
+      - Production Deployment: docs/PHASE3_PRODUCTION_DEPLOYMENT.md
+      - Production Runbook: docs/PRODUCTION_RUNBOOK.md
+      - Prometheus Setup: docs/PROMETHEUS_DEPLOYMENT_SUMMARY.md
+      - Progress Tracking: docs/MICROSERVICES_PROGRESS.md
+
+# Extra configuration
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/unc-barc
+    - icon: fontawesome/brands/docker
+      link: https://hub.docker.com/u/uncbarc
+  version:
+    provider: mike 
