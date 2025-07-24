@@ -76,17 +76,14 @@ export const POST: APIRoute = async ({ request }) => {
           .returningAll()
           .executeTakeFirstOrThrow()
         
-        submissionId = submission.id
+                submissionId = submission.id
         
-        // Now create sample data with submission reference
-        const sampleData = {
-          sampleName: extractedData.sample_name || 'Unknown Sample',
+        // Base sample data for all samples
+        const baseSampleData = {
           submitterName: extractedData.submitter_name || 'Unknown',
           submitterEmail: extractedData.submitter_email || 'unknown@email.com',
           sampleType: extractedData.sample_type || 'DNA',
           organism: extractedData.organism || '',
-          concentration: extractedData.concentration || null,
-          volume: extractedData.volume || null,
           buffer: extractedData.buffer || '',
           chartField: extractedData.chart_field || extractedData.quote_identifier || 'HTSF-001',
           priority: extractedData.priority || 'normal',
@@ -94,33 +91,37 @@ export const POST: APIRoute = async ({ request }) => {
           labName: extractedData.lab_name || extractedData.metadata?.lab || '',
           quoteIdentifier: extractedData.quote_identifier || '',
           submissionId: submissionId, // Link to submission
-          sampleNumber: 1, // Start numbering from 1
           metadata: {
             extractedFrom: data.metadata?.filename || 'PDF',
             extractionDate: new Date().toISOString(),
             ...extractedData.metadata
           }
         }
-
-        // Create the sample
-        const createdSample = await sampleService.createSample(sampleData)
-        if (createdSample) {
-          samplesCreated = 1
-        }
-
-        // If there's a sample table with multiple samples, create them too
+        
+        // Only create samples from the sample table if it exists
         if (extractedData.sample_table && Array.isArray(extractedData.sample_table)) {
+          let sampleNumber = 1
           for (let i = 0; i < extractedData.sample_table.length; i++) {
             const tableSample = extractedData.sample_table[i]
+            
+            // Skip entries that look like header data
+            const sampleName = tableSample.sample_name || ''
+            if (sampleName.toLowerCase() === 'ratio' || 
+                sampleName.toLowerCase().includes('sample') && sampleName.toLowerCase().includes('name') ||
+                sampleName.toLowerCase().includes('µl') ||
+                sampleName.toLowerCase().includes('ng/µl')) {
+              continue
+            }
+            
             try {
               const additionalSample = {
-                ...sampleData,
-                sampleName: tableSample.sample_name || `Sample ${tableSample.sample_index || (i + 1)}`,
+                ...baseSampleData,
+                sampleName: sampleName || `Sample ${tableSample.sample_index || sampleNumber}`,
                 concentration: tableSample.qubit_conc || tableSample.nanodrop_conc || null,
                 volume: tableSample.volume || null,
-                sampleNumber: i + 2, // Start from 2 since primary sample is 1
+                sampleNumber: sampleNumber,
                 metadata: {
-                  ...sampleData.metadata,
+                  ...baseSampleData.metadata,
                   tableIndex: tableSample.sample_index,
                   fromSampleTable: true
                 }
@@ -129,10 +130,31 @@ export const POST: APIRoute = async ({ request }) => {
               const created = await sampleService.createSample(additionalSample)
               if (created) {
                 samplesCreated++
+                sampleNumber++
               }
             } catch (err) {
               console.error('Error creating sample from table:', err)
             }
+          }
+        } else if (extractedData.sample_name && 
+                   !extractedData.sample_name.toLowerCase().includes('volume') &&
+                   !extractedData.sample_name.toLowerCase().includes('conc')) {
+          // If no sample table but we have a valid sample name, create a single sample
+          try {
+            const singleSample = {
+              ...baseSampleData,
+              sampleName: extractedData.sample_name,
+              concentration: extractedData.concentration || null,
+              volume: extractedData.volume || null,
+              sampleNumber: 1
+            }
+            
+            const created = await sampleService.createSample(singleSample)
+            if (created) {
+              samplesCreated = 1
+            }
+          } catch (err) {
+            console.error('Error creating single sample:', err)
           }
         }
         
