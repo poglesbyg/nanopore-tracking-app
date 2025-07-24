@@ -35,6 +35,8 @@ export class PostgreSQLSampleRepository implements ISampleRepository {
         assigned_to: data.assignedTo || null,
         library_prep_by: data.libraryPrepBy || null,
         chart_field: data.chartField,
+        submission_id: (data as any).submissionId || null,
+        sample_number: (data as any).sampleNumber || null,
         submitted_at: now,
         created_at: now,
         updated_at: now,

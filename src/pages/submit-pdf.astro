@@ -68,11 +68,14 @@ import Layout from '../layouts/layout.astro'
             <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; color: #155724;">
               <p><strong>Success!</strong> PDF processed successfully.</p>
               ${result.samples_created > 0 ? `
-                <p><strong>${result.samples_created} sample(s) created</strong></p>
+                <p><strong>${result.samples_created} sample(s) created in submission</strong></p>
+              ` : ''}
+              ${result.submissionId ? `
+                <p>Submission ID: ${result.submissionId.substring(0, 8)}...</p>
               ` : ''}
               ${result.extractedData ? `
-                <p>Sample Name: ${result.extractedData.sample_name || 'Not found'}</p>
                 <p>Submitter: ${result.extractedData.submitter_name || 'Not found'}</p>
+                <p>Lab: ${result.extractedData.lab_name || 'Not specified'}</p>
               ` : ''}
               <div style="margin-top: 15px;">
                 <a href="/submissions" style="background-color: #007bff; color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; display: inline-block;">
