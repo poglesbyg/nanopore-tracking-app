@@ -343,13 +343,14 @@ class PDFProcessor:
                 groups = match.groups()
                 
                 # Handle different group patterns
-                if i == 0 and len(groups) >= 5:  # Pattern 1 (HTSF): sample#, vol, qubit, nanodrop, A260/A280, A260/A230
+                if i == 0 and len(groups) >= 5:  # Pattern 1 (HTSF): row#, sample_name, volume, nanodrop_conc, A260/A280, A260/A230(optional)
                     sample = {
                         'sample_index': groups[0],
-                        'sample_name': groups[0],  # Use sample number as name
-                        'volume': float(groups[1]) if groups[1] else None,
-                        'qubit_conc': float(groups[2]) if groups[2] else None,
-                        'nanodrop_conc': float(groups[3]) if groups[3] else None
+                        'sample_name': groups[1],  # The actual sample name
+                        'volume': float(groups[2]) if groups[2] else None,
+                        'nanodrop_conc': float(groups[3]) if groups[3] else None,
+                        'a260_280': float(groups[4]) if groups[4] else None,
+                        'a260_230': float(groups[5]) if len(groups) > 5 and groups[5] else None
                     }
                 elif i == 2 and len(groups) >= 5:  # Pattern 3: index, name, vol, conc1, conc2
                     sample = {

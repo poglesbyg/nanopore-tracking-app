@@ -128,13 +128,18 @@ export const POST: APIRoute = async ({ request }) => {
               const additionalSample = {
                 ...baseSampleData,
                 sampleName: sampleName || `Sample ${tableSample.sample_index || sampleNumber}`,
-                concentration: tableSample.qubit_conc || tableSample.nanodrop_conc || null,
+                concentration: tableSample.nanodrop_conc || tableSample.qubit_conc || null,
                 volume: tableSample.volume || null,
                 sampleNumber: sampleNumber,
                 metadata: {
                   ...baseSampleData.metadata,
                   tableIndex: tableSample.sample_index,
-                  fromSampleTable: true
+                  fromSampleTable: true,
+                  // Store all extracted measurements
+                  a260_280: tableSample.a260_280 || null,
+                  a260_230: tableSample.a260_230 || null,
+                  qubitConc: tableSample.qubit_conc || null,
+                  nanodropConc: tableSample.nanodrop_conc || null
                 }
               }
               
