@@ -91,9 +91,20 @@ export const POST: APIRoute = async ({ request }) => {
           labName: extractedData.lab_name || extractedData.metadata?.lab || '',
           quoteIdentifier: extractedData.quote_identifier || '',
           submissionId: submissionId, // Link to submission
+          // Additional extracted fields
+          flowCellType: extractedData.flow_cell || null,
+          flowCellCount: extractedData.flow_cell_count || 1,
+          genomeSize: extractedData.genome_size || null,
+          targetCoverage: extractedData.coverage ? extractedData.coverage.replace(/[^\dx-]/g, '') : null,
+          basecallingModel: extractedData.basecalling || null,
+          deliveryMethod: extractedData.data_delivery || null,
+          estimatedCost: extractedData.cost ? parseFloat(extractedData.cost.replace(/[^\d.-]/g, '')) : null,
           metadata: {
             extractedFrom: data.metadata?.filename || 'PDF',
             extractionDate: new Date().toISOString(),
+            fileFormat: extractedData.file_format || null,
+            specialInstructions: extractedData.special_instructions || null,
+            deliveryEmail: extractedData.delivery_email || null,
             ...extractedData.metadata
           }
         }
