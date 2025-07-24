@@ -1,0 +1,30 @@
+---
+import Layout from '@/layouts/layout.astro'
+---
+
+<Layout title="Submit PDF - Nanopore Tracking">
+  <div class="min-h-screen bg-gray-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <!-- Header -->
+      <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">Submit Nanopore Sample</h1>
+        <p class="mt-2 text-gray-600">Upload a PDF to automatically extract sample information</p>
+      </div>
+
+      <!-- Main Content -->
+      <div id="pdf-submission-app"></div>
+    </div>
+  </div>
+
+  <script>
+    import { PdfSubmissionApp } from '@/components/nanopore/pdf-submission-app'
+    import React from 'react'
+    import ReactDOM from 'react-dom/client'
+
+    const container = document.getElementById('pdf-submission-app')
+    if (container) {
+      const root = ReactDOM.createRoot(container)
+      root.render(React.createElement(PdfSubmissionApp))
+    }
+  </script>
+</Layout>
