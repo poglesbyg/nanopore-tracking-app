@@ -286,66 +286,70 @@ class PDFProcessor:
         """Extract sample table data from text."""
         samples = []
         
-        # Look for various sample table patterns
-        table_patterns = [
-            # Pattern 1: Standard sample table with headers
-            re.compile(
-                r'Sample\s*(?:Name|ID)\s*.*?(?:Volume|Vol).*?(?:Concentration|Conc).*?(?=\n\n|\Z)', 
-                re.IGNORECASE | re.DOTALL
-            ),
-            # Pattern 2: Sample Information table
-            re.compile(
-                r'Sample\s*Information.*?(?=\n\n|\Z)', 
-                re.IGNORECASE | re.DOTALL
-            ),
-            # Pattern 3: Generic table with sample data
-            re.compile(
-                r'(?:Sample|#)\s*(?:Name|ID).*?(?:\d+\.?\d*\s*(?:ng/[μu]l|μl|ul)).*?(?=\n\n|\Z)', 
-                re.IGNORECASE | re.DOTALL
-            )
-        ]
+        # For multi-page tables, we need to extract all table sections
+        # Look for all occurrences of sample table headers
+        table_header_pattern = re.compile(
+            r'Sample\s*(?:Name|ID)\s*.*?(?:Volume|Vol).*?(?:Conc)', 
+            re.IGNORECASE
+        )
         
-        table_text = None
-        for pattern in table_patterns:
-            table_match = pattern.search(text)
-            if table_match:
-                table_text = table_match.group(0)
-                break
+        # Find all table headers (indicating table sections)
+        headers = list(table_header_pattern.finditer(text))
         
-        if not table_text:
+        if not headers:
             return samples
+        
+        # Process each table section
+        table_sections = []
+        for i, header in enumerate(headers):
+            start = header.start()
+            # End at next header or end of text
+            end = headers[i + 1].start() if i + 1 < len(headers) else len(text)
+            table_sections.append(text[start:end])
+        
+        # Combine all table sections
+        table_text = '\n'.join(table_sections)
         
         # Multiple patterns for sample rows to handle different formats
         sample_row_patterns = [
-            # Pattern 1: Sample Name/ID, Volume, Concentration (with units)
+            # Pattern 1: HTSF format - Sample#, Volume, Qubit, Nanodrop, A260/A280, A260/A230(optional)
+            # Use $ to ensure we don't match into the next line
+            re.compile(
+                r'^(\d+)\s+(\d+)\s+(\d+\.?\d*)\s+(\d+\.?\d*)\s+(\d+\.?\d*)(?:\s+(\d+\.?\d*))?$', 
+                re.MULTILINE
+            ),
+            # Pattern 2: Sample Name/ID, Volume, Concentration (with units)
             re.compile(
                 r'(\w+[-\w]*)\s+(\d+\.?\d*)\s*(?:μl|ul)\s+(\d+\.?\d*)\s*(?:ng/μl|ng/ul)', 
                 re.IGNORECASE | re.MULTILINE
             ),
-            # Pattern 2: Numbered samples with measurements
+            # Pattern 3: Numbered samples with name and measurements
             re.compile(
                 r'(\d+)\s+([A-Za-z0-9_-]+)\s+(\d+\.?\d*)\s+(\d+\.?\d*)\s+(\d+\.?\d*)', 
                 re.MULTILINE
             ),
-            # Pattern 3: Simple sample data with name and measurements
+            # Pattern 4: Simple sample data with name and measurements
             re.compile(
                 r'([A-Za-z0-9_-]+)\s+(\d+\.?\d*)\s+(\d+\.?\d*)', 
-                re.MULTILINE
-            ),
-            # Pattern 4: Tab-separated or space-separated values
-            re.compile(
-                r'([A-Za-z0-9_-]+)[\s\t]+(\d+\.?\d*)[\s\t]+(\d+\.?\d*)[\s\t]*(\d+\.?\d*)?', 
                 re.MULTILINE
             )
         ]
         
-        for pattern in sample_row_patterns:
+        for i, pattern in enumerate(sample_row_patterns):
             matches = pattern.finditer(table_text)
             for match in matches:
                 groups = match.groups()
                 
                 # Handle different group patterns
-                if len(groups) >= 5:  # Pattern 2: index, name, vol, conc1, conc2
+                if i == 0 and len(groups) >= 5:  # Pattern 1 (HTSF): sample#, vol, qubit, nanodrop, A260/A280, A260/A230
+                    sample = {
+                        'sample_index': groups[0],
+                        'sample_name': groups[0],  # Use sample number as name
+                        'volume': float(groups[1]) if groups[1] else None,
+                        'qubit_conc': float(groups[2]) if groups[2] else None,
+                        'nanodrop_conc': float(groups[3]) if groups[3] else None
+                    }
+                elif i == 2 and len(groups) >= 5:  # Pattern 3: index, name, vol, conc1, conc2
                     sample = {
                         'sample_index': groups[0],
                         'sample_name': groups[1],
@@ -353,24 +357,37 @@ class PDFProcessor:
                         'qubit_conc': float(groups[3]) if groups[3] else None,
                         'nanodrop_conc': float(groups[4]) if groups[4] else None
                     }
-                elif len(groups) >= 3:  # Pattern 1 or 3: name, vol, conc
+                elif len(groups) >= 3:  # Pattern 2 or 4: name, vol, conc
                     sample = {
                         'sample_name': groups[0],
                         'volume': float(groups[1]) if groups[1] else None,
                         'concentration': float(groups[2]) if groups[2] else None
                     }
                     # Add qubit_conc as alias for concentration
-                    if sample['concentration']:
+                    if sample.get('concentration'):
                         sample['qubit_conc'] = sample['concentration']
                 
-                if len(groups) >= 4 and groups[3]:  # Additional concentration
-                    sample['nanodrop_conc'] = float(groups[3])
+                    if len(groups) >= 4 and groups[3]:  # Additional concentration
+                        sample['nanodrop_conc'] = float(groups[3])
                 
                 samples.append(sample)
             
             # If we found samples with this pattern, break
             if samples:
                 break
+        
+        # Also look for special entries like "Positive control" and "BLANK"
+        special_pattern = re.compile(r'^(\d+)\s+(Positive control|BLANK|Negative control)', re.MULTILINE | re.IGNORECASE)
+        special_matches = special_pattern.finditer(table_text)
+        for match in special_matches:
+            sample = {
+                'sample_index': match.group(1),
+                'sample_name': match.group(2),
+                'volume': None,
+                'qubit_conc': None,
+                'nanodrop_conc': None
+            }
+            samples.append(sample)
         
         # Remove duplicates based on sample_name
         unique_samples = []
