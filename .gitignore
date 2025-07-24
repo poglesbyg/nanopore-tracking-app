@@ -197,3 +197,19 @@ config/local.json
 
 # Documentation build output
 docs/_build/
+
+# Test PDFs and files
+test.pdf
+test.txt
+sample_submission*.pdf
+HTSF--*.pdf
+htsf_pdf_extraction_results.json
+
+# Python cache
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.py[cod]
+*$py.class

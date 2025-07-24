@@ -3,7 +3,7 @@ import type { APIRoute } from 'astro'
 export const POST: APIRoute = async ({ request }) => {
   try {
     // Get the submission service URL from environment
-    const submissionServiceUrl = process.env.SUBMISSION_SERVICE_URL || 'http://localhost:8001'
+    const submissionServiceUrl = process.env.SUBMISSION_SERVICE_URL || 'http://localhost:8000'
     
     // Get the form data from the request
     const formData = await request.formData()

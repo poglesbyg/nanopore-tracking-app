@@ -3,7 +3,7 @@ import type { APIRoute } from 'astro'
 export const GET: APIRoute = async ({ request }) => {
   try {
     // Get the submission service URL from environment
-    const submissionServiceUrl = process.env.SUBMISSION_SERVICE_URL || 'http://localhost:8001'
+    const submissionServiceUrl = process.env.SUBMISSION_SERVICE_URL || 'http://localhost:8000'
     
     // Forward the request to the submission service
     const response = await fetch(`${submissionServiceUrl}/api/v1/health`, {

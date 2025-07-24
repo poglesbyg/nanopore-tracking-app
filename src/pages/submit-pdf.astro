@@ -1,30 +1,101 @@
 ---
-import Layout from '@/layouts/layout.astro'
+import Layout from '../layouts/layout.astro'
 ---
 
 <Layout title="Submit PDF - Nanopore Tracking">
-  <div class="min-h-screen bg-gray-50">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <!-- Header -->
-      <div class="mb-8">
-        <h1 class="text-3xl font-bold text-gray-900">Submit Nanopore Sample</h1>
-        <p class="mt-2 text-gray-600">Upload a PDF to automatically extract sample information</p>
+  <main>
+    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+      <h1 style="font-size: 24px; margin-bottom: 20px;">Submit PDF</h1>
+      
+      <form id="pdfForm" style="background-color: #f5f5f5; padding: 20px; border-radius: 5px;">
+        <div style="margin-bottom: 15px;">
+          <label style="display: block; margin-bottom: 5px; font-weight: bold;">
+            Select PDF File
+          </label>
+          <input 
+            type="file" 
+            id="pdfFile" 
+            accept=".pdf" 
+            required
+            style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 3px; background: white;"
+          />
+        </div>
+        
+        <button 
+          type="submit"
+          style="padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;"
+        >
+          Upload PDF
+        </button>
+      </form>
+      
+      <div id="message" style="margin-top: 20px;"></div>
+      
+      <div style="margin-top: 20px;">
+        <a href="/nanopore" style="color: #007bff; text-decoration: none;">← Back to Dashboard</a>
       </div>
-
-      <!-- Main Content -->
-      <div id="pdf-submission-app"></div>
     </div>
-  </div>
+  </main>
 
   <script>
-    import { PdfSubmissionApp } from '@/components/nanopore/pdf-submission-app'
-    import React from 'react'
-    import ReactDOM from 'react-dom/client'
-
-    const container = document.getElementById('pdf-submission-app')
-    if (container) {
-      const root = ReactDOM.createRoot(container)
-      root.render(React.createElement(PdfSubmissionApp))
-    }
+    document.getElementById('pdfForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const fileInput = document.getElementById('pdfFile');
+      const messageDiv = document.getElementById('message');
+      const file = fileInput.files[0];
+      
+      if (!file) {
+        messageDiv.innerHTML = '<p style="color: red;">Please select a file</p>';
+        return;
+      }
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      messageDiv.innerHTML = '<p style="color: blue;">Processing PDF...</p>';
+      
+      try {
+        const response = await fetch('/api/submission/process-pdf', {
+          method: 'POST',
+          body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          messageDiv.innerHTML = `
+            <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; color: #155724;">
+              <p><strong>Success!</strong> PDF processed successfully.</p>
+              ${result.samples_created > 0 ? `
+                <p><strong>${result.samples_created} sample(s) created</strong></p>
+              ` : ''}
+              ${result.extractedData ? `
+                <p>Sample Name: ${result.extractedData.sample_name || 'Not found'}</p>
+                <p>Submitter: ${result.extractedData.submitter_name || 'Not found'}</p>
+              ` : ''}
+              <div style="margin-top: 15px;">
+                <a href="/submissions" style="background-color: #007bff; color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; display: inline-block;">
+                  View All Submissions
+                </a>
+              </div>
+            </div>
+          `;
+          fileInput.value = '';
+        } else {
+          messageDiv.innerHTML = `
+            <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; color: #721c24;">
+              <p><strong>Error!</strong> ${result.message || 'Failed to process PDF'}</p>
+            </div>
+          `;
+        }
+      } catch (error) {
+        messageDiv.innerHTML = `
+          <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; color: #721c24;">
+            <p><strong>Error!</strong> ${error.message || 'Network error'}</p>
+          </div>
+        `;
+      }
+    });
   </script>
 </Layout>

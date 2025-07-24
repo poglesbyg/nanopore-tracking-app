@@ -1,13 +1,10 @@
 ---
 import Layout from '../layouts/layout.astro'
-import MinimalDashboard from '../components/nanopore/minimal-dashboard'
-import AuthWrapper from '../components/auth/auth-wrapper'
+import UltraMinimalDashboard from '../components/nanopore/ultra-minimal-dashboard'
 ---
 
 <Layout title="Nanopore Tracking">
   <main>
-    <AuthWrapper client:load>
-      <MinimalDashboard client:load />
-    </AuthWrapper>
+    <UltraMinimalDashboard client:load />
   </main>
 </Layout>

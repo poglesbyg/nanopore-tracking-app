@@ -37,7 +37,7 @@ export class SubmissionServiceClient {
       this.baseUrl = '/api/submission'
     } else {
       // Direct connection to submission service (for development/testing)
-      this.baseUrl = baseUrl || process.env.SUBMISSION_SERVICE_URL || 'http://localhost:8001'
+      this.baseUrl = baseUrl || process.env.SUBMISSION_SERVICE_URL || 'http://localhost:8000'
     }
   }
 

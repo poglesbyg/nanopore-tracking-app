@@ -19,7 +19,7 @@ import uvicorn
 from pydantic import BaseModel, ValidationError
 import pandas as pd
 import pdfplumber
-from celery import Celery
+# from celery import Celery  # Commented out - not needed for basic functionality
 import httpx
 from dotenv import load_dotenv
 
@@ -50,11 +50,12 @@ app.add_middleware(
 )
 
 # Initialize Celery for background tasks
-celery_app = Celery(
-    'submission_service',
-    broker=os.getenv('REDIS_URL', 'redis://localhost:6379/0'),
-    backend=os.getenv('REDIS_URL', 'redis://localhost:6379/0')
-)
+# Commented out - not needed for basic functionality
+# celery_app = Celery(
+#     'submission_service',
+#     broker=os.getenv('REDIS_URL', 'redis://localhost:6379/0'),
+#     backend=os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+# )
 
 # Pydantic models for validation
 class SampleData(BaseModel):
