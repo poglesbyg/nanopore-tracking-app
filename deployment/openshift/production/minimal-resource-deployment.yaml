@@ -1,0 +1,127 @@
+---
+# Minimal Resource Deployment for Constrained OpenShift Environment
+# Total Resources: ~200Mi memory, 150m CPU
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nanopore-minimal-config
+  namespace: dept-barc
+data:
+  NODE_ENV: "production"
+  PORT: "3001"
+  # DATABASE_URL moved to secret
+  
+  # Disable non-essential features
+  AI_PROCESSING_ENABLED: "false"
+  MCP_ENABLED: "false"
+  MEMORY_MONITORING_ENABLED: "false"
+  
+  # Optimize for low memory
+  NODE_OPTIONS: "--max-old-space-size=128"
+  UV_THREADPOOL_SIZE: "2"
+  
+  # Connection pooling
+  DB_POOL_MIN: "1"
+  DB_POOL_MAX: "2"
+  DB_CONNECTION_TIMEOUT: "5000"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nanopore-app-minimal
+  namespace: dept-barc
+  labels:
+    app: nanopore-tracking
+    tier: frontend
+    deployment: minimal
+spec:
+  replicas: 1  # Single replica only
+  selector:
+    matchLabels:
+      app: nanopore-app-minimal
+  template:
+    metadata:
+      labels:
+        app: nanopore-app-minimal
+        app.kubernetes.io/name: nanopore-tracking
+    spec:
+      containers:
+      - name: nanopore-app
+        # Using the existing frontend image
+        image: image-registry.openshift-image-registry.svc:5000/dept-barc/nanopore-tracking-app:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3001
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: nanopore-minimal-config
+        - secretRef:
+            name: nanopore-secrets
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "192Mi"  # Very tight memory limit
+            cpu: "150m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3001
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3001
+          initialDelaySeconds: 10
+          timeoutSeconds: 5
+          periodSeconds: 10
+        # Add volume for temp files
+        volumeMounts:
+        - name: temp-storage
+          mountPath: /tmp
+      volumes:
+      - name: temp-storage
+        emptyDir:
+          sizeLimit: 100Mi
+      # Security context - removed user ID to use OpenShift defaults
+      securityContext:
+        runAsNonRoot: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nanopore-app-minimal
+  namespace: dept-barc
+  labels:
+    app: nanopore-tracking
+spec:
+  selector:
+    app: nanopore-app-minimal
+  ports:
+  - name: http
+    port: 3001
+    targetPort: 3001
+    protocol: TCP
+  type: ClusterIP
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: nanopore-app-minimal
+  namespace: dept-barc
+  labels:
+    app: nanopore-tracking
+spec:
+  host: nanopore-minimal-dept-barc.apps.cloudapps.unc.edu
+  to:
+    kind: Service
+    name: nanopore-app-minimal
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect 

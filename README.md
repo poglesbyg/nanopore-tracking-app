@@ -2,6 +2,18 @@
 
 A standalone application for tracking nanopore sequencing samples, separated from the main monorepo.
 
+## 📚 Documentation
+
+Comprehensive documentation is available at: [https://nanopore-tracking-app.readthedocs.io/](https://nanopore-tracking-app.readthedocs.io/en/latest/index.html)
+
+The documentation includes:
+- Getting Started guides
+- Architecture & Design documentation
+- Development guides
+- Deployment & Operations procedures
+- API Reference
+- Troubleshooting guides
+
 ## Features
 
 - Sample submission and tracking
@@ -56,6 +68,8 @@ The application will be available at `http://localhost:3001`
 
 ## Deployment
 
+For comprehensive deployment guides, see the [Deployment & Operations documentation](https://nanopore-tracking-app.readthedocs.io/en/latest/index.html).
+
 ### OpenShift Deployment
 
 1. Login to OpenShift:
@@ -107,6 +121,8 @@ The application provides tRPC endpoints for:
 2. Create a feature branch
 3. Make your changes
 4. Submit a pull request
+
+For detailed development guides and best practices, see the [Development documentation](https://nanopore-tracking-app.readthedocs.io/en/latest/index.html).
 
 ## License
 

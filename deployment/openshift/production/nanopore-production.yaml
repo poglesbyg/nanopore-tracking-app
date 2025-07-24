@@ -1,0 +1,191 @@
+---
+# Production Deployment for Nanopore Tracking Application
+# Optimized for OpenShift 4.x
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nanopore-config
+  namespace: dept-barc
+data:
+  # Application Configuration
+  NODE_ENV: "production"
+  PORT: "3001"
+  
+  # Database Configuration
+  DB_POOL_MIN: "2"
+  DB_POOL_MAX: "10"
+  DB_CONNECTION_TIMEOUT: "10000"
+  DB_IDLE_TIMEOUT: "30000"
+  
+  # Feature Flags
+  AI_PROCESSING_ENABLED: "true"
+  PDF_PROCESSING_ENABLED: "true"
+  CSV_PROCESSING_ENABLED: "true"
+  
+  # Performance Tuning
+  NODE_OPTIONS: "--max-old-space-size=1024"
+  UV_THREADPOOL_SIZE: "4"
+  
+  # Logging
+  LOG_LEVEL: "info"
+  STRUCTURED_LOGGING: "true"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nanopore-secrets
+  namespace: dept-barc
+type: Opaque
+stringData:
+  DATABASE_URL: "postgresql://nanopore_user:CHANGE_ME@postgresql:5432/nanopore_db"
+  JWT_SECRET: "CHANGE_ME_TO_SECURE_SECRET"
+  ADMIN_PASSWORD: "CHANGE_ME_TO_SECURE_PASSWORD"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nanopore-app
+  namespace: dept-barc
+  labels:
+    app: nanopore-tracking
+    version: production
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nanopore-tracking
+  template:
+    metadata:
+      labels:
+        app: nanopore-tracking
+        version: production
+    spec:
+      containers:
+      - name: nanopore-app
+        image: image-registry.openshift-image-registry.svc:5000/dept-barc/nanopore-app:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3001
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: nanopore-config
+        - secretRef:
+            name: nanopore-secrets
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3001
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+          periodSeconds: 30
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3001
+          initialDelaySeconds: 10
+          timeoutSeconds: 5
+          periodSeconds: 10
+          failureThreshold: 3
+        volumeMounts:
+        - name: uploads
+          mountPath: /app/uploads
+      volumes:
+      - name: uploads
+        persistentVolumeClaim:
+          claimName: nanopore-uploads-pvc
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nanopore-app
+  namespace: dept-barc
+  labels:
+    app: nanopore-tracking
+spec:
+  selector:
+    app: nanopore-tracking
+  ports:
+  - name: http
+    port: 3001
+    targetPort: 3001
+    protocol: TCP
+  type: ClusterIP
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: nanopore-app
+  namespace: dept-barc
+  labels:
+    app: nanopore-tracking
+spec:
+  host: nanopore-dept-barc.apps.cloudapps.unc.edu
+  to:
+    kind: Service
+    name: nanopore-app
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nanopore-uploads-pvc
+  namespace: dept-barc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: nanopore-hpa
+  namespace: dept-barc
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: nanopore-app
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: nanopore-pdb
+  namespace: dept-barc
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: nanopore-tracking 

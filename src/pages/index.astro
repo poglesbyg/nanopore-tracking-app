@@ -1,94 +1,45 @@
 ---
 import Layout from '@/layouts/layout.astro'
+import { NanoporeApp } from '@/components/nanopore/nanopore-app'
 ---
 
-<Layout title="Nanopore Tracking System">
-  <div class="min-h-screen bg-gray-50">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <!-- Header -->
-      <div class="text-center mb-12">
-        <h1 class="text-4xl font-bold text-gray-900 mb-4">Nanopore Tracking System</h1>
-        <p class="text-xl text-gray-600">Streamline your sample submission and tracking</p>
-      </div>
+<Layout title="Nanopore Submissions | Tracking App">
+  <NanoporeApp client:load />
 
-      <!-- Quick Actions -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-        <a
-          href="/submit-pdf"
-          class="block p-6 bg-white rounded-lg shadow hover:shadow-lg transition-shadow"
-        >
-          <div class="flex items-center justify-center w-12 h-12 bg-blue-100 rounded-full mb-4">
-            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-            </svg>
-          </div>
-          <h3 class="text-lg font-semibold text-gray-900 mb-2">Submit PDF</h3>
-          <p class="text-gray-600">Upload a PDF form to automatically extract and submit sample information</p>
-        </a>
+  <script>
+    // Hide loading screen once React component is loaded
+    document.addEventListener('DOMContentLoaded', () => {
+      const checkForReactApp = () => {
+        const reactContent = document.querySelector('[data-astro-cid]')
+        if (reactContent) {
+          const loadingDiv = document.getElementById('nanopore-loading')
+          if (loadingDiv) {
+            loadingDiv.style.display = 'none'
+          }
+        } else {
+          // Keep checking for React app to load
+          setTimeout(checkForReactApp, 100)
+        }
+      }
+      
+      // Start checking after a short delay
+      setTimeout(checkForReactApp, 500)
+    })
+  </script>
 
-        <a
-          href="/nanopore"
-          class="block p-6 bg-white rounded-lg shadow hover:shadow-lg transition-shadow"
-        >
-          <div class="flex items-center justify-center w-12 h-12 bg-green-100 rounded-full mb-4">
-            <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-            </svg>
-          </div>
-          <h3 class="text-lg font-semibold text-gray-900 mb-2">Dashboard</h3>
-          <p class="text-gray-600">View all samples, track progress, and manage submissions</p>
-        </a>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+        'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+        sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
 
-        <a
-          href="/submissions"
-          class="block p-6 bg-white rounded-lg shadow hover:shadow-lg transition-shadow"
-        >
-          <div class="flex items-center justify-center w-12 h-12 bg-purple-100 rounded-full mb-4">
-            <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-            </svg>
-          </div>
-          <h3 class="text-lg font-semibold text-gray-900 mb-2">Submissions</h3>
-          <p class="text-gray-600">View and manage all sample submissions</p>
-        </a>
-      </div>
-
-      <!-- Recent Activity -->
-      <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-xl font-semibold text-gray-900 mb-4">Getting Started</h2>
-        <div class="space-y-3">
-          <div class="flex items-start">
-            <div class="flex-shrink-0">
-              <div class="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
-                <span class="text-sm font-semibold text-blue-600">1</span>
-              </div>
-            </div>
-            <div class="ml-3">
-              <p class="text-gray-700">Upload your PDF submission form using the Submit PDF option</p>
-            </div>
-          </div>
-          <div class="flex items-start">
-            <div class="flex-shrink-0">
-              <div class="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
-                <span class="text-sm font-semibold text-blue-600">2</span>
-              </div>
-            </div>
-            <div class="ml-3">
-              <p class="text-gray-700">Review the automatically extracted information and make corrections if needed</p>
-            </div>
-          </div>
-          <div class="flex items-start">
-            <div class="flex-shrink-0">
-              <div class="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
-                <span class="text-sm font-semibold text-blue-600">3</span>
-              </div>
-            </div>
-            <div class="ml-3">
-              <p class="text-gray-700">Submit your sample and track its progress through the dashboard</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+    * {
+      box-sizing: border-box;
+    }
+  </style>
 </Layout> 

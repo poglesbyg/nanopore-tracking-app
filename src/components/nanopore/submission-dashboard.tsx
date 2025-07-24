@@ -555,28 +555,26 @@ export function SubmissionDashboard({ className = '' }: SubmissionDashboardProps
         </CardContent>
       </Card>
 
-      {/* Full MCP Dashboard Modal/Drawer */}
+      {/* Full MCP Dashboard - Inline Panel */}
       {showAIInsights && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
-            <div className="p-6 border-b flex items-center justify-between">
-              <h2 className="text-2xl font-bold flex items-center gap-2">
-                <Brain className="h-6 w-6 text-blue-600" />
-                AI-Powered Analysis Dashboard
-              </h2>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowAIInsights(false)}
-              >
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-              <MCPEnhancedDashboard />
-            </div>
-          </div>
-        </div>
+        <Card className="mt-6">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-2xl font-bold flex items-center gap-2">
+              <Brain className="h-6 w-6 text-blue-600" />
+              AI-Powered Analysis Dashboard
+            </CardTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowAIInsights(false)}
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <MCPEnhancedDashboard />
+          </CardContent>
+        </Card>
       )}
     </div>
   )
