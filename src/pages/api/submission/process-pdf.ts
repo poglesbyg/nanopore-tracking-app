@@ -22,6 +22,14 @@ export const POST: APIRoute = async ({ request }) => {
     // Get the response data
     const data = await response.json()
 
+    // Extract the first sample data if available
+    let extractedData = null
+    if (data.data && Array.isArray(data.data) && data.data.length > 0) {
+      extractedData = data.data[0]
+    } else if (data.data && !Array.isArray(data.data)) {
+      extractedData = data.data
+    }
+
     // Transform the response to match the ProcessingResult interface
     const transformedResponse = {
       success: data.status === 'completed',
@@ -30,8 +38,8 @@ export const POST: APIRoute = async ({ request }) => {
       samples_created: 0, // PDF processing doesn't create samples directly
       errors: data.errors || [],
       processing_time: data.processing_time || 0,
-      // Include the original data as extractedData for the frontend
-      extractedData: data.data,
+      // Include the extracted data for the frontend
+      extractedData: extractedData,
       metadata: data.metadata
     }
 
