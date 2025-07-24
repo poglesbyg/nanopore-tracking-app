@@ -12,6 +12,7 @@ email-validator>=2.1.0  # Email validation
 # Database
 sqlalchemy[asyncio]>=2.0.23
 asyncpg>=0.29.0  # PostgreSQL async driver
+psycopg2-binary>=2.9.9  # PostgreSQL sync driver
 redis>=5.0.1  # Redis client
 aiocache>=0.12.2  # Async caching
 

@@ -19,7 +19,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 
 # Import the new models
-from models import (
+from app.models import (
     Base, NanoporeSubmission, NanoporeSample, NanoporeProcessingStep,
     NanoporeSampleDetail, NanoporeAttachment,
     SubmissionStatus, SampleStatus, QCStatus, Priority, SampleType,

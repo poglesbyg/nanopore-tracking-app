@@ -3,40 +3,8 @@ import Layout from '@/layouts/layout.astro'
 ---
 
 <Layout title="Nanopore Tracking System">
-  <main style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
-    <h1 style="font-size: 28px; margin-bottom: 20px; text-align: center;">Nanopore Tracking System</h1>
-    <p style="text-align: center; color: #666; margin-bottom: 40px;">Simple sample submission and tracking</p>
-    
-    <div style="display: flex; flex-direction: column; gap: 20px;">
-      <a 
-        href="/nanopore" 
-        style="display: block; padding: 20px; background-color: #007bff; color: white; text-align: center; text-decoration: none; border-radius: 5px; font-size: 18px;"
-      >
-        Go to Dashboard
-      </a>
-      
-            <a
-        href="/submit-pdf"
-        style="display: block; padding: 20px; background-color: #28a745; color: white; text-align: center; text-decoration: none; border-radius: 5px; font-size: 18px;"
-      >
-        Submit PDF
-      </a>
-
-      <a
-        href="/submissions"
-        style="display: block; padding: 20px; background-color: #6c757d; color: white; text-align: center; text-decoration: none; border-radius: 5px; font-size: 18px;"
-      >
-        View All Submissions
-      </a>
-    </div>
-    
-    <div style="margin-top: 40px; padding: 20px; background-color: #f5f5f5; border-radius: 5px;">
-      <h2 style="font-size: 20px; margin-bottom: 15px;">How it works:</h2>
-      <ol style="list-style: decimal; margin-left: 20px; line-height: 1.8;">
-        <li>Submit samples using the dashboard or upload a PDF</li>
-        <li>Track your sample status</li>
-        <li>View all submitted samples</li>
-      </ol>
-    </div>
-  </main>
+  <script>
+    // Redirect directly to the nanopore dashboard
+    window.location.href = '/nanopore';
+  </script>
 </Layout> 
