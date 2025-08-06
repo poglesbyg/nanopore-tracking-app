@@ -106,6 +106,8 @@ spec:
             secretKeyRef:
               name: nanopore-production-secrets
               key: JWT_SECRET
+        - name: NODE_OPTIONS
+          value: "--max-old-space-size=768"
         resources:
           limits:
             cpu: 1000m
@@ -282,7 +284,7 @@ spec:
   - ReadWriteOnce
   resources:
     requests:
-      storage: 10Gi
+      storage: 3Gi
 
 ---
 apiVersion: v1
