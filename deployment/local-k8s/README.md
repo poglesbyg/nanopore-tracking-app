@@ -21,9 +21,9 @@ This directory contains Kubernetes manifests and scripts for running the nanopor
    ```
 
 3. **Access the application:**
-   - Frontend: http://localhost:3000/nanopore
-   - Submission Service API: http://localhost:8000/api/v1/health
-   - Sample Management API: http://localhost:3002/api/v1/samples
+   - Frontend Dashboard: http://localhost:3001/
+   - Frontend Submissions: http://localhost:3001/submissions
+   - Submission Service API: http://localhost:8000/health
 
 ## Available Commands
 
@@ -42,16 +42,14 @@ The local deployment includes:
 
 ### Services
 - **PostgreSQL Database** - Persistent storage for application data
-- **Frontend** - Astro-based React application
-- **Submission Service** - Python FastAPI service for PDF processing
-- **Sample Management** - Mock service providing sample data API
+- **Frontend** - Astro-based React application with Dashboard and Submissions pages
+- **Submission Service** - Python FastAPI service for sample processing
 
 ### Networking
 - All services run in the `nanopore-local` namespace
 - Port forwarding provides local access:
-  - Frontend: 3000 → 3000
+  - Frontend: 3001 → 3001
   - Submission Service: 8000 → 8000
-  - Sample Management: 3002 → 3002
 
 ## Development Workflow
 

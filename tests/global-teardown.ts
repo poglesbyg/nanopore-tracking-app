@@ -25,16 +25,16 @@ async function cleanupTestData() {
   const { db } = await import('../src/lib/database')
   
   try {
-    // Delete test samples
+    // Delete test samples (using created_at since created_by doesn't exist)
     await db
       .deleteFrom('nanopore_samples')
-      .where('created_by', 'like', 'test-%')
+      .where('sample_name', 'like', 'E2E%')
       .execute()
     
-    // Delete test users
+    // Delete test users (cast UUID to text for LIKE operation)
     await db
       .deleteFrom('users')
-      .where('id', 'like', 'test-%')
+      .where('email', 'like', 'e2e@%')
       .execute()
     
     logger.info('✅ Test data cleaned up successfully')

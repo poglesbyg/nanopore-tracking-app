@@ -15,6 +15,35 @@ export interface Database {
     created_at: Date
     updated_at: Date
   }
+  projects: {
+    id: string
+    name: string
+    description: string | null
+    owner_name: string
+    owner_email: string
+    status: 'active' | 'archived' | 'completed'
+    chart_prefix: 'HTSF' | 'NANO' | 'SEQ' | 'PROJ'
+    created_at: Date
+    updated_at: Date
+  }
+  submissions: {
+    id: string
+    project_id: string
+    name: string
+    description: string | null
+    submitter_name: string
+    submitter_email: string
+    submission_type: 'manual' | 'pdf' | 'csv' | 'batch'
+    status: 'draft' | 'submitted' | 'processing' | 'completed' | 'archived'
+    priority: 'low' | 'normal' | 'high' | 'urgent'
+    original_filename: string | null
+    file_size_bytes: number | null
+    processing_notes: string | null
+    submitted_at: Date | null
+    completed_at: Date | null
+    created_at: Date
+    updated_at: Date
+  }
   nanopore_submissions: {
     id: string
     submission_number: string
@@ -45,6 +74,7 @@ export interface Database {
     submission_id: string | null
     sample_number: number | null
     sample_name: string
+    sample_id: string
     project_id: string | null
     submitter_name: string
     submitter_email: string
@@ -52,21 +82,50 @@ export interface Database {
     sample_type: string
     sample_buffer: string | null
     concentration: number | null
+    concentration_unit: string | null
     volume: number | null
+    volume_unit: string | null
     total_amount: number | null
     flow_cell_type: string | null
     flow_cell_count: number
-    status: 'submitted' | 'prep' | 'sequencing' | 'analysis' | 'completed' | 'archived'
+    workflow_stage: 'sample_qc' | 'library_prep' | 'library_qc' | 'sequencing_setup' | 'sequencing_run' | 'basecalling' | 'quality_assessment' | 'data_delivery'
+    status: 'submitted' | 'prep' | 'sequencing' | 'analysis' | 'completed' | 'failed' | 'archived'
     priority: 'low' | 'normal' | 'high' | 'urgent'
     assigned_to: string | null
     library_prep_by: string | null
     chart_field: string
-    submitted_at: Date
     started_at: Date | null
     completed_at: Date | null
     created_at: Date
     updated_at: Date
-    created_by: string
+  }
+  sample_hierarchy: {
+    project_id: string
+    project_name: string
+    project_status: string
+    submission_id: string
+    submission_name: string
+    submission_status: string
+    submission_type: string
+    submitted_at: Date | null
+    sample_id: string
+    sample_name: string
+    sample_identifier: string
+    sample_status: string
+    sample_priority: string
+    sample_type: string
+    lab_name: string
+    chart_field: string
+    submitter_name: string
+    submitter_email: string
+    concentration: number | null
+    concentration_unit: string | null
+    volume: number | null
+    volume_unit: string | null
+    workflow_stage: string
+    flow_cell_count: number | null
+    sample_created_at: Date
+    sample_updated_at: Date
   }
   nanopore_sample_details: {
     id: string
@@ -102,7 +161,7 @@ export interface Database {
  */
 class DatabaseManager {
   private pool: Pool
-  private kysely: Kysely<Database>
+  private kysely!: Kysely<Database>
   private healthCheckInterval: NodeJS.Timeout | null = null
   private isShuttingDown = false
   private connectionStats = {
@@ -136,7 +195,7 @@ class DatabaseManager {
    * Setup connection pool event handlers
    */
   private setupPoolEventHandlers(): void {
-    this.pool.on('connect', (client: PoolClient) => {
+    this.pool.on('connect', (_client: PoolClient) => {
       this.connectionStats.totalConnections++
       applicationMetrics.dbConnectionsActive.inc()
       
@@ -148,15 +207,15 @@ class DatabaseManager {
       })
     })
 
-    this.pool.on('acquire', (client: PoolClient) => {
+    this.pool.on('acquire', (_client: PoolClient) => {
       // Connection acquired from pool
     })
 
-    this.pool.on('release', (client: PoolClient) => {
+    this.pool.on('release', (_err: Error, _client: PoolClient) => {
       // Connection released back to pool
     })
 
-    this.pool.on('remove', (client: PoolClient) => {
+    this.pool.on('remove', (_client: PoolClient) => {
       this.connectionStats.totalConnections--
       applicationMetrics.dbConnectionsActive.dec()
       
@@ -168,7 +227,7 @@ class DatabaseManager {
       })
     })
 
-    this.pool.on('error', (err: Error, client: PoolClient) => {
+    this.pool.on('error', (err: Error, _client: PoolClient) => {
       this.connectionStats.totalErrors++
       
       logger.error('Database pool error', {
@@ -241,7 +300,7 @@ class DatabaseManager {
    */
   private extractOperation(sql: string): string {
     const match = sql.trim().match(/^(\w+)/i)
-    return match ? match[1].toLowerCase() : 'unknown'
+    return match?.[1]?.toLowerCase() || 'unknown'
   }
 
   /**
@@ -254,7 +313,7 @@ class DatabaseManager {
     const deleteMatch = sql.match(/delete\s+from\s+["`']?(\w+)["`']?/i)
     
     const match = selectMatch || insertMatch || updateMatch || deleteMatch
-    return match ? match[1] : 'unknown'
+    return match?.[1] || 'unknown'
   }
 
   /**
@@ -281,8 +340,8 @@ class DatabaseManager {
       this.connectionStats.lastHealthCheck = new Date()
       
       logger.debug('Database health check passed', {
-        responseTime,
         metadata: {
+          responseTime,
           totalHealthChecks: this.connectionStats.healthChecksPassed + this.connectionStats.healthChecksFailed,
           connectionCount: this.pool.totalCount
         }
@@ -320,9 +379,9 @@ class DatabaseManager {
         
         if (attempt > 1) {
           logger.info('Database operation succeeded after retry', {
-            operation,
-            attempt,
             metadata: {
+              operation,
+              attempt,
               totalAttempts: attempt
             }
           })
@@ -334,10 +393,10 @@ class DatabaseManager {
         
         if (attempt === maxRetries) {
           logger.error('Database operation failed after all retries', {
-            operation,
-            attempt,
             errorType: lastError.name,
             metadata: {
+              operation,
+              attempt,
               maxAttempts: maxRetries,
               errorMessage: lastError.message
             }
@@ -348,11 +407,11 @@ class DatabaseManager {
         }
         
         logger.warn('Database operation failed, retrying', {
-          operation,
-          attempt,
-          delay,
           errorType: lastError.name,
           metadata: {
+            operation,
+            attempt,
+            delay,
             maxAttempts: maxRetries
           }
         })

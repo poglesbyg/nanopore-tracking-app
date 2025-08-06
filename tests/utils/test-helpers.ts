@@ -44,6 +44,157 @@ export class AuthHelper {
   }
 }
 
+// PDF Submission helpers
+export class PDFSubmissionHelper {
+  constructor(private page: Page) {}
+
+  async uploadPDF(pdfPath: string) {
+    const fileChooserPromise = this.page.waitForEvent('filechooser')
+    await this.page.click('label:has-text("Click to upload HTSF")')
+    const fileChooser = await fileChooserPromise
+    await fileChooser.setFiles(pdfPath)
+    
+    // Wait for processing
+    await expect(this.page.locator('text=/PDF uploaded and processed/')).toBeVisible({ timeout: 15000 })
+  }
+
+  async createProjectFromPDF(projectName: string) {
+    await expect(this.page.locator('[data-testid="create-project-modal"]')).toBeVisible()
+    await this.page.fill('input[name="name"]', projectName)
+    await this.page.click('button:has-text("Create Project")')
+    await expect(this.page.locator('[data-testid="create-project-modal"]')).not.toBeVisible()
+  }
+
+  async submitSubmission(submissionName: string) {
+    await this.page.fill('input[name="submissionName"]', submissionName)
+    await this.page.click('button:has-text("Create Submission")')
+    
+    // Wait for success
+    await expect(this.page.locator('text=Submission Created Successfully!')).toBeVisible({ timeout: 10000 })
+  }
+}
+
+// Workflow Management helpers
+export class WorkflowHelper {
+  constructor(private page: Page) {}
+
+  async openSampleDetail(sampleId?: string) {
+    const selector = sampleId ? `[data-sample-id="${sampleId}"]` : '[data-sample-id]'
+    await this.page.locator(selector).first().click()
+    await expect(this.page.locator('[data-testid="sample-detail-modal"]')).toBeVisible()
+  }
+
+  async updateWorkflowStage(stage: string) {
+    await this.page.click('button:has-text("Edit")')
+    await this.page.selectOption('select[name="workflowStage"]', stage)
+    await this.page.click('button:has-text("Save Changes")')
+  }
+
+  async verifyStageTransition(expectedStage: string) {
+    await expect(this.page.locator('text=Sample updated successfully')).toBeVisible()
+    await expect(this.page.locator('[data-testid="current-stage"]')).toContainText(expectedStage)
+  }
+
+  async closeSampleModal() {
+    await this.page.click('button:has-text("Close")')
+    await expect(this.page.locator('[data-testid="sample-detail-modal"]')).not.toBeVisible()
+  }
+}
+
+// Bulk Operations helpers
+export class BulkOperationsHelper {
+  constructor(private page: Page) {}
+
+  async enableBulkMode() {
+    await this.page.click('button:has-text("Bulk Operations")')
+    await expect(this.page.locator('input[type="checkbox"][data-sample-checkbox]').first()).toBeVisible()
+  }
+
+  async selectSamples(count: number) {
+    for (let i = 0; i < count; i++) {
+      await this.page.locator('input[type="checkbox"][data-sample-checkbox]').nth(i).check()
+    }
+    await expect(this.page.locator(`text=/${count} samples selected/`)).toBeVisible()
+  }
+
+  async applyBulkOperation(operation: string, value?: string) {
+    await this.page.click('button:has-text("Apply Operations")')
+    await expect(this.page.locator('[data-testid="bulk-operations-modal"]')).toBeVisible()
+    
+    await this.page.selectOption('select[name="operation"]', operation)
+    if (value) {
+      await this.page.selectOption('select[name="priority"], select[name="status"], select[name="workflowStage"]', value)
+    }
+    
+    await this.page.click('button:has-text("Apply to Selected Samples")')
+    await expect(this.page.locator('text=Bulk operation completed successfully')).toBeVisible()
+  }
+
+  async selectAllVisible() {
+    await this.page.click('button:has-text("Select All Visible")')
+  }
+
+  async clearAllSelections() {
+    await this.page.click('button:has-text("Clear All")')
+    await expect(this.page.locator('text=/0 samples selected/')).toBeVisible()
+  }
+}
+
+// Export helpers
+export class ExportHelper {
+  constructor(private page: Page) {}
+
+  async openExportModal() {
+    await this.page.click('button:has-text("📊 Export Data")')
+    await expect(this.page.locator('[data-testid="export-modal"]')).toBeVisible()
+  }
+
+  async configureExport(entityType: string, format: string, fields: string[]) {
+    await this.page.selectOption('select[name="entityType"]', entityType)
+    await this.page.selectOption('select[name="format"]', format)
+    
+    for (const field of fields) {
+      await this.page.check(`input[name="fields"][value="${field}"]`)
+    }
+  }
+
+  async executeExport() {
+    const downloadPromise = this.page.waitForEvent('download')
+    await this.page.click('button:has-text("Export Data")')
+    return await downloadPromise
+  }
+}
+
+// Hierarchy Dashboard helpers
+export class HierarchyHelper {
+  constructor(private page: Page) {}
+
+  async waitForDashboardLoad() {
+    await this.page.waitForSelector('[data-testid="hierarchical-dashboard"]', { timeout: 10000 })
+  }
+
+  async expandProject(projectName?: string) {
+    const selector = projectName ? `[data-testid="project-row"]:has-text("${projectName}")` : '[data-testid="project-row"]'
+    await this.page.locator(selector).first().click()
+  }
+
+  async expandSubmission(submissionName?: string) {
+    const selector = submissionName ? `[data-testid="submission-row"]:has-text("${submissionName}")` : '[data-testid="submission-row"]'
+    await this.page.locator(selector).first().click()
+  }
+
+  async verifySampleCount(expectedCount: number) {
+    const actualCount = await this.page.locator('[data-testid="sample-row"]').count()
+    expect(actualCount).toBe(expectedCount)
+  }
+
+  async verifyStatistics() {
+    await expect(this.page.locator('[data-testid="total-projects"]')).toBeVisible()
+    await expect(this.page.locator('[data-testid="total-submissions"]')).toBeVisible()
+    await expect(this.page.locator('[data-testid="total-samples"]')).toBeVisible()
+  }
+}
+
 // Sample management helpers
 export class SampleHelper {
   constructor(private page: Page) {}

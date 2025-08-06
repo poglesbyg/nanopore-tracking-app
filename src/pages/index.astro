@@ -1,10 +1,10 @@
 ---
-import Layout from '@/layouts/layout.astro'
+import Layout from '../layouts/layout.astro'
+import HierarchicalDashboard from '../components/nanopore/hierarchical-dashboard'
 ---
 
-<Layout title="Nanopore Tracking System">
-  <script>
-    // Redirect directly to the nanopore dashboard
-    window.location.href = '/nanopore';
-  </script>
+<Layout title="Dashboard - Nanopore Tracking">
+  <main>
+    <HierarchicalDashboard client:load />
+  </main>
 </Layout> 

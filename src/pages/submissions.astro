@@ -1,10 +1,10 @@
 ---
 import Layout from '../layouts/layout.astro'
+import SubmissionWithHierarchy from '../components/nanopore/submission-with-hierarchy'
 ---
 
-<Layout title="Submissions - Nanopore Tracking">
-  <script>
-    // Redirect to the main nanopore dashboard which has all submissions
-    window.location.href = '/nanopore';
-  </script>
+<Layout title="Create Submission - Nanopore Tracking">
+  <main>
+    <SubmissionWithHierarchy client:load />
+  </main>
 </Layout> 

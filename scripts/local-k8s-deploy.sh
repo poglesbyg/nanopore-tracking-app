@@ -47,11 +47,9 @@ check_context() {
 build_images() {
     print_status "Building Docker images..."
     
-    # Build frontend image
+    # Build frontend image (from root directory)
     print_status "Building frontend image..."
-    cd services/frontend
     docker build -t nanopore-frontend:local .
-    cd ../..
     
     # Build submission service image
     print_status "Building submission service image..."
@@ -70,14 +68,13 @@ deploy() {
     kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
     
     # Deploy services
+    kubectl apply -f deployment/local-k8s/namespace.yaml
     kubectl apply -f deployment/local-k8s/postgresql.yaml
-    kubectl apply -f deployment/local-k8s/sample-management.yaml
     kubectl apply -f deployment/local-k8s/submission-service.yaml
     kubectl apply -f deployment/local-k8s/frontend.yaml
     
     print_status "Waiting for pods to be ready..."
     kubectl wait --for=condition=ready pod -l app=postgres -n $NAMESPACE --timeout=120s
-    kubectl wait --for=condition=ready pod -l app=sample-management -n $NAMESPACE --timeout=120s
     kubectl wait --for=condition=ready pod -l app=submission-service -n $NAMESPACE --timeout=120s
     kubectl wait --for=condition=ready pod -l app=nanopore-frontend -n $NAMESPACE --timeout=120s
     
@@ -92,28 +89,22 @@ setup_port_forwarding() {
     pkill -f "port-forward.*nanopore-local" 2>/dev/null || true
     
     # Start port forwarding
-    kubectl port-forward -n $NAMESPACE svc/nanopore-frontend 3000:3000 &
+    kubectl port-forward -n $NAMESPACE svc/nanopore-frontend 3001:3001 &
     kubectl port-forward -n $NAMESPACE svc/submission-service 8000:8000 &
-    kubectl port-forward -n $NAMESPACE svc/sample-management 3002:3002 &
     
     sleep 3
     
     print_status "Port forwarding setup complete"
-    print_status "Frontend: http://localhost:3000/nanopore"
+    print_status "Frontend Dashboard: http://localhost:3001/"
+    print_status "Frontend Submissions: http://localhost:3001/submissions"
     print_status "Submission Service: http://localhost:8000/api/v1/health"
-    print_status "Sample Management: http://localhost:3002/api/v1/samples"
+    print_status "PDF Processing: http://localhost:8000/api/v1/process-pdf"
+    print_status "API Documentation: http://localhost:8000/docs"
 }
 
 # Function to test services
 test_services() {
     print_status "Testing services..."
-    
-    # Test sample management service
-    if curl -s http://localhost:3002/health > /dev/null; then
-        print_status "✓ Sample Management service is healthy"
-    else
-        print_error "✗ Sample Management service is not responding"
-    fi
     
     # Test submission service
     if curl -s http://localhost:8000/api/v1/health > /dev/null; then
@@ -122,11 +113,18 @@ test_services() {
         print_error "✗ Submission service is not responding"
     fi
     
-    # Test frontend
-    if curl -s -I http://localhost:3000/nanopore | grep -q "200 OK"; then
-        print_status "✓ Frontend is responding"
+    # Test frontend dashboard
+    if curl -s -I http://localhost:3001/ | grep -q "200\|HTTP"; then
+        print_status "✓ Frontend dashboard is responding"
     else
-        print_error "✗ Frontend is not responding"
+        print_error "✗ Frontend dashboard is not responding"
+    fi
+    
+    # Test frontend submissions page
+    if curl -s -I http://localhost:3001/submissions | grep -q "200\|HTTP"; then
+        print_status "✓ Frontend submissions page is responding"
+    else
+        print_error "✗ Frontend submissions page is not responding"
     fi
 }
 

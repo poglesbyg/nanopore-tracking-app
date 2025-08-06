@@ -9,7 +9,8 @@ import {
   Menu, 
   X,
   Home,
-  Settings
+  Settings,
+  FolderOpen
 } from 'lucide-react'
 
 interface NavigationProps {
@@ -24,20 +25,20 @@ export function Navigation({ currentPath = '/' }: NavigationProps) {
       label: 'Dashboard',
       href: '/',
       icon: Home,
-      description: 'Sample management dashboard'
+      description: 'Hierarchical project dashboard'
+    },
+    {
+      label: 'Projects',
+      href: '/projects',
+      icon: FolderOpen,
+      description: 'Manage projects'
     },
     {
       label: 'Submissions',
       href: '/submissions',
       icon: FileText,
-      description: 'PDF submission tracking',
+      description: 'Submit new samples',
       badge: 'New'
-    },
-    {
-      label: 'Legacy Samples',
-      href: '/nanopore',
-      icon: TestTube,
-      description: 'Individual sample view'
     }
   ]
   

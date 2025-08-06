@@ -1,17 +1,49 @@
 #!/usr/bin/env node
 
-const { Pool } = require('pg')
-const fs = require('fs')
-const path = require('path')
+import { Pool } from 'pg'
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 async function setupDatabase() {
-  // Connect to PostgreSQL
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/nanopore_db',
-  })
-
+  const dbUrl = process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/nanopore_db'
+  const dbName = dbUrl.split('/').pop()
+  const baseUrl = dbUrl.replace(`/${dbName}`, '/postgres')
+  
+  // First connect to postgres database to create our target database if needed
+  const adminPool = new Pool({ connectionString: baseUrl })
+  
   try {
-    console.log('🔗 Connecting to database...')
+    console.log('🔗 Connecting to PostgreSQL...')
+    
+    // Check if target database exists
+    const result = await adminPool.query(
+      'SELECT 1 FROM pg_database WHERE datname = $1', 
+      [dbName]
+    )
+    
+    if (result.rows.length === 0) {
+      console.log(`🗄️ Creating database ${dbName}...`)
+      await adminPool.query(`CREATE DATABASE "${dbName}"`)
+      console.log('✅ Database created successfully')
+    } else {
+      console.log(`✅ Database ${dbName} already exists`)
+    }
+  } catch (error) {
+    console.error('❌ Database creation failed:', error)
+    throw error
+  } finally {
+    await adminPool.end()
+  }
+  
+  // Now connect to the target database
+  const pool = new Pool({ connectionString: dbUrl })
+  
+  try {
+    console.log('🔗 Connecting to target database...')
     
     // Test connection
     await pool.query('SELECT NOW()')
@@ -32,8 +64,8 @@ async function setupDatabase() {
     // Insert demo user
     await pool.query(`
       INSERT INTO users (id, email, name) 
-      VALUES ('demo-user', 'demo@example.com', 'Demo User') 
-      ON CONFLICT (id) DO NOTHING;
+      VALUES (gen_random_uuid(), 'demo@example.com', 'Demo User') 
+      ON CONFLICT (email) DO NOTHING;
     `)
 
     // Create trigger function for timestamps
