@@ -107,7 +107,7 @@ spec:
               name: nanopore-production-secrets
               key: JWT_SECRET
         - name: NODE_OPTIONS
-          value: "--max-old-space-size=768"
+          value: "--max-old-space-size=768 --expose-gc"
         resources:
           limits:
             cpu: 500m
