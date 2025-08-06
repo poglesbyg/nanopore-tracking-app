@@ -1,4 +1,4 @@
-import pdf from 'pdf-parse'
+// Dynamic import to avoid loading pdf-parse debug code during module initialization
 
 interface HTSFSample {
   sample_id: string
@@ -76,6 +76,8 @@ function extractSamples(text: string): HTSFSample[] {
 }
 
 export async function parseHTSFPdf(buffer: Buffer): Promise<HTSFQuoteData> {
+  // Dynamic import to avoid loading pdf-parse during module initialization
+  const pdf = await import('pdf-parse').then(m => m.default || m)
   const data = await pdf(buffer)
   const text = normalise(data.text)
 

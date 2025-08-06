@@ -329,6 +329,11 @@ class DatabaseManager {
    * Perform health check
    */
   private async performHealthCheck(): Promise<void> {
+    // Skip health check if shutting down
+    if (this.isShuttingDown) {
+      return
+    }
+    
     try {
       const startTime = Date.now()
       
@@ -348,6 +353,11 @@ class DatabaseManager {
       })
       
     } catch (error) {
+      // Don't log errors if we're shutting down
+      if (this.isShuttingDown) {
+        return
+      }
+      
       this.connectionStats.healthChecksFailed++
       
       logger.error('Database health check failed', {

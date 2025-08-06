@@ -1,6 +1,5 @@
 import type { APIRoute } from 'astro'
 import { processHTSFPdf as mockProcessPdf, validateHTSFData } from '../../lib/pdf/htsf-pdf-processor'
-import { parseHTSFPdf } from '../../lib/pdf/htsf-real-parser'
 import { badRequest, internalError, ok } from '../../lib/api/server-response'
 
 export const POST: APIRoute = async ({ request }) => {
@@ -19,7 +18,8 @@ export const POST: APIRoute = async ({ request }) => {
 
     let extractedData
     try {
-      // Attempt real PDF parsing
+      // Attempt real PDF parsing with dynamic import
+      const { parseHTSFPdf } = await import('../../lib/pdf/htsf-real-parser')
       extractedData = await parseHTSFPdf(buffer)
     } catch (err) {
       console.warn('Real PDF parsing failed, falling back to mock:', err)
