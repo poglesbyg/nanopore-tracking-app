@@ -29,7 +29,7 @@ export class AIEventPublisher {
       fileName,
       fileSize,
       processingMethod,
-      userId
+      ...(userId && { userId })
     }, correlationId)
 
     await this.publishEvent(event)
@@ -59,7 +59,7 @@ export class AIEventPublisher {
         confidenceScore, 
         processingTimeMs, 
         extractedFieldCount,
-        userId,
+        ...(userId && { userId }),
         correlationId 
       }
     })
@@ -72,7 +72,7 @@ export class AIEventPublisher {
       confidenceScore,
       processingTimeMs,
       extractedFieldCount,
-      userId
+      ...(userId && { userId })
     }, correlationId)
 
     await this.publishEvent(event)
@@ -101,7 +101,7 @@ export class AIEventPublisher {
       error,
       processingMethod,
       retryCount,
-      userId
+      ...(userId && { userId })
     }, correlationId)
 
     await this.publishEvent(event)
@@ -130,7 +130,7 @@ export class AIEventPublisher {
         extractionMethod, 
         confidenceScore, 
         issueCount: issues.length,
-        userId,
+        ...(userId && { userId }),
         correlationId 
       }
     })
@@ -143,7 +143,7 @@ export class AIEventPublisher {
       confidenceScore,
       extractedData,
       issues,
-      userId
+      ...(userId && { userId })
     }, correlationId)
 
     await this.publishEvent(event)
@@ -173,7 +173,7 @@ export class AIEventPublisher {
         threshold, 
         extractionMethod, 
         issueCount: issues.length,
-        userId,
+        ...(userId && { userId }),
         correlationId 
       }
     })
@@ -186,7 +186,7 @@ export class AIEventPublisher {
       threshold,
       extractionMethod,
       issues,
-      userId
+      ...(userId && { userId })
     }, correlationId)
 
     await this.publishEvent(event)
@@ -213,7 +213,7 @@ export class AIEventPublisher {
       jobType,
       inputData,
       priority,
-      userId
+      ...(userId && { userId })
     }, correlationId)
 
     await this.publishEvent(event)
@@ -268,7 +268,7 @@ export class AIEventPublisher {
       duration,
       outputData,
       success,
-      userId
+      ...(userId && { userId })
     }, correlationId)
 
     await this.publishEvent(event)
@@ -299,7 +299,7 @@ export class AIEventPublisher {
       error,
       retryCount,
       maxRetries,
-      userId
+      ...(userId && { userId })
     }, correlationId)
 
     await this.publishEvent(event)
@@ -328,7 +328,7 @@ export class AIEventPublisher {
       accuracyScore,
       processingTimeMs,
       sampleCount,
-      userId
+      ...(userId && { userId })
     }, correlationId)
 
     await this.publishEvent(event)
@@ -356,7 +356,7 @@ export class AIEventPublisher {
         previousAccuracy, 
         threshold, 
         degradationPercentage,
-        userId,
+        ...(userId && { userId }),
         correlationId 
       }
     })
@@ -368,7 +368,7 @@ export class AIEventPublisher {
       previousAccuracy,
       threshold,
       degradationPercentage,
-      userId
+      ...(userId && { userId })
     }, correlationId)
 
     await this.publishEvent(event)

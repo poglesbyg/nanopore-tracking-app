@@ -45,7 +45,7 @@ export class PostgreSQLSampleRepository implements ISampleRepository {
       .returningAll()
       .executeTakeFirstOrThrow()
 
-    return result as Sample
+    return result as unknown as Sample
   }
 
   async update(id: string, data: UpdateSampleData): Promise<Sample> {
@@ -85,7 +85,7 @@ export class PostgreSQLSampleRepository implements ISampleRepository {
       .returningAll()
       .executeTakeFirstOrThrow()
 
-    return result as Sample
+    return result as unknown as Sample
   }
 
   async findById(id: string): Promise<Sample | null> {
@@ -95,17 +95,17 @@ export class PostgreSQLSampleRepository implements ISampleRepository {
       .where('id', '=', id)
       .executeTakeFirst()
 
-    return result as Sample || null
+    return result as unknown as Sample || null
   }
 
   async findAll(): Promise<Sample[]> {
     const results = await this.db
       .selectFrom('nanopore_samples')
       .selectAll()
-      .orderBy('submitted_at', 'desc')
+      .orderBy('created_at', 'desc')
       .execute()
 
-    return results as Sample[]
+    return results as unknown as Sample[]
   }
 
   async search(criteria: SearchCriteria): Promise<Sample[]> {
@@ -139,20 +139,21 @@ export class PostgreSQLSampleRepository implements ISampleRepository {
     }
 
     if (criteria.createdBy) {
+      // Note: created_by column exists but may need to be added to type definition
       query = query.where('created_by', '=', criteria.createdBy)
     }
 
     if (criteria.dateRange) {
       query = query
-        .where('submitted_at', '>=', criteria.dateRange.start)
-        .where('submitted_at', '<=', criteria.dateRange.end)
+        .where('created_at', '>=', criteria.dateRange.start)
+        .where('created_at', '<=', criteria.dateRange.end)
     }
 
     const results = await query
-      .orderBy('submitted_at', 'desc')
+      .orderBy('created_at', 'desc')
       .execute()
 
-    return results as Sample[]
+    return results as unknown as Sample[]
   }
 
   async delete(id: string): Promise<void> {
@@ -167,21 +168,22 @@ export class PostgreSQLSampleRepository implements ISampleRepository {
       .selectFrom('nanopore_samples')
       .selectAll()
       .where('status', '=', status as any)
-      .orderBy('submitted_at', 'desc')
+      .orderBy('created_at', 'desc')
       .execute()
 
-    return results as Sample[]
+    return results as unknown as Sample[]
   }
 
   async findByUser(userId: string): Promise<Sample[]> {
     const results = await this.db
       .selectFrom('nanopore_samples')
       .selectAll()
+      // Note: created_by column exists but may need to be added to type definition
       .where('created_by', '=', userId)
-      .orderBy('submitted_at', 'desc')
+      .orderBy('created_at', 'desc')
       .execute()
 
-    return results as Sample[]
+    return results as unknown as Sample[]
   }
 
   async findByAssignedTo(assignedTo: string): Promise<Sample[]> {
@@ -189,10 +191,10 @@ export class PostgreSQLSampleRepository implements ISampleRepository {
       .selectFrom('nanopore_samples')
       .selectAll()
       .where('assigned_to', '=', assignedTo)
-      .orderBy('submitted_at', 'desc')
+      .orderBy('created_at', 'desc')
       .execute()
 
-    return results as Sample[]
+    return results as unknown as Sample[]
   }
 
   async updateStatus(id: string, status: string): Promise<Sample> {
@@ -215,7 +217,7 @@ export class PostgreSQLSampleRepository implements ISampleRepository {
       .returningAll()
       .executeTakeFirstOrThrow()
 
-    return result as Sample
+    return result as unknown as Sample
   }
 
   async assign(id: string, assignedTo: string, libraryPrepBy?: string): Promise<Sample> {
@@ -230,7 +232,7 @@ export class PostgreSQLSampleRepository implements ISampleRepository {
       .returningAll()
       .executeTakeFirstOrThrow()
 
-    return result as Sample
+    return result as unknown as Sample
   }
 
   async count(): Promise<number> {

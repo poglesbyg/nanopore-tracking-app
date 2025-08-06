@@ -5,41 +5,41 @@ import type { RAGResult } from './rag-system'
 
 export interface NanoporeFormData {
   // Basic Information
-  sampleName?: string
-  submitterName?: string
-  submitterEmail?: string
-  labName?: string
-  projectName?: string
+  sampleName?: string | undefined
+  submitterName?: string | undefined
+  submitterEmail?: string | undefined
+  labName?: string | undefined
+  projectName?: string | undefined
 
   // Sequencing Details
-  sequencingType?: string // DNA, RNA, cDNA
-  sampleType?: string // Genomic DNA, Total RNA, etc.
-  libraryType?: string // Ligation, Rapid, PCR-free, etc.
-  flowCellType?: string // MinION, GridION, PromethION, etc.
+  sequencingType?: string | undefined // DNA, RNA, cDNA
+  sampleType?: string | undefined // Genomic DNA, Total RNA, etc.
+  libraryType?: string | undefined // Ligation, Rapid, PCR-free, etc.
+  flowCellType?: string | undefined // MinION, GridION, PromethION, etc.
 
   // Sample Metrics
-  concentration?: string
-  volume?: string
-  purity?: string
-  fragmentSize?: string
+  concentration?: string | undefined
+  volume?: string | undefined
+  purity?: string | undefined
+  fragmentSize?: string | undefined
 
   // Processing Options
-  priority?: string // Standard, High, Rush, Urgent
-  basecalling?: string // Standard, High Accuracy, Fast
-  demultiplexing?: boolean
+  priority?: string | undefined // Standard, High, Rush, Urgent
+  basecalling?: string | undefined // Standard, High Accuracy, Fast
+  demultiplexing?: boolean | undefined
 
   // Bioinformatics
-  referenceGenome?: string
-  analysisType?: string
-  dataDelivery?: string // Raw, Processed, FASTQ, etc.
+  referenceGenome?: string | undefined
+  analysisType?: string | undefined
+  dataDelivery?: string | undefined // Raw, Processed, FASTQ, etc.
 
   // Metadata
   extractionMethod: string // 'llm', 'pattern', 'hybrid', 'rag'
   confidence: number
-  issues?: string[]
-  processingTime?: number
-  ragInsights?: RAGResult
-  ragRecommendations?: string[]
+  issues?: string[] | undefined
+  processingTime?: number | undefined
+  ragInsights?: RAGResult | undefined
+  ragRecommendations?: string[] | undefined
 }
 
 export interface NanoporeExtractionResult {
@@ -247,7 +247,7 @@ JSON Response:
 `
 
     try {
-      const response = await aiService.answerQuestion(prompt)
+      const response = await (aiService as any).answerQuestion(prompt)
 
       // Parse the LLM response
       const jsonMatch = response.match(/{[\S\s]*}/)
@@ -302,26 +302,26 @@ JSON Response:
     const nanoporeFields = this.extractNanoporeSpecificFields(rawText)
 
     return {
-      sampleName: basicFields.sampleName || nanoporeFields.sampleName,
-      submitterName: basicFields.submitterName || nanoporeFields.submitterName,
+      sampleName: basicFields.sampleName || nanoporeFields.sampleName || undefined,
+      submitterName: basicFields.submitterName || nanoporeFields.submitterName || undefined,
       submitterEmail:
-        basicFields.submitterEmail || nanoporeFields.submitterEmail,
-      labName: basicFields.labName || nanoporeFields.labName,
-      projectName: basicFields.projectName || nanoporeFields.projectName,
-      sequencingType: nanoporeFields.sequencingType,
-      sampleType: nanoporeFields.sampleType,
-      libraryType: nanoporeFields.libraryType,
-      flowCellType: nanoporeFields.flowCellType,
-      concentration: nanoporeFields.concentration,
-      volume: nanoporeFields.volume,
-      purity: nanoporeFields.purity,
-      fragmentSize: nanoporeFields.fragmentSize,
-      priority: (basicFields.priority as any) || nanoporeFields.priority,
-      basecalling: nanoporeFields.basecalling,
-      demultiplexing: nanoporeFields.demultiplexing,
-      referenceGenome: nanoporeFields.referenceGenome,
-      analysisType: nanoporeFields.analysisType,
-      dataDelivery: nanoporeFields.dataDelivery,
+        basicFields.submitterEmail || nanoporeFields.submitterEmail || undefined,
+      labName: basicFields.labName || nanoporeFields.labName || undefined,
+      projectName: basicFields.projectName || nanoporeFields.projectName || undefined,
+      sequencingType: nanoporeFields.sequencingType || undefined,
+      sampleType: nanoporeFields.sampleType || undefined,
+      libraryType: nanoporeFields.libraryType || undefined,
+      flowCellType: nanoporeFields.flowCellType || undefined,
+      concentration: nanoporeFields.concentration || undefined,
+      volume: nanoporeFields.volume || undefined,
+      purity: nanoporeFields.purity || undefined,
+      fragmentSize: nanoporeFields.fragmentSize || undefined,
+      priority: (basicFields.priority as any) || nanoporeFields.priority || undefined,
+      basecalling: nanoporeFields.basecalling || undefined,
+      demultiplexing: nanoporeFields.demultiplexing || false,
+      referenceGenome: nanoporeFields.referenceGenome || undefined,
+      analysisType: nanoporeFields.analysisType || undefined,
+      dataDelivery: nanoporeFields.dataDelivery || undefined,
       confidence: basicFields.confidence || 0.6,
       extractionMethod: 'pattern',
       issues: [],
@@ -434,25 +434,25 @@ JSON Response:
   ): NanoporeFormData {
     return {
       // Prefer LLM results, fall back to pattern matching
-      sampleName: llmData.sampleName || patternData.sampleName,
-      submitterName: llmData.submitterName || patternData.submitterName,
-      submitterEmail: llmData.submitterEmail || patternData.submitterEmail,
-      labName: llmData.labName || patternData.labName,
-      projectName: llmData.projectName || patternData.projectName,
-      sequencingType: llmData.sequencingType || patternData.sequencingType,
-      sampleType: llmData.sampleType || patternData.sampleType,
-      libraryType: llmData.libraryType || patternData.libraryType,
-      flowCellType: llmData.flowCellType || patternData.flowCellType,
-      concentration: llmData.concentration || patternData.concentration,
-      volume: llmData.volume || patternData.volume,
-      purity: llmData.purity || patternData.purity,
-      fragmentSize: llmData.fragmentSize || patternData.fragmentSize,
-      priority: llmData.priority || patternData.priority,
-      basecalling: llmData.basecalling || patternData.basecalling,
-      demultiplexing: llmData.demultiplexing || patternData.demultiplexing,
-      referenceGenome: llmData.referenceGenome || patternData.referenceGenome,
-      analysisType: llmData.analysisType || patternData.analysisType,
-      dataDelivery: llmData.dataDelivery || patternData.dataDelivery,
+      sampleName: llmData.sampleName || patternData.sampleName || undefined,
+      submitterName: llmData.submitterName || patternData.submitterName || undefined,
+      submitterEmail: llmData.submitterEmail || patternData.submitterEmail || undefined,
+      labName: llmData.labName || patternData.labName || undefined,
+      projectName: llmData.projectName || patternData.projectName || undefined,
+      sequencingType: llmData.sequencingType || patternData.sequencingType || undefined,
+      sampleType: llmData.sampleType || patternData.sampleType || undefined,
+      libraryType: llmData.libraryType || patternData.libraryType || undefined,
+      flowCellType: llmData.flowCellType || patternData.flowCellType || undefined,
+      concentration: llmData.concentration || patternData.concentration || undefined,
+      volume: llmData.volume || patternData.volume || undefined,
+      purity: llmData.purity || patternData.purity || undefined,
+      fragmentSize: llmData.fragmentSize || patternData.fragmentSize || undefined,
+      priority: llmData.priority || patternData.priority || undefined,
+      basecalling: llmData.basecalling || patternData.basecalling || undefined,
+      demultiplexing: llmData.demultiplexing || patternData.demultiplexing || false,
+      referenceGenome: llmData.referenceGenome || patternData.referenceGenome || undefined,
+      analysisType: llmData.analysisType || patternData.analysisType || undefined,
+      dataDelivery: llmData.dataDelivery || patternData.dataDelivery || undefined,
       confidence: Math.max(llmData.confidence, patternData.confidence),
       extractionMethod: 'hybrid',
       issues: [...(llmData.issues || []), ...(patternData.issues || [])],

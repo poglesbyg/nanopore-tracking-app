@@ -8,20 +8,20 @@ import { sql } from 'kysely'
 const logger = getComponentLogger('AuditTrailAPI')
 
 interface AuditLogQuery {
-  startDate?: string
-  endDate?: string
-  eventType?: string
-  category?: string
-  severity?: string
-  userId?: string
-  resource?: string
-  action?: string
-  success?: boolean
-  page?: number
-  limit?: number
-  sortBy?: string
-  sortOrder?: 'asc' | 'desc'
-  search?: string
+  startDate?: string | undefined
+  endDate?: string | undefined
+  eventType?: string | undefined
+  category?: string | undefined
+  severity?: string | undefined
+  userId?: string | undefined
+  resource?: string | undefined
+  action?: string | undefined
+  success?: boolean | undefined
+  page?: number | undefined
+  limit?: number | undefined
+  sortBy?: string | undefined
+  sortOrder?: 'asc' | 'desc' | undefined
+  search?: string | undefined
 }
 
 interface AuditLogSummary {

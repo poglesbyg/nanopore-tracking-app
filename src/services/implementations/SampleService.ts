@@ -10,7 +10,7 @@ import type {
 import type { ISampleRepository } from '../interfaces/ISampleRepository'
 import type { IAuditLogger } from '../interfaces/IAuditLogger'
 import type { IEventEmitter } from '../interfaces/IEventEmitter'
-import { ValidationError, NotFoundError, BusinessLogicError } from '../../middleware/errors/ErrorTypes'
+import { ValidationError, NotFoundError } from '../../middleware/errors/ErrorTypes'
 import { getComponentLogger } from '../../lib/logging/StructuredLogger'
 import { applicationMetrics } from '../../lib/monitoring/MetricsCollector'
 import { withCache, cacheManager } from '../../lib/cache/CacheManager'

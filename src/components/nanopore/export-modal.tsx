@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Button } from '../ui/button'
-import { Badge } from '../ui/badge'
+
 import { Label } from '../ui/label'
 import { X, Download, FileText, Database, CheckSquare, Calendar } from 'lucide-react'
 
@@ -90,8 +90,7 @@ interface ExportModalProps {
 export default function ExportModal({ 
   isOpen, 
   onClose, 
-  availableProjects = [], 
-  availableSubmissions = [] 
+  availableProjects = []
 }: ExportModalProps) {
   const [entityType, setEntityType] = useState('samples')
   const [format, setFormat] = useState<'csv' | 'json'>('csv')
@@ -135,7 +134,7 @@ export default function ExportModal({
   const currentFields = FIELD_DEFINITIONS[entityType as keyof typeof FIELD_DEFINITIONS]
   const fieldsByCategory = currentFields.reduce((acc, field) => {
     if (!acc[field.category]) acc[field.category] = []
-    acc[field.category].push(field)
+    acc[field.category]!.push(field)
     return acc
   }, {} as Record<string, typeof currentFields>)
 
@@ -201,7 +200,7 @@ export default function ExportModal({
       // Get filename from response headers
       const contentDisposition = response.headers.get('Content-Disposition')
       const filename = contentDisposition
-        ? contentDisposition.split('filename=')[1]?.replace(/"/g, '')
+        ? contentDisposition.split('filename=')[1]?.replace(/"/g, '') || `${entityType}_export.${format}`
         : `${entityType}_export.${format}`
 
       // Create download link

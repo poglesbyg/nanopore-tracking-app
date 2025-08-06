@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro'
 import { db } from '../../lib/database'
 import { validateSampleQC } from '../../lib/nanopore/processing-steps'
-import { ok, created, badRequest, notFound, internalError } from '../../lib/api/server-response'
+import { ok } from '../../lib/api/server-response'
 
 // GET /api/samples?submission_id=xxx - List samples for a submission
 export const GET: APIRoute = async ({ url }) => {

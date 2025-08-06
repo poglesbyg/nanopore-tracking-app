@@ -87,7 +87,7 @@ export class LoadTestingFramework {
     const responses: Array<{
       responseTime: number
       success: boolean
-      error?: string
+      error?: string | undefined
       timestamp: number
     }> = []
 
@@ -333,7 +333,7 @@ export class LoadTestingFramework {
   private getPercentile(sortedArray: number[], percentile: number): number {
     if (sortedArray.length === 0) return 0
     const index = Math.floor(sortedArray.length * percentile)
-    return sortedArray[Math.min(index, sortedArray.length - 1)]
+    return sortedArray[Math.min(index, sortedArray.length - 1)] || 0
   }
 
   /**

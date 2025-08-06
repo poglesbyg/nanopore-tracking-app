@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro'
 import { db } from '../../lib/database'
+import { randomUUID } from 'crypto'
 
 // GET /api/projects - List all projects
 export const GET: APIRoute = async () => {
@@ -55,12 +56,15 @@ export const POST: APIRoute = async ({ request }) => {
 
     const result = await db.insertInto('projects')
       .values({
+        id: randomUUID(),
         name,
         description,
         owner_name,
         owner_email,
         chart_prefix,
-        status: 'active'
+        status: 'active',
+        created_at: new Date(),
+        updated_at: new Date()
       })
       .returningAll()
       .executeTakeFirstOrThrow()

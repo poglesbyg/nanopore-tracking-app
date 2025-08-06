@@ -1,7 +1,7 @@
 import { eventBus } from '../../lib/messaging/event-bus'
 import { SampleEventFactory, type AnySampleEvent } from '../../lib/messaging/events/sample-events'
 import { getComponentLogger } from '../../lib/logging/StructuredLogger'
-import type { Sample, CreateSampleData, UpdateSampleData } from '../interfaces/ISampleService'
+import type { Sample } from '../interfaces/ISampleService'
 
 const logger = getComponentLogger('SampleEventPublisher')
 
