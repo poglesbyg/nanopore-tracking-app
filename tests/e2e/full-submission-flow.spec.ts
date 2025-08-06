@@ -16,7 +16,7 @@ test.describe('Complete PDF Submission Workflow', () => {
     await fileChooser.setFiles(pdfPath)
 
     // Wait for PDF processing to complete
-    await expect(page.locator('text=/PDF uploaded and processed/')).toBeVisible({ timeout: 15000 })
+    await expect(page.locator('text=completed')).toBeVisible({ timeout: 15000 })
 
     // 3. Verify project modal opens with pre-filled data
     await expect(page.locator('[data-testid="create-project-modal"]')).toBeVisible()

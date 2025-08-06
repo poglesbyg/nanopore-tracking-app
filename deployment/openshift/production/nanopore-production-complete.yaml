@@ -1,0 +1,341 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nanopore-production-config
+  labels:
+    app: nanopore-tracking
+    env: production
+data:
+  NODE_ENV: "production"
+  LOG_LEVEL: "info"
+  PORT: "3001"
+  HOST: "0.0.0.0"
+  ENABLE_AI_FEATURES: "false"
+  BASE_URL: "https://nanopore-tracking-dept-barc.apps.cloudapps.unc.edu"
+  UPLOAD_DIR: "/app/uploads"
+  # Database will be set via secret
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nanopore-production-secrets
+  labels:
+    app: nanopore-tracking
+    env: production
+type: Opaque
+stringData:
+  DATABASE_URL: "postgresql://postgres:postgres@postgresql:5432/nanopore_db"
+  SESSION_SECRET: "your-secure-session-secret-change-this"
+  JWT_SECRET: "your-secure-jwt-secret-change-this"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nanopore-tracking-app
+  labels:
+    app: nanopore-tracking
+    env: production
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nanopore-tracking
+  template:
+    metadata:
+      labels:
+        app: nanopore-tracking
+        env: production
+    spec:
+      containers:
+      - name: nanopore-app
+        image: image-registry.openshift-image-registry.svc:5000/dept-barc/nanopore-tracking:latest
+        ports:
+        - containerPort: 3001
+          protocol: TCP
+        env:
+        - name: NODE_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: nanopore-production-config
+              key: NODE_ENV
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: nanopore-production-config
+              key: LOG_LEVEL
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: nanopore-production-config
+              key: PORT
+        - name: HOST
+          valueFrom:
+            configMapKeyRef:
+              name: nanopore-production-config
+              key: HOST
+        - name: ENABLE_AI_FEATURES
+          valueFrom:
+            configMapKeyRef:
+              name: nanopore-production-config
+              key: ENABLE_AI_FEATURES
+        - name: BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: nanopore-production-config
+              key: BASE_URL
+        - name: UPLOAD_DIR
+          valueFrom:
+            configMapKeyRef:
+              name: nanopore-production-config
+              key: UPLOAD_DIR
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: nanopore-production-secrets
+              key: DATABASE_URL
+        - name: SESSION_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: nanopore-production-secrets
+              key: SESSION_SECRET
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: nanopore-production-secrets
+              key: JWT_SECRET
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+          requests:
+            cpu: 200m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3001
+            scheme: HTTP
+          initialDelaySeconds: 30
+          timeoutSeconds: 10
+          periodSeconds: 30
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3001
+            scheme: HTTP
+          initialDelaySeconds: 15
+          timeoutSeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        volumeMounts:
+        - name: uploads-volume
+          mountPath: /app/uploads
+        imagePullPolicy: Always
+      volumes:
+      - name: uploads-volume
+        emptyDir: {}
+      restartPolicy: Always
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nanopore-tracking-service
+  labels:
+    app: nanopore-tracking
+    env: production
+spec:
+  type: ClusterIP
+  ports:
+  - port: 3001
+    targetPort: 3001
+    protocol: TCP
+    name: http
+  selector:
+    app: nanopore-tracking
+
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: nanopore-tracking-route
+  labels:
+    app: nanopore-tracking
+    env: production
+spec:
+  host: nanopore-tracking-dept-barc.apps.cloudapps.unc.edu
+  to:
+    kind: Service
+    name: nanopore-tracking-service
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgresql
+  labels:
+    app: postgresql
+    env: production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgresql
+  template:
+    metadata:
+      labels:
+        app: postgresql
+    spec:
+      containers:
+      - name: postgresql
+        image: postgres:15-alpine
+        ports:
+        - containerPort: 5432
+          protocol: TCP
+        env:
+        - name: POSTGRES_DB
+          value: nanopore_db
+        - name: POSTGRES_USER
+          value: postgres
+        - name: POSTGRES_PASSWORD
+          value: postgres
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        resources:
+          limits:
+            cpu: 500m
+            memory: 1Gi
+          requests:
+            cpu: 100m
+            memory: 256Mi
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+        - name: postgres-init
+          mountPath: /docker-entrypoint-initdb.d
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -U postgres
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -U postgres
+          initialDelaySeconds: 5
+          timeoutSeconds: 3
+          periodSeconds: 5
+      volumes:
+      - name: postgres-data
+        persistentVolumeClaim:
+          claimName: postgres-pvc
+      - name: postgres-init
+        configMap:
+          name: postgres-init-scripts
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql
+  labels:
+    app: postgresql
+    env: production
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+  selector:
+    app: postgresql
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  labels:
+    app: postgresql
+    env: production
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-scripts
+  labels:
+    app: postgresql
+    env: production
+data:
+  01-init.sql: |
+    -- Create database if it doesn't exist
+    SELECT 'CREATE DATABASE nanopore_db'
+    WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'nanopore_db')\gexec
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: nanopore-tracking-hpa
+  labels:
+    app: nanopore-tracking
+    env: production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: nanopore-tracking-app
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
