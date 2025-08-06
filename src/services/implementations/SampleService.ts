@@ -318,12 +318,12 @@ export class SampleService implements ISampleService {
     } catch (error) {
       this.logger.error('Failed to get samples by user', {
         action: 'get_samples_by_user_error',
-        error: error instanceof Error ? error.message : 'Unknown error',
+        errorType: error instanceof Error ? error.message : 'Unknown error',
         metadata: { userId }
       })
       throw error
     } finally {
-      timer.done()
+      timer()
     }
   }
 
@@ -346,12 +346,12 @@ export class SampleService implements ISampleService {
     } catch (error) {
       this.logger.error('Failed to get processing steps', {
         action: 'get_processing_steps_error',
-        error: error instanceof Error ? error.message : 'Unknown error',
+        errorType: error instanceof Error ? error.message : 'Unknown error',
         metadata: { sampleId }
       })
       throw error
     } finally {
-      timer.done()
+      timer()
     }
   }
 
@@ -373,12 +373,12 @@ export class SampleService implements ISampleService {
     } catch (error) {
       this.logger.error('Failed to update processing step', {
         action: 'update_processing_step_error',
-        error: error instanceof Error ? error.message : 'Unknown error',
+        errorType: error instanceof Error ? error.message : 'Unknown error',
         metadata: { stepId, updates }
       })
       throw error
     } finally {
-      timer.done()
+      timer()
     }
   }
 
@@ -406,12 +406,12 @@ export class SampleService implements ISampleService {
     } catch (error) {
       this.logger.error('Failed to start processing step', {
         action: 'start_processing_step_error',
-        error: error instanceof Error ? error.message : 'Unknown error',
+        errorType: error instanceof Error ? error.message : 'Unknown error',
         metadata: { stepId, assignedTo }
       })
       throw error
     } finally {
-      timer.done()
+      timer()
     }
   }
 
@@ -441,12 +441,12 @@ export class SampleService implements ISampleService {
     } catch (error) {
       this.logger.error('Failed to complete processing step', {
         action: 'complete_processing_step_error',
-        error: error instanceof Error ? error.message : 'Unknown error',
+        errorType: error instanceof Error ? error.message : 'Unknown error',
         metadata: { stepId, notes, resultsData }
       })
       throw error
     } finally {
-      timer.done()
+      timer()
     }
   }
 
@@ -523,12 +523,12 @@ export class SampleService implements ISampleService {
     } catch (error) {
       this.logger.error('Failed to create default processing steps', {
         action: 'create_default_processing_steps_error',
-        error: error instanceof Error ? error.message : 'Unknown error',
+        errorType: error instanceof Error ? error.message : 'Unknown error',
         metadata: { sampleId }
       })
       throw error
     } finally {
-      timer.done()
+      timer()
     }
   }
 

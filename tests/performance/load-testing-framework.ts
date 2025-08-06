@@ -236,7 +236,7 @@ export class LoadTestingFramework {
       const result: {
         responseTime: number
         success: boolean
-        error?: string | undefined
+        error?: string
         timestamp: number
       } = {
         responseTime,
@@ -252,7 +252,7 @@ export class LoadTestingFramework {
       const result: {
         responseTime: number
         success: boolean
-        error?: string | undefined
+        error?: string
         timestamp: number
       } = {
         responseTime,

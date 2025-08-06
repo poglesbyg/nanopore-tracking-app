@@ -122,7 +122,6 @@ export const POST: APIRoute = async ({ request }) => {
         workflow_stage: 'sample_qc',
         status: 'submitted',
         flow_cell_count: 1,
-        submitted_at: new Date(),
         created_at: new Date(),
         updated_at: new Date()
       })
