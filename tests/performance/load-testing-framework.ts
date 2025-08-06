@@ -233,20 +233,34 @@ export class LoadTestingFramework {
       const responseTime = performance.now() - startTime
       const success = response.ok
 
-      return {
+      const result: {
+        responseTime: number
+        success: boolean
+        error?: string | undefined
+        timestamp: number
+      } = {
         responseTime,
         success,
-        error: success ? undefined : `HTTP ${response.status}`,
         timestamp
       }
+      if (!success) {
+        result.error = `HTTP ${response.status}`
+      }
+      return result
     } catch (error) {
       const responseTime = performance.now() - startTime
-      return {
+      const result: {
+        responseTime: number
+        success: boolean
+        error?: string | undefined
+        timestamp: number
+      } = {
         responseTime,
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        timestamp
+        timestamp,
+        error: error instanceof Error ? error.message : 'Unknown error'
       }
+      return result
     }
   }
 
@@ -258,7 +272,7 @@ export class LoadTestingFramework {
     responses: Array<{
       responseTime: number
       success: boolean
-      error?: string
+      error?: string | undefined
       timestamp: number
     }>,
     errors: Map<string, number>,
