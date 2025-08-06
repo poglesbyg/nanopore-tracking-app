@@ -1,5 +1,5 @@
 import { db, testDatabaseConnection } from './database'
-import { aiService } from './ai/ollama-service'
+// AI service removed for lightweight version
 import { config, isFeatureEnabled } from './config'
 
 export interface HealthCheckResult {
