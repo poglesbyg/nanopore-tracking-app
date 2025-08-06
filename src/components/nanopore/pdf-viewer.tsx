@@ -13,7 +13,14 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import type { NanoporeFormData } from '@/lib/ai/nanopore-llm-service'
+// Simple type for PDF extracted data (replacing AI service)
+interface NanoporeFormData {
+  sampleName?: string
+  concentration?: string
+  volume?: string
+  submitterName?: string
+  submitterEmail?: string
+}
 
 interface PDFViewerProps {
   file: File

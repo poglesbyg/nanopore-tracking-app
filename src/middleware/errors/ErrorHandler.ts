@@ -1,4 +1,4 @@
-import { TRPCError } from '@trpc/server'
+// Simplified error handling without tRPC
 import { getComponentLogger } from '../../lib/logging/StructuredLogger'
 import { BaseError, classifyError, isBaseError, isOperationalError } from './ErrorTypes'
 
