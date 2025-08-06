@@ -1,5 +1,5 @@
 import { aiService } from './ollama-service'
-import { pdfTextService } from './pdf-text-extraction'
+// Dynamic import to avoid pdf-parse initialization issues
 import { ragService } from './rag-system'
 import type { RAGResult } from './rag-system'
 
@@ -58,7 +58,8 @@ class NanoporeFormExtractionService {
     const startTime = Date.now()
 
     try {
-      // Step 1: Check if PDF parsing is available
+      // Step 1: Check if PDF parsing is available (dynamic import)
+      const { pdfTextService } = await import('./pdf-text-extraction')
       const isPdfAvailable = await pdfTextService.isAvailable()
       if (!isPdfAvailable) {
         return {
@@ -102,12 +103,12 @@ class NanoporeFormExtractionService {
 
       // Step 4: Fallback to pattern matching or enhance LLM results
       if (!formData) {
-        const patternResult = this.extractWithPatterns(rawText)
+        const patternResult = await this.extractWithPatterns(rawText)
         formData = patternResult
         extractionMethod = 'pattern'
       } else {
         // Hybrid approach: enhance LLM results with pattern matching
-        const patternResult = this.extractWithPatterns(rawText)
+        const patternResult = await this.extractWithPatterns(rawText)
         formData = this.mergeExtractionResults(formData, patternResult)
         extractionMethod = 'hybrid'
       }
@@ -292,8 +293,9 @@ JSON Response:
   /**
    * Extract form data using pattern matching (fallback)
    */
-  private extractWithPatterns(rawText: string): NanoporeFormData {
-    // Use the existing pattern matching from pdf-text-extraction
+  private async extractWithPatterns(rawText: string): Promise<NanoporeFormData> {
+    // Use the existing pattern matching from pdf-text-extraction (dynamic import)
+    const { pdfTextService } = await import('./pdf-text-extraction')
     const basicFields = pdfTextService.extractStructuredData(rawText) || {}
 
     // Add Nanopore-specific fields

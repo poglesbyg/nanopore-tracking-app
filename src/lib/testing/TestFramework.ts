@@ -505,9 +505,13 @@ export class TestFramework {
   private async setupTestDatabase(context: TestContext): Promise<void> {
     // Create test isolation - in production, use separate test database
     context.cleanup.push(async () => {
-      // Clean up test data
+      // Clean up test data by sample name pattern (safer than created_by)
       await db.deleteFrom('nanopore_samples')
-        .where('created_by', '=', `test-${context.testId}`)
+        .where('sample_name', 'like', `%Test Sample ${context.testId}%`)
+        .execute()
+        
+      await db.deleteFrom('nanopore_samples')
+        .where('sample_name', 'like', `%Urgent Test Sample ${context.testId}%`)
         .execute()
     })
   }
@@ -628,7 +632,7 @@ export const sampleFixtures = {
       sample_type: 'DNA',
       status: 'submitted',
       priority: 'normal',
-      created_by: `test-${testId}`,
+      created_by: '550e8400-e29b-41d4-a716-446655440000', // Demo user UUID
       created_at: new Date(),
       updated_at: new Date(),
       submitted_at: new Date()
@@ -648,7 +652,7 @@ export const sampleFixtures = {
       sample_type: 'RNA',
       status: 'submitted',
       priority: 'urgent',
-      created_by: `test-${testId}`,
+      created_by: '550e8400-e29b-41d4-a716-446655440000', // Demo user UUID
       created_at: new Date(),
       updated_at: new Date(),
       submitted_at: new Date()

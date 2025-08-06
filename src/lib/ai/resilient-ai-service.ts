@@ -1,7 +1,7 @@
 import { aiService } from './ollama-service'
 import { nanoporeFormService } from './nanopore-llm-service'
 import { ragService } from './rag-system'
-import { pdfTextService } from './pdf-text-extraction'
+// Dynamic import to avoid pdf-parse initialization issues
 import type { NanoporeFormData } from './ollama-service'
 
 interface CircuitBreakerState {
@@ -312,7 +312,8 @@ class ResilientAIService {
 
       try {
         // Fallback 1: Extract text and use pattern matching
-        const textResult = await pdfTextService.extractText(file)
+        const { pdfTextService } = await import('./pdf-text-extraction')
+      const textResult = await pdfTextService.extractText(file)
         if (textResult.success && textResult.data) {
           let fallbackData: NanoporeFormData
 
@@ -405,7 +406,10 @@ class ResilientAIService {
     const [aiHealthy, ragHealthy, pdfHealthy] = await Promise.all([
       aiService.isAvailable().catch(() => false),
       ragService.isAvailable().catch(() => false),
-      pdfTextService.isAvailable().catch(() => false)
+              (async () => {
+          const { pdfTextService } = await import('./pdf-text-extraction')
+          return pdfTextService.isAvailable().catch(() => false)
+        })()
     ])
 
     return {

@@ -1,4 +1,4 @@
-import { pdfTextService } from './pdf-text-extraction'
+// Dynamic import to avoid pdf-parse initialization issues
 import { nanoporeFormService } from './nanopore-llm-service'
 import type { PDFProcessingResult } from '@/types/nanopore-submission'
 
@@ -33,6 +33,7 @@ interface PDFSubmissionData {
 export async function processPDFSubmission(file: File): Promise<PDFProcessingResult> {
   try {
     // First, extract text from PDF
+    const { pdfTextService } = await import('./pdf-text-extraction')
     const textResult = await pdfTextService.extractText(file)
     if (!textResult.success || !textResult.data) {
       throw new Error(textResult.error || 'Failed to extract text from PDF')
