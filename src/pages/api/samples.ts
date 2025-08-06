@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro'
 import { db } from '../../lib/database'
 import { validateSampleQC } from '../../lib/nanopore/processing-steps'
 import { ok } from '../../lib/api/server-response'
+import { randomUUID } from 'crypto'
 
 // GET /api/samples?submission_id=xxx - List samples for a submission
 export const GET: APIRoute = async ({ url }) => {
@@ -103,9 +104,10 @@ export const POST: APIRoute = async ({ request }) => {
 
     const result = await db.insertInto('nanopore_samples')
       .values({
-        id: crypto.randomUUID(),
+        id: randomUUID(),
         submission_id,
         sample_name,
+        sample_number: 1, // Default to 1, should be calculated based on existing samples in submission
         sample_id,
         submitter_name,
         submitter_email,
@@ -120,6 +122,7 @@ export const POST: APIRoute = async ({ request }) => {
         workflow_stage: 'sample_qc',
         status: 'submitted',
         flow_cell_count: 1,
+        submitted_at: new Date(),
         created_at: new Date(),
         updated_at: new Date()
       })
