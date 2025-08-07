@@ -7,18 +7,55 @@ export const GET: APIRoute = async ({ url }) => {
     const project_id = url.searchParams.get('project_id')
     const submission_id = url.searchParams.get('submission_id')
     
-    // Get hierarchical data using the view we created
-    let query = db.selectFrom('sample_hierarchy').selectAll()
-    
-    if (project_id) {
-      query = query.where('project_id', '=', project_id)
+    // Build hierarchy directly from base tables (no dependency on database view)
+    const flatResults: any[] = []
+    const submissions = await db.selectFrom('submissions').selectAll().execute().catch(() => [])
+    const projects = await db.selectFrom('projects').selectAll().execute().catch(() => [])
+    const projectMap = new Map(projects.map((p: any) => [p.id, p]))
+    for (const sub of submissions) {
+      if (submission_id && sub.id !== submission_id) continue
+      if (project_id && sub.project_id !== project_id) continue
+      const samples = await db
+        .selectFrom('nanopore_samples')
+        .selectAll()
+        .where('submission_id', '=', sub.id)
+        .execute()
+        .catch(() => [])
+      for (const s of samples) {
+        flatResults.push({
+          project_id: sub.project_id || null,
+          project_name: sub.project_id && projectMap.get(sub.project_id)?.name ? projectMap.get(sub.project_id).name : 'Default Project',
+          project_status: 'active',
+          submission_id: sub.id,
+          submission_name: sub.name || 'Untitled Submission',
+          submission_status: sub.status,
+          submission_type: sub.submission_type,
+          submitted_at: sub.submitted_at,
+          sample_id: s.id,
+          sample_name: s.sample_name,
+          sample_identifier: s.sample_id,
+          sample_status: s.status,
+          sample_priority: s.priority,
+          sample_type: s.sample_type,
+          lab_name: s.lab_name,
+          chart_field: s.chart_field,
+          submitter_name: s.submitter_name,
+          submitter_email: s.submitter_email,
+          concentration: s.concentration,
+          concentration_unit: s.concentration_unit,
+          volume: s.volume,
+          volume_unit: s.volume_unit,
+          qubit_concentration: (s as any).qubit_concentration ?? null,
+          nanodrop_concentration: (s as any).nanodrop_concentration ?? null,
+          a260_280_ratio: (s as any).a260_280_ratio ?? null,
+          a260_230_ratio: (s as any).a260_230_ratio ?? null,
+          workflow_stage: s.workflow_stage,
+          flow_cell_count: s.flow_cell_count,
+          sample_created_at: s.created_at,
+          sample_updated_at: s.updated_at,
+        })
+      }
     }
-    
-    if (submission_id) {
-      query = query.where('submission_id', '=', submission_id)
-    }
-    
-    const flatResults = await query.execute()
     
     // Transform flat results into hierarchical structure
     const projectsMap = new Map()
@@ -67,6 +104,10 @@ export const GET: APIRoute = async ({ url }) => {
           concentration_unit: row.concentration_unit,
           volume: row.volume,
           volume_unit: row.volume_unit,
+          qubit_concentration: row.qubit_concentration ?? null,
+          nanodrop_concentration: row.nanodrop_concentration ?? null,
+          a260_280_ratio: row.a260_280_ratio ?? null,
+          a260_230_ratio: row.a260_230_ratio ?? null,
           workflow_stage: row.workflow_stage,
           flow_cell_count: row.flow_cell_count,
           created_at: row.sample_created_at,
@@ -76,21 +117,21 @@ export const GET: APIRoute = async ({ url }) => {
     }
     
     // Convert maps to arrays for JSON response
-    const projects = Array.from(projectsMap.values()).map(project => ({
+    const projectsArr = Array.from(projectsMap.values()).map(project => ({
       ...project,
       submissions: Array.from(project.submissions.values())
     }))
     
     // Calculate summary statistics
-    const totalProjects = projects.length
-    const totalSubmissions = projects.reduce((sum, p) => sum + p.submissions.length, 0)
-    const totalSamples = projects.reduce((sum: number, p: any) => 
+    const totalProjects = projectsArr.length
+    const totalSubmissions = projectsArr.reduce((sum, p) => sum + p.submissions.length, 0)
+    const totalSamples = projectsArr.reduce((sum: number, p: any) => 
       sum + p.submissions.reduce((subSum: number, s: any) => subSum + s.samples.filter((sample: any) => sample.id).length, 0), 0)
     
     return new Response(JSON.stringify({
       success: true,
       data: {
-        projects,
+        projects: projectsArr,
         summary: {
           totalProjects,
           totalSubmissions,

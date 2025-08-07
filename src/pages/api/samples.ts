@@ -50,12 +50,20 @@ export const POST: APIRoute = async ({ request }) => {
       concentration,
       concentration_unit = 'ng/μL',
       volume,
-      volume_unit = 'μL'
+      volume_unit = 'μL',
+      qubit_concentration,
+      nanodrop_concentration,
+      a260_280_ratio,
+      a260_230_ratio
     } = data
 
     // Parse numeric values safely
     const concentrationNum = concentration !== undefined && concentration !== null ? parseFloat(concentration) : null
     const volumeNum = volume !== undefined && volume !== null ? parseFloat(volume) : null
+    const qubitNum = qubit_concentration !== undefined && qubit_concentration !== null ? parseFloat(qubit_concentration) : null
+    const nanodropNum = nanodrop_concentration !== undefined && nanodrop_concentration !== null ? parseFloat(nanodrop_concentration) : null
+    const ratioA = a260_280_ratio !== undefined && a260_280_ratio !== null ? parseFloat(a260_280_ratio) : null
+    const ratioB = a260_230_ratio !== undefined && a260_230_ratio !== null ? parseFloat(a260_230_ratio) : null
 
     // Validate required fields
     if (!submission_id || !sample_name || !sample_id || !submitter_name || !submitter_email) {
@@ -122,6 +130,10 @@ export const POST: APIRoute = async ({ request }) => {
         workflow_stage: 'sample_qc',
         status: 'submitted',
         flow_cell_count: 1,
+        qubit_concentration: qubitNum,
+        nanodrop_concentration: nanodropNum,
+        a260_280_ratio: ratioA,
+        a260_230_ratio: ratioB,
         created_at: new Date(),
         updated_at: new Date()
       })

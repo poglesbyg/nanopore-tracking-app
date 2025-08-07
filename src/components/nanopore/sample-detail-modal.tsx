@@ -59,6 +59,10 @@ interface Sample {
   concentration_unit?: string
   volume?: string
   volume_unit?: string
+  qubit_concentration?: number | null
+  nanodrop_concentration?: number | null
+  a260_280_ratio?: number | null
+  a260_230_ratio?: number | null
   workflow_stage?: string
   created_at: string
   updated_at: string
@@ -73,6 +77,7 @@ interface SampleDetailModalProps {
 
 export default function SampleDetailModal({ isOpen, onClose, sample, onSampleUpdated }: SampleDetailModalProps) {
   const [isEditing, setIsEditing] = useState(false)
+  const [freshSample, setFreshSample] = useState<Sample | null>(null)
   const [workflowStage, setWorkflowStage] = useState('')
   const [status, setStatus] = useState('')
   const [priority, setPriority] = useState('')
@@ -82,6 +87,10 @@ export default function SampleDetailModal({ isOpen, onClose, sample, onSampleUpd
   const [concentrationUnit, setConcentrationUnit] = useState('')
   const [volume, setVolume] = useState('')
   const [volumeUnit, setVolumeUnit] = useState('')
+  const [qubit, setQubit] = useState('')
+  const [nanodrop, setNanodrop] = useState('')
+  const [ratioA, setRatioA] = useState('')
+  const [ratioB, setRatioB] = useState('')
   const [labName, setLabName] = useState('')
   const [chartField, setChartField] = useState('')
   const [submitterName, setSubmitterName] = useState('')
@@ -89,25 +98,49 @@ export default function SampleDetailModal({ isOpen, onClose, sample, onSampleUpd
   const [updating, setUpdating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Fetch latest sample from API when modal opens to reflect DB values
   useEffect(() => {
-    if (sample) {
-      setWorkflowStage(sample.workflow_stage || 'sample_qc')
-      setStatus(sample.status)
-      setPriority(sample.priority)
-      setSampleName(sample.sample_name)
-      setSampleType(sample.sample_type)
-      setConcentration(sample.concentration || '')
-      setConcentrationUnit(sample.concentration_unit || '')
-      setVolume(sample.volume || '')
-      setVolumeUnit(sample.volume_unit || '')
-      setLabName(sample.lab_name)
-      setChartField(sample.chart_field)
-      setSubmitterName(sample.submitter_name)
-      setSubmitterEmail(sample.submitter_email)
+    const load = async () => {
+      if (!sample?.id || !isOpen) return
+      try {
+        const res = await fetch(`/api/samples/${sample.id}`)
+        const json = await res.json()
+        if (res.ok && json.success) {
+          setFreshSample(json.data as Sample)
+        } else {
+          setFreshSample(sample)
+        }
+      } catch {
+        setFreshSample(sample)
+      }
+    }
+    load()
+  }, [sample?.id, isOpen])
+
+  useEffect(() => {
+    const s = freshSample || sample
+    if (s) {
+      setWorkflowStage(s.workflow_stage || 'sample_qc')
+      setStatus(s.status)
+      setPriority(s.priority)
+      setSampleName(s.sample_name)
+      setSampleType(s.sample_type)
+      setConcentration((s.concentration ?? '').toString())
+      setConcentrationUnit(s.concentration_unit || '')
+      setVolume((s.volume ?? '').toString())
+      setVolumeUnit(s.volume_unit || '')
+      setLabName(s.lab_name)
+      setChartField(s.chart_field)
+      setSubmitterName(s.submitter_name)
+      setSubmitterEmail(s.submitter_email)
+      setQubit((s.qubit_concentration ?? '').toString())
+      setNanodrop((s.nanodrop_concentration ?? '').toString())
+      setRatioA((s.a260_280_ratio ?? '').toString())
+      setRatioB((s.a260_230_ratio ?? '').toString())
       setError(null)
       setIsEditing(false)
     }
-  }, [sample])
+  }, [freshSample, sample])
 
   if (!isOpen || !sample) return null
 
@@ -215,7 +248,7 @@ export default function SampleDetailModal({ isOpen, onClose, sample, onSampleUpd
             <h2 className="text-xl font-semibold text-gray-900">
               {isEditing ? 'Edit Sample' : 'Sample Details'}
             </h2>
-            <p className="text-sm text-gray-500 mt-1">{sample.sample_id}</p>
+            <p className="text-sm text-gray-500 mt-1">{(freshSample || sample).sample_id}</p>
           </div>
           <div className="flex items-center space-x-2">
             {!isEditing && (
@@ -257,7 +290,7 @@ export default function SampleDetailModal({ isOpen, onClose, sample, onSampleUpd
                     className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 ) : (
-                  <p className="mt-1 text-sm text-gray-900">{sample.sample_name}</p>
+                    <p className="mt-1 text-sm text-gray-900">{(freshSample || sample).sample_name}</p>
                 )}
               </div>
               
@@ -278,7 +311,7 @@ export default function SampleDetailModal({ isOpen, onClose, sample, onSampleUpd
                 ) : (
                   <div className="mt-1 flex items-center space-x-2">
                     <TestTube className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm text-gray-900">{sample.sample_type}</span>
+                    <span className="text-sm text-gray-900">{(freshSample || sample).sample_type}</span>
                   </div>
                 )}
               </div>
@@ -293,7 +326,7 @@ export default function SampleDetailModal({ isOpen, onClose, sample, onSampleUpd
                     className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 ) : (
-                  <p className="mt-1 text-sm text-gray-900">{sample.chart_field}</p>
+                    <p className="mt-1 text-sm text-gray-900">{(freshSample || sample).chart_field}</p>
                 )}
               </div>
 
@@ -309,7 +342,7 @@ export default function SampleDetailModal({ isOpen, onClose, sample, onSampleUpd
                 ) : (
                   <div className="mt-1 flex items-center space-x-2">
                     <Beaker className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm text-gray-900">{sample.lab_name || 'Not specified'}</span>
+                    <span className="text-sm text-gray-900">{(freshSample || sample).lab_name || 'Not specified'}</span>
                   </div>
                 )}
               </div>
@@ -340,7 +373,9 @@ export default function SampleDetailModal({ isOpen, onClose, sample, onSampleUpd
                   </div>
                 ) : (
                   <p className="mt-1 text-sm text-gray-900">
-                    {sample.concentration ? `${sample.concentration} ${sample.concentration_unit}` : 'Not specified'}
+                    {(freshSample || sample).concentration !== null && (freshSample || sample).concentration !== undefined
+                      ? `${(freshSample || sample).concentration} ${(freshSample || sample).concentration_unit || ''}`
+                      : 'Not specified'}
                   </p>
                 )}
               </div>
@@ -371,7 +406,42 @@ export default function SampleDetailModal({ isOpen, onClose, sample, onSampleUpd
                   </div>
                 ) : (
                   <p className="mt-1 text-sm text-gray-900">
-                    {sample.volume ? `${sample.volume} ${sample.volume_unit}` : 'Not specified'}
+                    {(freshSample || sample).volume !== null && (freshSample || sample).volume !== undefined
+                      ? `${(freshSample || sample).volume} ${(freshSample || sample).volume_unit || ''}`
+                      : 'Not specified'}
+                  </p>
+                )}
+              </div>
+
+              {/* PDF-derived QC metrics (read-only for now) */}
+              <div>
+                <Label className="text-sm font-medium text-gray-700">Qubit Conc. (ng/μL)</Label>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={qubit}
+                    onChange={(e) => setQubit(e.target.value)}
+                    className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                ) : (
+                  <p className="mt-1 text-sm text-gray-900">
+                    {(freshSample || sample).qubit_concentration ?? 'Not specified'}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium text-gray-700">Nanodrop Conc. (ng/μL)</Label>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={nanodrop}
+                    onChange={(e) => setNanodrop(e.target.value)}
+                    className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                ) : (
+                  <p className="mt-1 text-sm text-gray-900">
+                    {(freshSample || sample).nanodrop_concentration ?? 'Not specified'}
                   </p>
                 )}
               </div>
@@ -390,7 +460,7 @@ export default function SampleDetailModal({ isOpen, onClose, sample, onSampleUpd
                 ) : (
                   <div className="mt-1 flex items-center space-x-2">
                     <User className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm text-gray-900">{sample.submitter_name}</span>
+                    <span className="text-sm text-gray-900">{(freshSample || sample).submitter_name}</span>
                   </div>
                 )}
               </div>
@@ -405,7 +475,7 @@ export default function SampleDetailModal({ isOpen, onClose, sample, onSampleUpd
                     className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 ) : (
-                  <p className="mt-1 text-xs text-gray-500">{sample.submitter_email}</p>
+                  <p className="mt-1 text-xs text-gray-500">{(freshSample || sample).submitter_email}</p>
                 )}
               </div>
 
@@ -429,6 +499,34 @@ export default function SampleDetailModal({ isOpen, onClose, sample, onSampleUpd
                       {getCurrentPriorityInfo()?.label || 'Unknown'}
                     </Badge>
                   </div>
+                )}
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium text-gray-700">A260/A280 ratio</Label>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={ratioA}
+                    onChange={(e) => setRatioA(e.target.value)}
+                    className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                ) : (
+                  <p className="mt-1 text-sm text-gray-900">{(freshSample || sample).a260_280_ratio ?? 'Not specified'}</p>
+                )}
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium text-gray-700">A260/A230 ratio</Label>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={ratioB}
+                    onChange={(e) => setRatioB(e.target.value)}
+                    className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                ) : (
+                  <p className="mt-1 text-sm text-gray-900">{(freshSample || sample).a260_230_ratio ?? 'Not specified'}</p>
                 )}
               </div>
 

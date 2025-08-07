@@ -9,7 +9,13 @@
     "build": "astro build",
     "start": "node dist/server/entry.mjs",
     "db:setup": "node scripts/setup-database.js",
-    "postinstall": "astro sync"
+    "postinstall": "astro sync",
+    "test": "vitest",
+    "test:unit": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "lint": "eslint . --ext .ts,.tsx",
+    "format": "prettier --write ."
   },
   "packageManager": "pnpm@10.13.1",
   "dependencies": {

@@ -85,6 +85,10 @@ export interface Database {
     concentration_unit: string | null
     volume: number | null
     volume_unit: string | null
+    qubit_concentration?: number | null
+    nanodrop_concentration?: number | null
+    a260_280_ratio?: number | null
+    a260_230_ratio?: number | null
     total_amount: number | null
     flow_cell_type: string | null
     flow_cell_count: number
@@ -122,6 +126,10 @@ export interface Database {
     concentration_unit: string | null
     volume: number | null
     volume_unit: string | null
+    qubit_concentration?: number | null
+    nanodrop_concentration?: number | null
+    a260_280_ratio?: number | null
+    a260_230_ratio?: number | null
     workflow_stage: string
     flow_cell_count: number | null
     sample_created_at: Date
