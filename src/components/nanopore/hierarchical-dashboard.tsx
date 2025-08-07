@@ -69,6 +69,32 @@ export default function HierarchicalDashboard() {
     fetchHierarchyData()
   }, [])
 
+  // Auto-expand projects and submissions that contain samples
+  useEffect(() => {
+    if (hierarchyData.projects.length > 0) {
+      const newExpandedProjects = new Set<string>()
+      const newExpandedSubmissions = new Set<string>()
+      
+      hierarchyData.projects.forEach(project => {
+        // Check if project has any samples
+        const hasAnySamples = project.submissions.some(submission => submission.samples.length > 0)
+        if (hasAnySamples) {
+          newExpandedProjects.add(project.id)
+          
+          // Also expand submissions with samples
+          project.submissions.forEach(submission => {
+            if (submission.samples.length > 0) {
+              newExpandedSubmissions.add(submission.id)
+            }
+          })
+        }
+      })
+      
+      setExpandedProjects(newExpandedProjects)
+      setExpandedSubmissions(newExpandedSubmissions)
+    }
+  }, [hierarchyData])
+
   const fetchHierarchyData = async () => {
     try {
       const response = await fetch('/api/hierarchy')
@@ -441,6 +467,18 @@ export default function HierarchicalDashboard() {
                     </span>
                     <span style={{ marginLeft: '15px', color: '#6b7280', fontSize: '14px' }}>
                       {project.submissions.length} submission{project.submissions.length !== 1 ? 's' : ''}
+                      {(() => {
+                        const totalSamples = project.submissions.reduce((sum, sub) => sum + sub.samples.length, 0)
+                        return totalSamples > 0 ? (
+                          <span style={{ 
+                            marginLeft: '10px', 
+                            color: '#059669', 
+                            fontWeight: '600' 
+                          }}>
+                            • ✓ {totalSamples} sample{totalSamples !== 1 ? 's' : ''}
+                          </span>
+                        ) : null
+                      })()}
                     </span>
                   </div>
                   <span style={{ fontSize: '14px', color: '#6b7280' }}>
@@ -483,8 +521,13 @@ export default function HierarchicalDashboard() {
                             }}>
                               {submission.status}
                             </span>
-                            <span style={{ marginLeft: '10px', color: '#6b7280', fontSize: '13px' }}>
-                              {submission.samples.length} sample{submission.samples.length !== 1 ? 's' : ''}
+                            <span style={{ 
+                              marginLeft: '10px', 
+                              color: submission.samples.length > 0 ? '#059669' : '#6b7280', 
+                              fontSize: '13px',
+                              fontWeight: submission.samples.length > 0 ? '600' : '400'
+                            }}>
+                              {submission.samples.length > 0 ? `✓ ${submission.samples.length}` : '0'} sample{submission.samples.length !== 1 ? 's' : ''}
                             </span>
                           </div>
                           <span style={{ fontSize: '12px', color: '#6b7280' }}>
