@@ -27,42 +27,11 @@ export default function SubmissionsForm() {
     setUploadingPdf(true)
     setError(null)
 
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-
-      const response = await fetch('/api/process-pdf', {
-        method: 'POST',
-        body: formData,
-      })
-
-      if (!response.ok) {
-        throw new Error(`Upload failed: ${response.statusText}`)
-      }
-
-      const result = await response.json()
-      
-      if (result.success && result.data) {
-        // Auto-populate form with extracted data
-        const data = result.data
-        if (data.sample_name) setSampleName(data.sample_name)
-        if (data.submitter_name) setSubmitterName(data.submitter_name)
-        if (data.submitter_email) setSubmitterEmail(data.submitter_email)
-        if (data.lab_name) setLabName(data.lab_name)
-        if (data.sample_type) setSampleType(data.sample_type)
-        if (data.chart_field) setChartField(data.chart_field)
-        if (data.priority) setPriority(data.priority)
-        
-        setError(null)
-      } else {
-        setError(result.message || 'Failed to process PDF')
-      }
-    } catch (error) {
-      console.error('PDF upload error:', error)
-      setError('Failed to upload and process PDF. Please try again.')
-    } finally {
+    // For now, just acknowledge the file upload without server processing
+    setTimeout(() => {
       setUploadingPdf(false)
-    }
+      setError('PDF uploaded for reference. Please fill in the form manually.')
+    }, 1000)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {

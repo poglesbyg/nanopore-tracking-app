@@ -94,65 +94,13 @@ export default function SubmissionWithHierarchy() {
     setError(null)
     setUploadedFileName(file.name)
 
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-
-      const response = await fetch('/api/process-pdf', {
-        method: 'POST',
-        body: formData,
-      })
-
-      const result = await response.json().catch(() => ({ success: false, message: 'Invalid JSON response'}))
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || `Upload failed: ${response.statusText}`)
-      }
-      
-      if (result.success && result.data) {
-        const data = result.data
-        setExtractedData(data)
-        
-        // Auto-populate form fields
-        if (data.submitter_name) setSubmitterName(data.submitter_name)
-        if (data.submitter_email) setSubmitterEmail(data.submitter_email)
-        if (data.project_title) setSubmissionName(data.project_title)
-        if (data.department) setDescription(`Department: ${data.department}`)
-        
-        // Prepare project data from PDF
-        const projectData = {
-          name: data.project_title || 'Untitled Project',
-          description: data.department ? `Department: ${data.department}` : '',
-          owner_name: data.submitter_name || '',
-          owner_email: data.submitter_email || '',
-          chart_prefix: data.chart_field?.startsWith('HTSF') ? 'HTSF' : 'NANO'
-        }
-        
-        setProjectInitialData(projectData)
-        
-        // Check if a project with this name already exists
-        const existingProject = projects.find(p => 
-          p.name.toLowerCase() === projectData.name.toLowerCase()
-        )
-        
-        if (existingProject) {
-          // Select the existing project
-          setSelectedProjectId(existingProject.id)
-        } else {
-          // Always show modal for new project with pre-filled data from PDF
-          setShowCreateProjectModal(true)
-        }
-      }
-    } catch (error) {
-      console.error('PDF upload error:', error)
-      if (error instanceof Error) {
-        setError(error.message)
-      } else {
-        setError('Failed to process PDF. Please try again.')
-      }
-    } finally {
+    // For now, just store the file name - no server processing
+    // User will need to manually enter sample data
+    setTimeout(() => {
       setUploadingPdf(false)
-    }
+      // Show a message that manual entry is required
+      setError('PDF uploaded successfully. Please manually enter submission details below.')
+    }, 1000)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -195,39 +143,9 @@ export default function SubmissionWithHierarchy() {
 
       const submissionId = submissionResult.data.id
 
-      // Create samples if we have extracted data
+      // For now, just create the submission without samples
+      // Samples will be added manually through the dashboard
       let createdSamples = 0
-      if (extractedData?.samples && extractedData.samples.length > 0) {
-        for (const sample of extractedData.samples) {
-          const sampleResponse = await fetch('/api/samples', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              submission_id: submissionId,
-              sample_name: sample.sample_name || sample.sample_id,
-              sample_id: sample.sample_id,
-              sample_type: sample.sample_type || 'DNA',
-              submitter_name: submitterName,
-              submitter_email: submitterEmail,
-              lab_name: 'Default Lab',
-              chart_field: extractedData.chart_field || 'HTSF-001',
-              concentration: sample.concentration ? parseFloat(sample.concentration) : undefined,
-              concentration_unit: sample.concentration_unit,
-              volume: sample.volume ? parseFloat(sample.volume) : undefined,
-              volume_unit: sample.volume_unit,
-              priority: 'normal',
-              status: 'submitted'
-            })
-          })
-
-          const sampleResult = await sampleResponse.json().catch(()=>({ success:false, message:'Invalid JSON'}))
-          if (!sampleResponse.ok || !sampleResult.success) {
-            console.error('Failed to create sample:', sample.sample_id, sampleResult.message)
-          } else {
-            createdSamples++
-          }
-        }
-      }
 
       // Store sample count before resetting form
       setSampleCount(createdSamples)
@@ -271,7 +189,7 @@ export default function SubmissionWithHierarchy() {
           <div className="text-green-600 text-5xl mb-4">✅</div>
           <h2 className="text-2xl font-bold text-green-800 mb-2">Submission Created Successfully!</h2>
           <p className="text-green-700 mb-6">
-            Your submission has been created with {sampleCount} sample{sampleCount === 1 ? '' : 's'}.
+            Your submission has been created. You can now add samples through the dashboard.
           </p>
           <div className="flex gap-4 justify-center">
             <Button onClick={() => setSuccess(false)} variant="default">
@@ -344,26 +262,26 @@ export default function SubmissionWithHierarchy() {
                 <>
                   <FileText className="h-12 w-12 text-green-500 mb-2" />
                   <span className="text-green-600 font-medium">{uploadedFileName}</span>
-                  <span className="text-sm text-gray-500 mt-1">Click to change file</span>
+                  <span className="text-sm text-gray-500 mt-1">File attached for reference</span>
                 </>
               ) : (
                 <>
                   <Upload className="h-12 w-12 text-gray-400 mb-2" />
                   <span className="text-gray-600">
-                    {uploadingPdf ? 'Processing PDF...' : 'Click to upload HTSF quote PDF'}
+                    {uploadingPdf ? 'Uploading PDF...' : 'Click to upload HTSF quote PDF'}
                   </span>
                   <span className="text-sm text-gray-500 mt-1">
-                    PDF will be processed to extract sample information
+                    PDF will be stored for reference - enter details manually below
                   </span>
                 </>
               )}
             </label>
           </div>
           
-          {extractedData?.samples && (
+          {uploadedFileName && (
             <div className="mt-4 p-4 bg-blue-50 rounded-lg">
               <p className="text-sm text-blue-800">
-                ✓ Extracted {extractedData.samples.length} samples from PDF
+                ✓ PDF uploaded successfully. Please fill in submission details manually below.
               </p>
             </div>
           )}
