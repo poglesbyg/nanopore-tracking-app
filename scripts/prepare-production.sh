@@ -71,21 +71,34 @@ if [ ! -f .env.production ]; then
         print_warning "Please update .env.production with actual values!"
         print_warning "Generating secure secrets..."
         
-        # Generate secure secrets
-        JWT_SECRET=$(openssl rand -base64 32)
-        SESSION_SECRET=$(openssl rand -base64 32)
-        ADMIN_PASSWORD=$(openssl rand -base64 16)
+        # Generate secure secrets (URL-safe base64 to avoid sed issues)
+        JWT_SECRET=$(openssl rand -base64 32 | tr -d "=\n/" | cut -c 1-32)
+        SESSION_SECRET=$(openssl rand -base64 32 | tr -d "=\n/" | cut -c 1-32)
+        ADMIN_PASSWORD=$(openssl rand -base64 16 | tr -d "=\n/" | cut -c 1-16)
         
-        # Update the .env.production file (macOS compatible)
+        # Create a temporary file with the secrets
+        cp .env.production .env.production.tmp
+        
+        # Use a different approach for replacing secrets
         if [[ "$OSTYPE" == "darwin"* ]]; then
-            sed -i '' "s/JWT_SECRET=CHANGE_ME_TO_SECURE_SECRET_MIN_32_CHARS/JWT_SECRET=$JWT_SECRET/" .env.production
-            sed -i '' "s/SESSION_SECRET=CHANGE_ME_TO_SECURE_SESSION_SECRET/SESSION_SECRET=$SESSION_SECRET/" .env.production
-            sed -i '' "s/ADMIN_PASSWORD=CHANGE_ME_TO_SECURE_PASSWORD/ADMIN_PASSWORD=$ADMIN_PASSWORD/" .env.production
+            # macOS version
+            awk -v jwt="$JWT_SECRET" -v session="$SESSION_SECRET" -v admin="$ADMIN_PASSWORD" '
+                /^JWT_SECRET=/ { print "JWT_SECRET=" jwt; next }
+                /^SESSION_SECRET=/ { print "SESSION_SECRET=" session; next }
+                /^ADMIN_PASSWORD=/ { print "ADMIN_PASSWORD=" admin; next }
+                { print }
+            ' .env.production.tmp > .env.production
         else
-            sed -i "s/JWT_SECRET=CHANGE_ME_TO_SECURE_SECRET_MIN_32_CHARS/JWT_SECRET=$JWT_SECRET/" .env.production
-            sed -i "s/SESSION_SECRET=CHANGE_ME_TO_SECURE_SESSION_SECRET/SESSION_SECRET=$SESSION_SECRET/" .env.production
-            sed -i "s/ADMIN_PASSWORD=CHANGE_ME_TO_SECURE_PASSWORD/ADMIN_PASSWORD=$ADMIN_PASSWORD/" .env.production
+            # Linux version
+            awk -v jwt="$JWT_SECRET" -v session="$SESSION_SECRET" -v admin="$ADMIN_PASSWORD" '
+                /^JWT_SECRET=/ { print "JWT_SECRET=" jwt; next }
+                /^SESSION_SECRET=/ { print "SESSION_SECRET=" session; next }
+                /^ADMIN_PASSWORD=/ { print "ADMIN_PASSWORD=" admin; next }
+                { print }
+            ' .env.production.tmp > .env.production
         fi
+        
+        rm -f .env.production.tmp
         
         print_status "Secrets generated and saved to .env.production"
         echo ""
