@@ -70,22 +70,23 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Getting Started:
-      - Quick Reference: docs/QUICK_REFERENCE.md
-      - Implementation Guide: docs/COMPLETE_IMPLEMENTATION_GUIDE.md
+      - Quick Reference: QUICK_REFERENCE.md
+      - Implementation Guide: COMPLETE_IMPLEMENTATION_GUIDE.md
   - Architecture:
-      - Microservices Analysis: docs/MICROSERVICES_ANALYSIS.md
-      - Migration Plan: docs/MICROSERVICES_MIGRATION_PLAN.md
-      - Database Separation: docs/DATABASE_SEPARATION_GUIDE.md
-      - Service Mesh: docs/SERVICE_MESH_IMPLEMENTATION.md
+      - Architecture Diagrams: ARCHITECTURE_DIAGRAMS.md
+      - Microservices Analysis: MICROSERVICES_ANALYSIS.md
+      - Migration Plan: MICROSERVICES_MIGRATION_PLAN.md
+      - Database Separation: DATABASE_SEPARATION_GUIDE.md
+      - Service Mesh: SERVICE_MESH_IMPLEMENTATION.md
   - Development:
-      - Service Communication: docs/SERVICE_COMMUNICATION_GUIDE.md
-      - CORS Configuration: docs/CORS_CONFIGURATION_GUIDE.md
-      - Resource Optimization: docs/QUOTA_OPTIMIZED_SERVICE_MESH.md
+      - Service Communication: SERVICE_COMMUNICATION_GUIDE.md
+      - CORS Configuration: CORS_CONFIGURATION_GUIDE.md
+      - Resource Optimization: QUOTA_OPTIMIZED_SERVICE_MESH.md
   - Operations:
-      - Production Deployment: docs/PHASE3_PRODUCTION_DEPLOYMENT.md
-      - Production Runbook: docs/PRODUCTION_RUNBOOK.md
-      - Prometheus Setup: docs/PROMETHEUS_DEPLOYMENT_SUMMARY.md
-      - Progress Tracking: docs/MICROSERVICES_PROGRESS.md
+      - Production Deployment: PHASE3_PRODUCTION_DEPLOYMENT.md
+      - Production Runbook: PRODUCTION_RUNBOOK.md
+      - Prometheus Setup: PROMETHEUS_DEPLOYMENT_SUMMARY.md
+      - Progress Tracking: MICROSERVICES_PROGRESS.md
 
 # Extra configuration
 extra:

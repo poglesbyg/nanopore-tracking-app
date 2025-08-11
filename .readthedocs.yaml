@@ -9,19 +9,18 @@ build:
   os: ubuntu-22.04
   tools:
     python: "3.11"
-  # Removed nodejs and apt packages to simplify the build
 
-# Build documentation in the docs/ directory with Sphinx
-sphinx:
-  configuration: docs/conf.py
-  builder: html
+# Build documentation with MkDocs
+mkdocs:
+  configuration: mkdocs.yml
   fail_on_warning: false
 
-# Build formats - only HTML zip for simplicity
+# Build formats
 formats:
-  - htmlzip
+  - pdf
+  - epub
 
 # Python configuration
 python:
   install:
-    - requirements: docs/requirements.txt 
+    - requirements: docs/requirements.txt
