@@ -93,7 +93,7 @@ export interface Database {
     flow_cell_type: string | null
     flow_cell_count: number
     workflow_stage: 'sample_qc' | 'library_prep' | 'library_qc' | 'sequencing_setup' | 'sequencing_run' | 'basecalling' | 'quality_assessment' | 'data_delivery'
-    status: 'submitted' | 'prep' | 'sequencing' | 'analysis' | 'completed' | 'failed' | 'archived'
+    status: 'submitted' | 'prep' | 'sequencing' | 'analysis' | 'completed' | 'distributed' | 'failed' | 'archived'
     priority: 'low' | 'normal' | 'high' | 'urgent'
     assigned_to: string | null
     library_prep_by: string | null

@@ -61,7 +61,7 @@ export interface NanoporeSamplesTable {
   total_amount: number | null
   flow_cell_type: string | null
   flow_cell_count: number | null
-  status: 'submitted' | 'prep' | 'sequencing' | 'analysis' | 'completed' | 'archived'
+  status: 'submitted' | 'prep' | 'sequencing' | 'analysis' | 'completed' | 'distributed' | 'archived'
   priority: 'low' | 'normal' | 'high' | 'urgent'
   assigned_to: string | null
   library_prep_by: string | null

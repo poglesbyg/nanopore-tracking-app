@@ -322,6 +322,7 @@ export function EditTaskModal({
                 <option value="sequencing">Sequencing</option>
                 <option value="analysis">Analysis</option>
                 <option value="completed">Completed</option>
+                <option value="distributed">Distributed</option>
                 <option value="archived">Archived</option>
               </select>
             </div>

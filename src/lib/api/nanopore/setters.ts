@@ -102,7 +102,7 @@ export async function updateNanoporeSample(
 export async function updateSampleStatus(
   db: Kysely<DB>,
   sampleId: string,
-  status: 'submitted' | 'prep' | 'sequencing' | 'analysis' | 'completed' | 'archived',
+  status: 'submitted' | 'prep' | 'sequencing' | 'analysis' | 'completed' | 'distributed' | 'archived',
 ): Promise<Selectable<NanoporeSample>> {
   const now = new Date().toISOString()
   

@@ -1,5 +1,5 @@
 import { Badge } from '@/components/ui/badge'
-import { Clock, TestTube, Zap, Activity, CheckCircle, Archive } from 'lucide-react'
+import { Clock, TestTube, Zap, Activity, CheckCircle, Package, Archive } from 'lucide-react'
 
 const statusConfig = {
   submitted: { color: 'bg-blue-100 text-blue-800', icon: Clock },
@@ -7,6 +7,7 @@ const statusConfig = {
   sequencing: { color: 'bg-purple-100 text-purple-800', icon: Zap },
   analysis: { color: 'bg-orange-100 text-orange-800', icon: Activity },
   completed: { color: 'bg-green-100 text-green-800', icon: CheckCircle },
+  distributed: { color: 'bg-indigo-100 text-indigo-800', icon: Package },
   archived: { color: 'bg-gray-100 text-gray-800', icon: Archive }
 }
 

@@ -92,7 +92,7 @@ export const baseValidations = {
   flowCellCount: z.number().int().min(1, 'Flow cell count must be at least 1').max(10, 'Flow cell count cannot exceed 10').default(1),
   
   // Enum validations
-  status: z.enum(['submitted', 'prep', 'sequencing', 'analysis', 'completed', 'archived'], {
+  status: z.enum(['submitted', 'prep', 'sequencing', 'analysis', 'completed', 'distributed', 'archived'], {
     required_error: messages.required,
     invalid_type_error: 'Invalid status value'
   }),
