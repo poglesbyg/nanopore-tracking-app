@@ -9,7 +9,7 @@ export const GET: APIRoute = async ({ url }) => {
     
     // Build hierarchy directly from base tables (no dependency on database view)
     const flatResults: any[] = []
-    const submissions = await db.selectFrom('submissions').selectAll().execute().catch(() => [])
+    const submissions = await db.selectFrom('nanopore_submissions').selectAll().execute().catch(() => [])
     const projects = await db.selectFrom('projects').selectAll().execute().catch(() => [])
     const projectMap = new Map(projects.map((p: any) => [p.id, p]))
     for (const sub of submissions) {
@@ -21,22 +21,25 @@ export const GET: APIRoute = async ({ url }) => {
         .where('submission_id', '=', sub.id)
         .execute()
         .catch(() => [])
-      for (const s of samples) {
-        flatResults.push({
-          project_id: sub.project_id || null,
-          project_name: sub.project_id && projectMap.get(sub.project_id)?.name ? projectMap.get(sub.project_id).name : 'Default Project',
-          project_status: 'active',
-          submission_id: sub.id,
-          submission_name: sub.name || 'Untitled Submission',
-          submission_status: sub.status,
-          submission_type: sub.submission_type,
-          submitted_at: sub.submitted_at,
-          sample_id: s.id,
-          sample_name: s.sample_name,
-          sample_identifier: s.sample_id,
-          sample_status: s.status,
-          sample_priority: s.priority,
-          sample_type: s.sample_type,
+      
+      // If there are samples, add each one
+      if (samples.length > 0) {
+        for (const s of samples) {
+          flatResults.push({
+            project_id: (sub as any).project_id || null,
+            project_name: (sub as any).project_id && projectMap.get((sub as any).project_id)?.name ? projectMap.get((sub as any).project_id).name : 'Default Project',
+            project_status: 'active',
+            submission_id: sub.id,
+            submission_name: (sub as any).submission_number || (sub as any).name || 'Untitled Submission',
+            submission_status: (sub as any).status,
+            submission_type: (sub as any).submission_type || 'manual',
+            submitted_at: (sub as any).submitted_at || (sub as any).submission_date,
+            sample_id: s.id,
+            sample_name: s.sample_name,
+            sample_identifier: s.sample_id,
+            sample_status: s.status,
+            sample_priority: s.priority,
+            sample_type: s.sample_type,
           lab_name: s.lab_name,
           chart_field: s.chart_field,
           submitter_name: s.submitter_name,
@@ -55,6 +58,41 @@ export const GET: APIRoute = async ({ url }) => {
           sample_updated_at: s.updated_at,
         })
       }
+    } else {
+      // No samples, but still add the submission
+      flatResults.push({
+        project_id: (sub as any).project_id || null,
+        project_name: (sub as any).project_id && projectMap.get((sub as any).project_id)?.name ? projectMap.get((sub as any).project_id).name : 'Default Project',
+        project_status: 'active',
+        submission_id: sub.id,
+        submission_name: (sub as any).submission_number || (sub as any).name || 'Untitled Submission',
+        submission_status: (sub as any).status,
+        submission_type: (sub as any).submission_type || 'manual',
+        submitted_at: (sub as any).submitted_at || (sub as any).submission_date,
+        sample_id: null,
+        sample_name: null,
+        sample_identifier: null,
+        sample_status: null,
+        sample_priority: null,
+        sample_type: null,
+        lab_name: null,
+        chart_field: null,
+        submitter_name: (sub as any).submitter_name,
+        submitter_email: (sub as any).submitter_email,
+        concentration: null,
+        concentration_unit: null,
+        volume: null,
+        volume_unit: null,
+        qubit_concentration: null,
+        nanodrop_concentration: null,
+        a260_280_ratio: null,
+        a260_230_ratio: null,
+        workflow_stage: null,
+        flow_cell_count: null,
+        sample_created_at: null,
+        sample_updated_at: null,
+      })
+    }
     }
     
     // Transform flat results into hierarchical structure
