@@ -338,57 +338,60 @@ src/
 - Explain your OBSERVATIONS clearly, then provide REASONING to identify the exact issue. Add console logs when needed to gather more information.
 
 
-Nanopore Sample Tracking System Architecture
+The system implements a nanopore sequencing sample management platform with microservices architecture. Core business domains include:
 
-Core Domain Components:
+## Sample Processing Workflow
+- Sample submission and validation with specialized metadata fields (concentration, volume, flow cell type)
+- Multi-stage processing pipeline: QC → Library Prep → Sequencing → Analysis
+- PDF/CSV data extraction optimized for lab documentation
+- Priority-based sample queue management
 
-1. Sample Management Workflow
-- 8-stage laboratory process: Sample QC → Library Prep → Library QC → Sequencing Setup → Sequencing Run → Basecalling → Quality Assessment → Data Delivery
-- Status transitions: submitted → prep → sequencing → analysis → completed → archived
-- Priority levels (low, normal, high, urgent) affecting processing order
-- Chart field validation for institutional tracking (HTSF-XXX, NANO-XXX, SEQ-XXX)
+Key Files:
+- `src/lib/pdf-pattern-matcher.ts`
+- `src/repositories/SamplesRepository.ts`
+- `app/services/pdf_processor.py`
 
-2. AI-Powered Form Processing
-- Multi-strategy extraction combining LLM, pattern matching, and RAG
-- Confidence scoring system for extraction quality
-- Domain-specific field validation for concentrations, volumes, and flow cell types
-- Fallback mechanisms ensuring continuous operation
+## Laboratory Integration
+- Integration with Mitchell Lab protocols
+- Support for High Molecular Weight DNA/gDNA processing
+- Organism-specific validation rules
+- Buffer compatibility validation
 
-3. Laboratory Sample Validation
-- Sample type-specific concentration ranges:
-  * DNA: 0.1-1000 ng/μL
-  * RNA: 0.01-100 ng/μL
-  * Protein: 0.001-10 ng/μL
-- Flow cell compatibility verification
-- Volume and concentration unit standardization
-- Quality control gates between workflow stages
+Key Files:
+- `src/lib/nanopore/processing-steps.ts`
+- `src/repositories/AIRepository.ts`
 
-4. Audit and Compliance
-- Comprehensive tracking of sample modifications
-- Chain of custody maintenance
-- Equipment and reagent usage logging
-- Retention policies for laboratory records
+## Service Mesh Architecture
+- Quota-optimized service management
+- Laboratory-specific circuit breaker patterns
+- Custom health monitoring for sequencing services
+- Domain-specific load balancing for bioinformatics workloads
 
-Key Integration Points:
+Key Files:
+- `src/lib/service-mesh/QuotaOptimizedServiceMesh.ts`
+- `src/lib/service-mesh/TrafficManagement.ts`
 
-1. Submission Processing
-- PDF quote form extraction (HTSF format)
-- CSV bulk sample processing
-- Memory-optimized handling for large submissions
+## AI and Domain Knowledge
+- Protocol recommendations based on sample characteristics
+- Quality assessment with success probability calculation
+- Pattern-based troubleshooting for sequencing issues
+- Model performance monitoring for genomic data processing
 
-2. Sample Data Management
-- Specialized metadata tracking for nanopore sequencing
-- Flow cell allocation and management
-- Library preparation assignments
-- Processing step progression
+Key Files:
+- `src/lib/messaging/events/ai-events.ts`
+- `scripts/test-mcp-servers.js`
 
-Business-Critical Components:
-- /src/lib/ai/nanopore-llm-service.ts: AI extraction pipeline
-- /services/python-sample-management/app/main.py: Sample workflow management
-- /services/submission-service/app/services/pdf_processor.py: Form processing
-- /src/services/implementations/AuditLogger.ts: Compliance tracking
+## Audit and Compliance
+- Comprehensive audit trails for sample processing
+- Laboratory-specific security controls
+- Quality control thresholds monitoring
+- Retention policy management
 
-The system implements specialized laboratory sample tracking with emphasis on nanopore sequencing requirements, regulatory compliance, and efficient processing of institutional documentation.
+Key Files:
+- `src/lib/audit/AuditLogger.ts`
+- `src/repositories/AuditRepository.ts`
+
+The system emphasizes reliability in laboratory workflows while maintaining strict compliance and quality control standards for nanopore sequencing operations.
 
 $END$
 

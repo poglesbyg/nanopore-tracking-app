@@ -1,87 +1,73 @@
 ---
-description: Defines core 8-step workflow model for nanopore sample processing including state transitions, validation, and timing requirements
-globs: **/nanopore/**,**/workflow/**,**/sample-management/**
-alwaysApply: false
+description: Documents the 8-step nanopore sequencing workflow model for managing sample processing states and transitions
 ---
 
 
 # nanopore-workflow-model
 
-Core 8-Step Nanopore Sample Processing Workflow:
+The nanopore sequencing workflow implements an 8-stage model for processing samples:
 
-1. Sample QC (1h)
-- Initial quality control validation 
-- Concentration verification (0.1-1000 ng/μL)
-- Volume validation (0.1-1000 μL)
-- Required fields: sample name, submitter info, chart field
+1. Sample QC
+- Initial quality control validation
+- Records concentration, purity ratios
+- Validates sample meets minimum requirements
+- Status transitions: submitted → qc_started → qc_complete/qc_failed
 
-2. Library Preparation (4h)
-- DNA/RNA library construction
-- Kit compatibility validation
-- Barcoding requirements check
-- Records library prep specialist assignment
+2. Library Preparation 
+- Tracks library prep kit and chemistry
+- Records adaptor ligation metrics
+- Validates library concentration
+- Status: qc_complete → prep_started → prep_complete/prep_failed
 
-3. Library QC (1h)
-- Validates library quality metrics
-- Fragment size analysis
-- Concentration re-verification
-- Go/no-go quality gate
+3. Library QC
+- Secondary QC after library prep
+- Validates library size distribution
+- Checks final concentration
+- Status: prep_complete → lib_qc_started → lib_qc_complete/lib_qc_failed
 
-4. Sequencing Setup (1h)
-- Flow cell preparation 
-- Chemistry validation (R9.4.1, R10.4.1)
-- Device type matching (PromethION/MinION)
-- Run parameters configuration
+4. Sequencing Setup
+- Flow cell QC and priming
+- Platform configuration 
+- Run parameters setup
+- Status: lib_qc_complete → seq_setup_started → seq_setup_complete
 
-5. Sequencing Run (48h)
+5. Sequencing Run
 - Active sequencing monitoring
-- Real-time quality metrics
-- Run progress tracking
-- Error state detection
+- Yield tracking
+- Run metrics collection
+- Status: seq_setup_complete → sequencing_started → sequencing_complete
 
-6. Basecalling (2h)
-- Raw signal conversion
-- Model selection logic
-- Quality score calculation
-- Read length distribution analysis
+6. Basecalling
+- Raw signal processing
+- Base sequence generation
+- Quality scoring
+- Status: sequencing_complete → basecalling_started → basecalling_complete
 
-7. Quality Assessment (1h)
-- Read quality verification
+7. Quality Assessment
+- Read quality analysis 
 - Coverage calculation
-- Error rate analysis 
-- Pass/fail determination
+- Error rate determination
+- Status: basecalling_complete → qc_analysis_started → qc_analysis_complete
 
-8. Data Delivery (1h)
+8. Data Delivery
 - Results packaging
-- Delivery method selection
-- Archive requirements check
-- Completion notification
+- Data transfer
+- Delivery confirmation
+- Status: qc_analysis_complete → delivery_started → complete
 
-Workflow State Transitions:
-- Sequential progression through all 8 stages
-- Each stage requires completion before advancement
-- Failed stages trigger rework or sample rejection
-- Priority levels affect queue position
-
-Key Validation Rules:
-- Chart field format: (HTSF|NANO|SEQ)-\d{3}
-- Concentration ranges by type:
-  - DNA: 0.1-1000 ng/μL
-  - RNA: 0.1-500 ng/μL
-  - Protein: 0.5-2000 μg/mL
-- Volume minimum: 0.1 μL
-- Required fields enforced at each stage
-
-Priority Classifications:
-- urgent: Skip queue, immediate processing
-- high: Next in queue
-- normal: Standard processing
-- low: Process when resources available
-
-Implementation Paths:
-- src/services/sample-management/workflow.ts
+File paths:
 - src/lib/nanopore/processing-steps.ts
-- src/repositories/WorkflowStateManager.ts
+- src/types/nanopore-submission.ts
+
+Importance Score: 90
+
+Key workflow rules:
+- Sequential stage progression only
+- Each stage requires previous stage completion
+- Failed states block progression
+- Stage transitions log timestamp and operator
+- Quality gates between major stages
+- Automated state transitions based on process signals
 
 $END$
 

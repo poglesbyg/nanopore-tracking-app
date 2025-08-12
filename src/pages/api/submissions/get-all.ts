@@ -6,9 +6,9 @@ export const GET: APIRoute = async () => {
     
     // Fetch all submissions with their sample count
     const submissions = await db
-      .selectFrom('nanopore_submissions')
+      .selectFrom('submissions')
       .selectAll()
-      .orderBy('submission_date', 'desc')
+      .orderBy('created_at', 'desc')
       .execute()
     
     // For each submission, fetch its samples

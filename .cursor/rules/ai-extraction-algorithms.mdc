@@ -1,60 +1,49 @@
 ---
-description: Defines AI-powered data extraction algorithms and processing rules for nanopore sample data extraction from forms and documents.
-globs: src/lib/ai/**,services/ai-processing/**,src/services/ai/**
-alwaysApply: false
+description: Defines AI-powered data extraction algorithms and pipelines for processing scientific documents and forms
 ---
 
 
 # ai-extraction-algorithms
 
-Core AI Extraction Components:
+## PDF Pattern Matching Engine
+- Specialized pattern matching for nanopore sequencing form fields
+- Multi-tier matching strategy with confidence scoring:
+  - Primary patterns (0.95 confidence) for exact field matches
+  - Secondary patterns (0.85 confidence) for variations 
+  - Contextual patterns (0.75 confidence) for related content
+  - Fuzzy patterns (0.65 confidence) for potential matches
+- Domain-specific confidence boosting based on scientific terminology
+- Field-specific validation rules for nanopore sequencing data
 
-1. PDF Form Processing Pipeline
-- Primary extraction using domain-specific LLM prompt patterns
-- Fallback processing using regex pattern matching
-- RAG enhancement using domain knowledge base
-- Custom confidence scoring algorithm
+Importance Score: 85
 
-2. Field Processing Strategies:
-```typescript
-// Field confidence scoring weights
-const confidenceWeights = {
-  llm_extraction: 0.6,
-  pattern_match: 0.3, 
-  rag_enhancement: 0.1
-}
+## Scientific Document Processing Pipeline
+- Event-driven AI processing workflow with multiple methods:
+  - LLM processing for unstructured content
+  - Pattern matching for standardized forms
+  - Hybrid approach combining both methods
+  - RAG enhancement with domain knowledge
+- Confidence scoring and validation of extracted data
+- Model performance degradation tracking
+- Domain-specific processing steps:
+  - Scientific metadata extraction
+  - Pattern matching for lab data
+  - LLM processing for scientific content
+  - RAG enhancement with domain knowledge
 
-// Processing methods
-type ExtractionMethod = 'llm' | 'pattern' | 'hybrid' | 'rag'
-```
+Importance Score: 90
 
-3. Confidence Scoring System:
-- Field-level confidence based on extraction method
-- Aggregate confidence across multiple methods
-- Threshold-based acceptance (>0.7 required)
-- Confidence boosting through RAG validation
+## Progress Tracking
+- Specialized workflow tracking for document processing
+- Step-specific duration estimates for sequencing workflows
+- Weighted progress calculation based on scientific processing complexity
 
-4. Field Validation Rules:
-- Sample concentration format: /^\d+(\.\d+)?\s*(ng\/ul|ng\/ml|ug\/ml)$/i
-- Volume measurements: /^\d+(\.\d+)?\s*(ul|ml)$/i
-- Chart field format: /(HTSF|NANO|SEQ)-\d{3}/
-- Flow cell types: /^(FLO-MIN106|FLO-MIN107|FLO-MIN110|FLO-MIN111|FLO-MIN114)$/
+Importance Score: 75
 
-5. RAG Enhancement Pipeline:
-- Domain-specific knowledge base for nanopore protocols
-- Context-aware answer generation for form field validation
-- Semantic matching for scientific terminology
-- Confidence adjustment based on knowledge base matches
-
-Key File Locations:
-```
-src/lib/ai/pdf-text-extraction.ts
-src/lib/ai/rag-system.ts
-services/ai-processing/src/services/AIProcessingService.ts
-services/ai-processing/src/services/PDFProcessingService.ts
-```
-
-The system implements specialized AI extraction algorithms optimized for nanopore sequencing forms with emphasis on accuracy through multi-method validation and domain-specific knowledge enhancement.
+File Paths:
+- src/lib/pdf-pattern-matcher.ts 
+- src/lib/pdf-progress-tracker.ts
+- src/lib/messaging/events/ai-events.ts
 
 $END$
 

@@ -1,7 +1,5 @@
 ---
-description: Defines data flow architecture patterns for nanopore sample tracking system including submission processing, analysis pipelines, and export workflows
-globs: src/lib/**/*.ts,services/**/*.{ts,py},src/api/**/*
-alwaysApply: false
+description: Technical specification for analyzing data flow architecture between system components including real-time status updates, processing pipelines and transformations.
 ---
 
 
@@ -9,60 +7,57 @@ alwaysApply: false
 
 Core Data Flow Components:
 
-1. Sample Submission Pipeline
-- PDF/CSV submissions flow through memory-optimized submission service
-- Multi-stage extraction process:
-  1. Pattern matching for structured fields 
-  2. AI enhancement for unstructured content
-  3. RAG system for validation/enrichment
-- Chunked processing with configurable batch sizes (100 rows CSV, page-by-page PDF)
-- Integration with sample creation workflow via TRPC endpoints
+## Sample Submission Pipeline
+- Hierarchical flow through stages: submitted → prep → sequencing → analysis → completed
+- Real-time status updates propagated through event bus
+- PDF form data extracted via specialized pattern matching
+- Sample metadata validated against domain rules
+- Automatic state transitions based on workflow progress
 
-2. Real-Time Status Updates
-- Event-driven status propagation through message bus
-- Saga pattern for distributed sample processing:
-  - Submission → Prep → Sequencing → Analysis → Completion
-- Circuit breaker implementation for service health management
-- Optimistic locking for concurrent status updates
+## Event-Driven Processing
+- SagaOrchestrator manages distributed transactions with compensation
+- AI events handle document processing with multiple methods (LLM, pattern, hybrid, RAG)
+- Sample events track laboratory workflow states
+- Distributed tracing for cross-service correlation
 
-3. PDF Processing Pipeline  
-- Domain-specific extraction rules for HTSF quote forms
-- Tiered confidence scoring system:
-  - Pattern matches: 0.95
-  - Context matches: 0.75 
-  - Fuzzy matches: 0.65
-- Memory-optimized processing (50-100MB per PDF)
-- Fallback processing chain for extraction failures
+## Service Communication
+- Service mesh handles inter-service communication
+- Circuit breaker patterns protect downstream services
+- Load balancing optimizes request distribution
+- Rate limiting enforces quotas
 
-4. Export Transformations
-- Specialized formatting for lab workflows
-- Multi-format support: CSV, JSON
-- Custom field mapping for external systems
-- Configurable retention policies for exported data
+## Data Export Transformations 
+- Sample data exports with configurable formats
+- Laboratory results transformed for reporting
+- Audit trail generation for compliance
+- Performance metrics collection and aggregation
 
-Critical Data Flows:
+## Critical Data Flows:
+1. PDF Sample Submission:
+```
+Submit PDF → Extract Data → Validate → Create Sample → Update Status
+```
 
-/services/submission-service/
-- Initial sample data ingestion
-- Validation and enrichment
-- Memory-optimized processing
+2. Sample Processing:
+```
+Update Stage → Validate Rules → Record Changes → Notify Status → Update UI
+```
 
-/services/ai-processing/
-- PDF text extraction
-- Confidence scoring
-- RAG enhancement
+3. Export Generation:
+```
+Request Export → Gather Data → Transform Format → Generate File → Deliver
+```
 
-/services/sample-management/
-- Status workflow management
-- Assignment tracking
-- Processing coordination
+File Paths:
+- src/lib/messaging/saga/SagaOrchestrator.ts
+- src/lib/messaging/events/ai-events.ts 
+- src/lib/messaging/events/sample-events.ts
+- src/lib/pdf-pattern-matcher.ts
+- src/lib/pdf-progress-tracker.ts
+- src/repositories/AIRepository.ts
+- src/repositories/AuditRepository.ts
 
-/services/audit/
-- Activity logging
-- Compliance tracking
-- Chain of custody maintenance
-
-The architecture emphasizes reliable sample processing with multiple validation stages while maintaining strict memory constraints and providing comprehensive audit trails.
+Importance Score: 90
 
 $END$
 

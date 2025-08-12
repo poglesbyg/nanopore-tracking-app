@@ -1,68 +1,65 @@
 ---
-description: Defines core sample tracking data model, status transitions, priority system and workflow integration for nanopore sequencing samples
-globs: src/types/*.ts,src/models/*.ts,src/repositories/*Repository.ts,services/*/models.py
-alwaysApply: false
+description: Defines the core data model and logic for tracking laboratory samples through nanopore sequencing workflows
 ---
 
 
 # sample-tracking-model
 
-Core Sample Data Model:
+## Sample Data Model
+```typescript
+interface NanoporeSample {
+  id: string
+  status: 'submitted' | 'prep' | 'sequencing' | 'analysis' | 'completed' | 'archived'
+  priority: 'low' | 'normal' | 'high' | 'urgent'
+  metadata: {
+    concentration: number
+    volume: number 
+    a260_280_ratio: number
+    flow_cell_type: string
+    chart_field: string
+  }
+  timestamps: {
+    submitted: Date
+    prep_start?: Date
+    sequencing_start?: Date
+    analysis_start?: Date
+    completed?: Date
+    archived?: Date
+  }
+}
+```
 
-1. Sample Status Workflow
-- Sequential status progression:
-  ```
-  submitted → assigned → in_progress → completed
-       ↓         ↓           ↓           ↓
-    cancelled  cancelled  cancelled    (end)
-       ↓           ↓           ↓
-    failed → in_progress (retry)
-  ```
-- Each transition requires validation and triggers status-specific hooks
-- Status changes emit domain events for audit tracking
+## Status Progression Logic
+- Enforces sequential workflow: submitted → prep → sequencing → analysis → completed → archived
+- Each transition records timestamp automatically
+- Prep requires valid concentration and volume
+- Sequencing requires valid a260_280_ratio
+- Analysis requires successful sequencing completion
+- Archival only allowed after completion
 
-2. Priority Classification System
-- 5-level priority scale (1-5) with validation
-- Priority affects queue position and processing order
-- Auto-adjustment based on wait time thresholds
-- Emergency override capability for urgent samples
+## Priority System
+- Four priority levels with specific SLA targets:
+  - urgent: 24 hours
+  - high: 48 hours
+  - normal: 5 business days
+  - low: 10 business days
+- Priority upgrades allowed but require approval
+- Priority affects resource allocation in processing pipeline
 
-3. Sample Metadata Requirements
-- Required fields:
-  - Sample name (unique within system)
-  - Submitter details
-  - Flow cell type (FLO-MIN106 through FLO-MIN300)
-  - Concentration metrics
-  - Volume measurements
-  - Chart field for billing
-- Optional fields:
-  - Project association
-  - Notes/comments
-  - Custom metadata (1000 char limit)
+## Processing Workflow Integration
+- Interfaces with laboratory equipment for automated status updates
+- Validates sample requirements before each stage transition
+- Tracks sample location and chain of custody
+- Manages flow cell assignments and sequencing runs
+- Records quality control metrics at each stage
 
-4. Sample Repository Integration
-- Status-based query optimization
-- Priority-driven queue management
-- Soft delete implementation ("deleted" status)
-- Processing history with audit trails
-
-Key Business Rules:
-- Status transitions must follow defined workflow
-- Chart field must match pattern: (HTSF|NANO|SEQ)-\d{3}
-- Priority changes trigger queue reordering
-- Metadata validation prohibits sensitive info
-- Sample names must be unique system-wide
-
-Notable Domain Logic:
-- Flow cell compatibility validation
-- Status-based permission checks
-- Multi-step workflow progression
-- Priority-based resource allocation
+Importance Score: 90
 
 File Paths:
-- src/repositories/SampleRepository.ts
-- src/lib/sample-management/workflow.ts
-- services/sample-management/src/models.py
+- src/types/nanopore-database.ts  
+- src/types/nanopore-submission.ts
+- src/types/submission.ts
+- src/pages/api/samples/[id]/stage.ts
 
 $END$
 
