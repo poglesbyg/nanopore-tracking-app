@@ -30,13 +30,17 @@ fi
 
 echo "Found PostgreSQL pod: $DB_POD"
 
-# Copy the migration file to the pod
-echo "Copying migration file to pod..."
+# Copy the migration files to the pod
+echo "Copying migration files to pod..."
 oc cp database/migrations/1755000000000_fix_submissions_table_name.sql $DB_POD:/tmp/fix_submissions.sql
+oc cp database/migrations/1755100000000_add_sample_number_column.sql $DB_POD:/tmp/add_sample_number.sql
 
-# Execute the migration
-echo "Executing migration..."
+# Execute the migrations
+echo "Executing migration 1: Creating nanopore_submissions view..."
 oc exec $DB_POD -- psql -U postgres -d nanopore_db -f /tmp/fix_submissions.sql
+
+echo "Executing migration 2: Adding sample_number column..."
+oc exec $DB_POD -- psql -U postgres -d nanopore_db -f /tmp/add_sample_number.sql
 
 if [ $? -eq 0 ]; then
     echo "✅ Migration completed successfully!"
@@ -54,7 +58,7 @@ if [ $? -eq 0 ]; then
     
     # Clean up
     echo "Cleaning up temporary files..."
-    oc exec $DB_POD -- rm /tmp/fix_submissions.sql
+    oc exec $DB_POD -- rm /tmp/fix_submissions.sql /tmp/add_sample_number.sql
     
     echo ""
     echo "=================================================="

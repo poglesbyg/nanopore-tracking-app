@@ -7,13 +7,15 @@ The OpenShift deployment wasn't displaying samples within submissions because of
 - This caused the API endpoint `/api/submissions/get-all` to fail when trying to fetch submissions with their samples
 
 ## Solution Implemented
-Created a database view that maps `nanopore_submissions` to the existing `submissions` table, allowing the application to work without modifying all the code references.
+Created a database view that maps `nanopore_submissions` to the existing `submissions` table, and added the missing `sample_number` column to the `nanopore_samples` table.
 
 ### What the Fix Does:
 1. Creates a view `nanopore_submissions` that reads from the `submissions` table
 2. Maps column names appropriately (e.g., `name` → `submission_number`, `created_at` → `submission_date`)
 3. Implements triggers for INSERT, UPDATE, and DELETE operations so the view behaves like a real table
-4. Maintains backward compatibility with existing code
+4. Adds the missing `sample_number` column to `nanopore_samples` table
+5. Updates API to handle missing columns gracefully
+6. Maintains backward compatibility with existing code
 
 ## How to Apply the Fix
 
@@ -86,10 +88,16 @@ After applying the fix:
 1. **Created migration:** `database/migrations/1755000000000_fix_submissions_table_name.sql`
    - Creates the view and triggers for compatibility
 
-2. **Created fix script:** `scripts/fix-openshift-submissions.sh`
-   - Automated script to apply the fix to OpenShift
+2. **Created migration:** `database/migrations/1755100000000_add_sample_number_column.sql`
+   - Adds the missing sample_number column to nanopore_samples table
 
-3. **Created documentation:** `FIX_SUBMISSIONS_DISPLAY.md` (this file)
+3. **Updated API:** `src/pages/api/submissions/get-all.ts`
+   - Changed to order by created_at instead of sample_number for compatibility
+
+4. **Created fix script:** `scripts/fix-openshift-submissions.sh`
+   - Automated script to apply both migrations to OpenShift
+
+5. **Created documentation:** `FIX_SUBMISSIONS_DISPLAY.md` (this file)
    - Instructions and explanation of the fix
 
 ## Technical Details
