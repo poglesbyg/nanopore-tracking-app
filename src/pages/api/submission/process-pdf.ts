@@ -6,10 +6,27 @@ import { db } from '@/lib/database'
 export const POST: APIRoute = async ({ request }) => {
   try {
     // Get the submission service URL from environment
-    const submissionServiceUrl = process.env.SUBMISSION_SERVICE_URL || 'http://localhost:8000'
-    
-    // Get the form data from the request
-    const formData = await request.formData()
+    const submissionServiceUrl = process.env.SUBMISSION_SERVICE_URL || 'http://submission-service:8000'
+
+    // Get the form data from the request. If the client sent a raw PDF
+    // (Content-Type: application/pdf), wrap it into multipart/form-data
+    // under the field name "file" so the submission service accepts it.
+    let formData: FormData
+    try {
+      formData = await request.formData()
+      // If no file provided (e.g., incorrect field), attempt to read raw body
+      if (![...formData.keys()].includes('file')) {
+        const buff = await request.arrayBuffer()
+        const pdfBlob = new Blob([buff], { type: 'application/pdf' })
+        formData = new FormData()
+        formData.append('file', pdfBlob, 'upload.pdf')
+      }
+    } catch {
+      const buff = await request.arrayBuffer()
+      const pdfBlob = new Blob([buff], { type: 'application/pdf' })
+      formData = new FormData()
+      formData.append('file', pdfBlob, 'upload.pdf')
+    }
     
     // Forward the request to the submission service
     const response = await fetch(`${submissionServiceUrl}/api/v1/process-pdf`, {

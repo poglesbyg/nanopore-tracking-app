@@ -94,8 +94,8 @@ export const POST: APIRoute = async ({ request }) => {
       })
     }
 
-    // Verify submission exists
-    const submission = await db.selectFrom('submissions')
+    // Verify submission exists (use nanopore_submissions in OpenShift)
+    const submission = await db.selectFrom('nanopore_submissions')
       .select(['id'])
       .where('id', '=', submission_id)
       .executeTakeFirst()
