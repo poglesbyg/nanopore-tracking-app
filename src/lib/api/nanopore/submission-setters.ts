@@ -1,5 +1,6 @@
 import type { Database } from '../../database'
 import type { Selectable, Insertable, Updateable, Kysely, Transaction } from 'kysely'
+import { randomUUID } from 'crypto'
 import type { CreateSubmissionInput, UpdateSubmissionInput, CreateSampleForSubmissionInput } from '@/types/nanopore-submission'
 
 /**
@@ -9,17 +10,18 @@ export async function createNanoporeSubmission(
   db: Kysely<Database>,
   submissionData: CreateSubmissionInput & { created_by: string },
 ): Promise<Selectable<Database['nanopore_submissions']>> {
-  const now = new Date().toISOString()
+  const now = new Date()
   
   return await db
     .insertInto('nanopore_submissions')
     .values({
+      id: randomUUID(),
+      submission_number: submissionData.submission_number || `SUB-${Date.now()}`,
       pdf_filename: submissionData.pdf_filename,
       submitter_name: submissionData.submitter_name,
       submitter_email: submissionData.submitter_email,
       lab_name: submissionData.lab_name || null,
       department: submissionData.department || null,
-      billing_account: submissionData.billing_account || null,
       project_id: submissionData.project_id || null,
       project_name: submissionData.project_name || null,
       special_instructions: submissionData.special_instructions || null,
@@ -48,7 +50,7 @@ export async function updateNanoporeSubmission(
   submissionId: string,
   updateData: UpdateSubmissionInput,
 ): Promise<Selectable<Database['nanopore_submissions']>> {
-  const now = new Date().toISOString()
+  const now = new Date()
   
   const finalUpdateData: any = {
     ...updateData,
@@ -81,10 +83,12 @@ export async function createSamplesForSubmission(
     .where('id', '=', submissionId)
     .executeTakeFirstOrThrow()
   
-  const sampleValues = samples.map((sample, index) => ({
+  const sampleValues: Array<Insertable<Database['nanopore_samples']>> = samples.map((sample, index) => ({
+    id: randomUUID(),
     submission_id: submissionId,
     sample_number: index + 1,
     sample_name: sample.sample_name,
+    sample_id: randomUUID().slice(0, 8),
     project_id: sample.project_id || submission.project_id,
     submitter_name: submission.submitter_name,
     submitter_email: submission.submitter_email,
@@ -92,15 +96,18 @@ export async function createSamplesForSubmission(
     sample_type: sample.sample_type,
     sample_buffer: sample.sample_buffer || null,
     concentration: sample.concentration || null,
+    concentration_unit: 'ng/μL',
     volume: sample.volume || null,
+    volume_unit: 'μL',
     total_amount: (sample.concentration && sample.volume) 
       ? sample.concentration * sample.volume 
       : null,
     flow_cell_type: sample.flow_cell_type || null,
     flow_cell_count: sample.flow_cell_count || 1,
+    workflow_stage: 'sample_qc' as const,
     status: 'submitted' as const,
     priority: sample.priority || submission.priority,
-    chart_field: sample.chart_field || submission.billing_account || '',
+    chart_field: sample.chart_field || 'HTSF-001',
     assigned_to: null,
     library_prep_by: null,
     submitted_at: now,
@@ -144,7 +151,7 @@ export async function createSubmissionWithSamples(
       .updateTable('nanopore_submissions')
       .set({
         sample_count: createdSamples.length,
-        updated_at: new Date().toISOString() as any,
+        updated_at: new Date(),
       })
       .where('id', '=', submission.id)
       .execute()
@@ -177,13 +184,13 @@ export async function updateSubmissionStatus(
   submissionId: string,
   status: 'pending' | 'processing' | 'completed' | 'failed',
 ): Promise<Selectable<Database['nanopore_submissions']>> {
-  const now = new Date().toISOString()
+  const now = new Date()
   
   return await db
     .updateTable('nanopore_submissions')
     .set({
       status,
-      updated_at: now as any,
+      updated_at: now,
     })
     .where('id', '=', submissionId)
     .returningAll()

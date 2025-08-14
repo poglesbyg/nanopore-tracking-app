@@ -40,6 +40,8 @@ export default function SubmissionWithHierarchy() {
   const [success, setSuccess] = useState(false)
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null)
   const [projectInitialData, setProjectInitialData] = useState<any>(null)
+  const [createdSubmissionId, setCreatedSubmissionId] = useState<string | null>(null)
+  const [samplesProcessed, setSamplesProcessed] = useState<number>(0)
   
   // Form fields
   const [submissionName, setSubmissionName] = useState('')
@@ -94,13 +96,40 @@ export default function SubmissionWithHierarchy() {
     setError(null)
     setUploadedFileName(file.name)
 
-    // For now, just store the file name - no server processing
-    // User will need to manually enter sample data
-    setTimeout(() => {
+    try {
+      const form = new FormData()
+      form.append('file', file, file.name)
+
+      const res = await fetch('/api/submission/process-pdf', {
+        method: 'POST',
+        body: form
+      })
+
+      // Some environments may return non-JSON on error; guard parse
+      let data: any = null
+      try {
+        data = await res.json()
+      } catch {
+        throw new Error('Failed to parse server response')
+      }
+
+      if (!res.ok) {
+        throw new Error(data?.message || 'Failed to process PDF')
+      }
+
+      // If submission created, show success banner with counts and allow navigation
+      const created = Number(data?.samples_created || 0)
+      const processed = Number(data?.samples_processed || 0)
+      const subId = (data?.submissionId as string) || null
+      setCreatedSubmissionId(subId)
+      setSampleCount(created)
+      setSamplesProcessed(processed)
+      setSuccess(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'PDF processing failed')
+    } finally {
       setUploadingPdf(false)
-      // Show a message that manual entry is required
-      setError('PDF uploaded successfully. Please manually enter submission details below.')
-    }, 1000)
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -188,14 +217,17 @@ export default function SubmissionWithHierarchy() {
         <div className="bg-green-50 border border-green-200 rounded-lg p-8 text-center">
           <div className="text-green-600 text-5xl mb-4">✅</div>
           <h2 className="text-2xl font-bold text-green-800 mb-2">Submission Created Successfully!</h2>
-          <p className="text-green-700 mb-6">
-            Your submission has been created. You can now add samples through the dashboard.
+          <p className="text-green-700 mb-2">
+            Parsed {samplesProcessed} row{samplesProcessed === 1 ? '' : 's'}. Created {sampleCount} sample{sampleCount === 1 ? '' : 's'}.
           </p>
+          {createdSubmissionId && (
+            <p className="text-green-700 mb-6 break-all">Submission ID: {createdSubmissionId}</p>
+          )}
           <div className="flex gap-4 justify-center">
             <Button onClick={() => setSuccess(false)} variant="default">
               Create Another Submission
             </Button>
-            <Button onClick={() => window.location.href = '/'} variant="outline">
+            <Button onClick={() => (window.location.href = createdSubmissionId ? `/?submissionId=${createdSubmissionId}&t=${Date.now()}` : '/')} variant="outline">
               Back to Dashboard
             </Button>
           </div>

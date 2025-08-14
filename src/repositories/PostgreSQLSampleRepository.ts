@@ -1,4 +1,5 @@
 import type { Kysely } from 'kysely'
+import { randomUUID } from 'crypto'
 import type { Database } from '../lib/database'
 import type { ISampleRepository } from '../services/interfaces/ISampleRepository'
 import type { 
@@ -17,7 +18,9 @@ export class PostgreSQLSampleRepository implements ISampleRepository {
     const result = await this.db
       .insertInto('nanopore_samples')
       .values({
-        id: crypto.randomUUID(),
+        id: randomUUID(),
+        // Required identifiers
+        sample_id: randomUUID().slice(0, 8),
         sample_name: data.sampleName,
         project_id: data.projectId || null,
         submitter_name: data.submitterName,
@@ -26,10 +29,14 @@ export class PostgreSQLSampleRepository implements ISampleRepository {
         sample_type: data.sampleType,
         sample_buffer: data.sampleBuffer || null,
         concentration: data.concentration || null,
+        concentration_unit: 'ng/μL',
         volume: data.volume || null,
+        volume_unit: 'μL',
         total_amount: data.totalAmount || null,
         flow_cell_type: data.flowCellType || null,
         flow_cell_count: data.flowCellCount || 1,
+        // Default initial workflow stage
+        workflow_stage: 'sample_qc',
         status: 'submitted',
         priority: data.priority || 'normal',
         assigned_to: data.assignedTo || null,
